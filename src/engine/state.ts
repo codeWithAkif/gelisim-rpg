@@ -37,6 +37,7 @@ export interface GameState {
   knownElements: string[];                     // annenin defterinden açılmış element sayfaları
   mana: number;
   story: { reached: string[]; flags: Record<string, number> };
+  prep?: Record<string, { day: number; scout?: boolean; readWind?: boolean }>; // savaş öncesi yapılmış keşifler
   log: LogEntry[];
 }
 

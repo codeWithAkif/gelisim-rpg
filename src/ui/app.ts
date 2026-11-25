@@ -10,6 +10,7 @@ import { GAME_ITEMS, QUESTS } from "../content/world";
 import { esc, ICONS } from "./sketch";
 import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, gainList, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
+import { openPlan } from "./plan-view";
 import { checkForUpdates } from "../update";
 import { showIntro } from "./intro";
 import { advanceStory } from "../engine/story";
@@ -98,7 +99,7 @@ export function startApp(root: HTMLElement) {
       case "fight": {
         const q = QUESTS.find(x => x.id === id)!;
         if (s.energy < 15) { toast("Bu yorgunlukla kurtların karşısına çıkamazsın."); break; }
-        openBattle(cfg, s, q.battle!.map, q.battle!.enemies, id, (o) => {
+        openPlan(cfg, s, id, q.title, q.battle!.map, q.battle!.enemies, (sc, plan) => openBattle(cfg, s, sc, plan, id, (o) => {
           let extra = "";
           if (o.result === "won") {
             const r = completeQuest(cfg, s, id);
@@ -108,7 +109,7 @@ export function startApp(root: HTMLElement) {
           modal(`<h2>${o.result === "won" ? "Kurtlar uzaklaştı" : o.result === "fled" ? "Geri çekildin" : "Yenildin"}</h2>
             <p class="lede">${o.result === "lost" ? "Hasan seni yaralı hâlde bulup köye taşıdı. Dinlenmeden tekrar deneme." : o.result === "fled" ? "Kurtlar hâlâ orada. Hazırlanıp tekrar dene." : "Hasan uzaktan izliyordu; koşarak geldi."}</p>
             <h3>Savaşta gelişen</h3>${gainList(cfg, o.gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
-        }, persist);
+        }, persist), () => { persist(); render(); });
         break;
       }
       case "equip": {

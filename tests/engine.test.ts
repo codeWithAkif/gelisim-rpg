@@ -173,3 +173,73 @@ describe("hikâye", () => {
     s.day += 1; expect(advanceStory(s).map(m => m.id)).toEqual(["mektup"]);
   });
 });
+
+import { makeScenario, assessPlan, prepOptions, DEFAULT_PLAN, playerPush, pushTarget, playerDefend, throwTorch, threatMap, detectChance, key } from "../src/engine/combat";
+
+describe("hazırlık ve taktik", () => {
+  it("senaryo aynı gün aynı iş için sabittir", () => {
+    const s = newGame(cfg, 5);
+    const a = makeScenario(s, "mera", ["kurt", "kurt"], "kurt"), b = makeScenario(s, "mera", ["kurt", "kurt"], "kurt");
+    expect(a).toEqual(b);
+  });
+  it("plan değerlendirmesi seçimlere göre değişir ve maliyet uygulanır", () => {
+    const s = newGame(cfg, 5); const sc = makeScenario(s, "mera", ["kurt"], "kurt");
+    const open = assessPlan(cfg, s, sc, DEFAULT_PLAN);
+    const hill = assessPlan(cfg, s, sc, { ...DEFAULT_PLAN, start: 1, readWind: true, scout: true });
+    expect(hill.some(a => a.text.startsWith("Yüksek zemin"))).toBe(true);
+    expect(open.some(a => a.text.startsWith("Rüzgârı bilmiyorsun"))).toBe(true);
+    expect(prepOptions(cfg, s).find(o => o.id === "torch")!.ok).toBe(true);
+    const m0 = s.minute, money0 = s.money;
+    createBattle(cfg, s, "mera", ["kurt"], 1, "kurt", { ...DEFAULT_PLAN, scout: true, torch: true, traps: [[3, 5]] }, sc);
+    expect(s.minute).toBe(m0 + 30 + 10 + 30);
+    expect(s.money).toBe(money0 - 2);
+  });
+  it("gündüz kurtlar habersiz başlar; pusu isabet ve kritik verir", () => {
+    const s = newGame(cfg, 5);
+    const b = createBattle(cfg, s, "mera", ["kurt"], 3);
+    const e = enemies(b)[0]; expect(e.alert).toBeFalsy();
+    const p = player(b); p.x = e.x; p.y = e.y + 1;
+    const amb = previewAttack(cfg, s, b, e);
+    e.alert = true; const normal = previewAttack(cfg, s, b, e);
+    expect(amb.hit).toBeGreaterThan(normal.hit); expect(amb.crit).toBeGreaterThan(normal.crit);
+  });
+  it("rüzgâr kokuyu taşır: rüzgâr kurda doğru eserse uzaktan fark eder", () => {
+    const s = newGame(cfg, 5); const b = createBattle(cfg, s, "mera", ["kurt"], 3);
+    const e = enemies(b)[0]; const p = player(b);
+    p.x = 3; p.y = 6; e.x = 3; e.y = 1; // kurt kuzeyde
+    b.wind = { dir: 4, strength: 2 }; const toward = detectChance(b, e).smell; // kuzeybatıya
+    b.wind = { dir: 1, strength: 2 }; const away = detectChance(b, e).smell;    // güneydoğuya
+    expect(toward).toBe(1); expect(away).toBe(0);
+  });
+  it("itme: kurdu ateşe itmek yakar ve korkutur", () => {
+    const s = newGame(cfg, 5); s.attrs.ust_govde.level = 90; s.attrs.core.level = 90;
+    const b = createBattle(cfg, s, "mera", ["kurt"], 3);
+    const e = enemies(b)[0]; const p = player(b);
+    p.x = 3; p.y = 6; e.x = 3; e.y = 5; e.hp = 22;
+    for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) b.tiles[y][x] = "cayir";
+    const t = pushTarget(b, e); b.fire[key(...t.to)] = 3;
+    playerPush(cfg, s, b, e);
+    expect(e.x === t.to[0] && e.y === t.to[1]).toBe(true);
+    expect(e.hp).toBeLessThan(22); expect(e.scared).toBe(true);
+  });
+  it("savunma kurt isabetini düşürür; meşale otu tutuşturur; tehdit alanı hesaplanır", () => {
+    const s = newGame(cfg, 5); const b = createBattle(cfg, s, "mera", ["kurt"], 3, undefined, { ...DEFAULT_PLAN, torch: true });
+    const e = enemies(b)[0]; e.alert = true; const p = player(b);
+    expect(threatMap(cfg, s, b).size).toBeGreaterThan(0);
+    b.weather = "acik"; b.tiles[p.y - 1][p.x] = "uzun_ot";
+    expect(throwTorch(b, p.x, p.y - 1)).toBeTruthy();
+    expect(b.fire[key(p.x, p.y - 1)]).toBe(3);
+    const b2 = createBattle(cfg, s, "mera", ["kurt"], 3); player(b2).acted = false;
+    expect(playerDefend(b2)).toBe(true); expect(player(b2).defending).toBe(true);
+  });
+  it("tuzağa basan kurt yaralanır ve topallar", () => {
+    const s = newGame(cfg, 5);
+    const b = createBattle(cfg, s, "mera", ["kurt"], 3);
+    const e = enemies(b)[0]; e.alert = true; const p = player(b);
+    p.x = 3; p.y = 6; e.x = 3; e.y = 2;
+    for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) b.tiles[y][x] = "cayir";
+    for (let y = 3; y <= 5; y++) for (let x = 0; x < b.w; x++) b.traps[key(x, y)] = 1; // geçilmez tuzak hattı
+    enemyTurn(cfg, s, b);
+    expect(e.hp).toBeLessThan(e.maxHp); expect(b.events.some(v => v.k === "trap")).toBe(true);
+  });
+});

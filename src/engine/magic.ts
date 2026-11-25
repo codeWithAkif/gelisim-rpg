@@ -4,7 +4,7 @@
 import type { Config, Spell } from "./config";
 import type { GameState } from "./state";
 import { effectiveAttr, envPct } from "./derived";
-import { type Battle, type Unit, player, enemies, dist, neighbors, unitAt, ctxAt, moraleCheck } from "./combat";
+import { type Battle, type Unit, type XY, player, enemies, dist, neighbors, unitAt, ctxAt, moraleCheck, detect } from "./combat";
 import { Rng } from "./rng";
 import { ENEMIES, TERRAIN, type Terrain } from "../content/world";
 
@@ -71,7 +71,8 @@ export function previewSpell(cfg: Config, s: GameState, b: Battle, spellId: stri
   const targets = enemies(b).filter(e => area.some(([x, y]) => x === e.x && y === e.y));
   const single = hexArea(sp) === 0;
   const ev = targets[0] ? ENEMIES[targets[0].def!].evasion : 0;
-  const hit = single ? Math.max(15, Math.min(97, 70 + effectiveAttr(cfg, s, "mekansal", ctx) * 0.4 + m * 0.4 - ev * 0.5)) : 100;
+  const unaware = targets[0] && !targets[0].alert ? 15 : 0;
+  const hit = single ? Math.max(15, Math.min(97, 70 + effectiveAttr(cfg, s, "mekansal", ctx) * 0.4 + m * 0.4 - ev * 0.5 + unaware)) : 100;
   const adjacent = enemies(b).some(e => dist(e.x, e.y, p.x, p.y) === 1);
   const fizzle = Math.max(0, Math.min(80, ((sp.focusNeed ?? 10) - effectiveAttr(cfg, s, "odak", ctx) - m * 0.3) * 2.5 + (adjacent ? 15 : 0) + (s.energy < 25 ? 10 : 0)));
   const ep = spellEnvPct(cfg, s, b, sp);
@@ -92,17 +93,21 @@ export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string,
   b.stats.casts++; if (sp.mastery) b.stats.castMastery[sp.mastery] = (b.stats.castMastery[sp.mastery] ?? 0) + 1;
   s.energy = Math.max(0, s.energy - 3);
   let text: string;
+  const hits: { uid: string; dmg: number }[] = [];
+  const from: XY = [p.x, p.y];
   if (rng.chance(pv.fizzle)) {
+    b.events.push({ k: "cast", spell: sp.id, from, to: [tx, ty], fizzle: true, hits });
     s.mana = Math.max(0, s.mana - Math.ceil((sp.manaCost ?? 0) / 2));
     text = `${sp.name} elinde dağıldı; odağın kaydı.`;
   } else {
     s.mana = Math.max(0, s.mana - (sp.manaCost ?? 0));
     const parts: string[] = [];
     const single = hexArea(sp) === 0;
+    b.events.push({ k: "cast", spell: sp.id, from, to: [tx, ty], fizzle: false, hits }); // hits aşağıda dolar
     for (const e of pv.targets) {
       if (single && !rng.chance(pv.hit)) { parts.push(`${e.name} son anda sıçradı.`); continue; }
       const dmg = rng.int(pv.dmg[0], pv.dmg[1]);
-      if (dmg > 0) { e.hp = Math.max(0, e.hp - dmg); parts.push(`${e.name} ${dmg} hasar aldı.`); }
+      if (dmg > 0) { e.hp = Math.max(0, e.hp - dmg); parts.push(`${e.name} ${dmg} hasar aldı.`); hits.push({ uid: e.uid, dmg }); }
       if (fx.slow) e.slowed = Math.max(e.slowed, fx.slow);
       if (fx.blind) e.blind = Math.max(e.blind ?? 0, fx.blind);
       if (fx.ignite && b.weather !== "yagmur") e.scared = true; // kurtlar ateşten korkar; yağmurda alev cılız
@@ -117,7 +122,7 @@ export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string,
     }
     for (const [x, y] of areaHexes(b, sp, tx, ty)) {
       const k = x + "," + y;
-      if (fx.ignite && b.weather !== "yagmur" && rng.chance(IGNITE[b.tiles[y][x]] ?? 0)) { b.fire[k] = 3; parts.push(`${TERRAIN[b.tiles[y][x]].name} tutuştu.`); }
+      if (fx.ignite && b.weather !== "yagmur" && rng.chance(IGNITE[b.tiles[y][x]] ?? 0)) { b.fire[k] = 3; b.events.push({ k: "ignite", at: [x, y] }); parts.push(`${TERRAIN[b.tiles[y][x]].name} tutuştu.`); }
       if (fx.mud && !TERRAIN[b.tiles[y][x]].blocks) b.tiles[y][x] = "camur";
     }
     if (fx.wall) {
@@ -129,6 +134,7 @@ export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string,
     text = `${sp.name}! ${parts.filter(Boolean).join(" ") || "Boşluğa çarptı."}`;
   }
   b.seed = rng.seed; b.log.unshift(text);
+  detect(b, true);
   if (player(b).hp <= 0) b.phase = "lost"; else if (enemies(b).length === 0) b.phase = "won";
   return text;
 }

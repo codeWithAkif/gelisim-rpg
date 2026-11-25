@@ -94,22 +94,33 @@ export const QUESTS: QuestDef[] = [
 ];
 
 /** Savaş haritaları: satırlar üstten alta, her karakter bir altıgen. */
-export const MAPS: Record<string, { rows: string[]; player: [number, number]; enemies: [number, number][] }> = {
+export interface MapStart { name: string; at: [number, number]; note: string }
+export interface BattleMap { name: string; rows: string[]; starts: MapStart[]; enemies: [number, number][]; flock: [number, number] }
+/** Savaş haritaları: satırlar kuzeyden güneye, her karakter bir altıgen. */
+export const MAPS: Record<string, BattleMap> = {
   // . çayır  , uzun ot  ~ çamur  ^ kaya  T tepe  = su  * ağaç
   mera: {
+    name: "Hasan'ın merası",
     rows: [
-      "**,,..T",
-      "*,,..TT",
-      ",,...^.",
-      ".~~...^",
-      "..~~,..",
-      "==~,,..",
-      ".=..,,*",
-      "..^.,**",
-      ".^^..,*",
+      "**,,,**",
+      "*,,.,,*",
+      ",,..,..",
+      "..,~~.^",
+      ".~~~,.^",
+      "..~,,TT",
+      "==.,,.T",
+      ".=...,.",
+      "..^.,,*",
+      ".^^..**",
+      "..^..,*",
     ],
-    player: [3, 8],
-    enemies: [[1, 0], [4, 1]],
+    starts: [
+      { name: "Güney çayırı", at: [3, 10], note: "Açık arazi; sürünün yanında. Her yönden gelinebilir." },
+      { name: "Doğu tepesi", at: [6, 5], note: "Yüksek zemin. Önünde kuru ot şeridi var." },
+      { name: "Dere kenarı", at: [0, 7], note: "Arkan ve solun dere; kurtlar ancak önden gelebilir. Önü çamur." },
+    ],
+    enemies: [[2, 1], [4, 1]],
+    flock: [3, 9],
   },
 };
 export const MAP_CHARS: Record<string, Terrain> = { ".": "cayir", ",": "uzun_ot", "~": "camur", "^": "kaya", T: "tepe", "=": "su", "*": "agac" };
