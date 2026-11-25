@@ -4,6 +4,7 @@ import { type GameState, DAY_MINUTES, log, minutesLeft } from "./state";
 import { applyGain, type GainReport } from "./progression";
 import { PLACES, ROADS, NPC_PLACE, ACTIVITY_PLACES, type Place } from "../content/map";
 import { teacherOf } from "../content/world";
+import { markSeen, isSeen } from "./explore";
 
 export const place = (id: string) => PLACES.find(p => p.id === id);
 export const here = (s: GameState): Place => place(s.location) ?? PLACES[0];
@@ -42,6 +43,7 @@ export function planTravel(cfg: Config, s: GameState, to: string): TravelPlan {
   if (!p) return { ok: false, reason: "Böyle bir yer yok", minutes: 0, energy: 0, pts: [] };
   if (!isOpen(p)) return { ok: false, reason: `${p.chapter ?? "İleride"} açılacak`, minutes: 0, energy: 0, pts: [] };
   if (to === s.location) return { ok: false, reason: "Zaten buradasın", minutes: 0, energy: 0, pts: [] };
+  if (!isSeen(s, to)) return { ok: false, reason: "Henüz bilmediğin bir yer", minutes: 0, energy: 0, pts: [] };
   const r = route(s.location, to); if (!r) return { ok: false, reason: "Oraya yol yok", minutes: 0, energy: 0, pts: [] };
   const speed = 1 + ((s.attrs.bacak?.level ?? 10) - 10) / 80 + ((s.attrs.kardiyo?.level ?? 10) - 10) / 160;
   const minutes = Math.max(5, Math.round(r.length * MIN_PER_UNIT / speed));
@@ -59,7 +61,7 @@ export function travel(cfg: Config, s: GameState, to: string): { gains: GainRepo
   applyGain(cfg, s, "bacak", 0.15 * h, gains); applyGain(cfg, s, "kardiyo", 0.1 * h, gains); applyGain(cfg, s, "mekansal", 0.05 * h, gains);
   s.minute = Math.min(DAY_MINUTES, s.minute + p.minutes);
   s.energy = Math.max(0, s.energy - p.energy); s.satiety = Math.max(0, s.satiety - h * 4);
-  s.location = to;
+  s.location = to; markSeen(s, to);
   log(s, `Vardın: ${place(to)!.name} (${p.minutes} dk yol).`, "info");
   return { gains, minutes: p.minutes };
 }

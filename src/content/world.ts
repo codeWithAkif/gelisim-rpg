@@ -25,6 +25,15 @@ export const GAME_ITEMS: Record<string, GameItem> = {
   ip: { id: "ip", name: "Kenevir ipi", slot: "Malzeme", stack: 10, price: 1, desc: "Sağlam bir sicim. Dikiş ve tuzak için." },
   bez_torba: { id: "bez_torba", name: "Bez torba", slot: "Çanta", capacity: 8, desc: "Omza asılan kaba bir torba. 8 göz." },
   deri_canta: { id: "deri_canta", name: "Deri çanta", slot: "Çanta", capacity: 12, desc: "Kendi diktiğin, iki bölmeli deri çanta. 12 göz." },
+  // keşifle toplananlar (content/explore.ts)
+  kekik: { id: "kekik", name: "Kekik", slot: "Malzeme", stack: 10, desc: "Yaylanın taşlarında biter. Zehra çayına katar." },
+  isirgan: { id: "isirgan", name: "Isırgan", slot: "Malzeme", stack: 10, desc: "Dere kenarında, eldivensiz toplanmaz. Yara merhemine girer." },
+  nane: { id: "nane", name: "Yabani nane", slot: "Malzeme", stack: 10, desc: "Suyun kıyısında. Kokusu parmağında kalır." },
+  adacayi: { id: "adacayi", name: "Adaçayı", slot: "Malzeme", stack: 10, desc: "Gümüşi yapraklı. Zehra'nın bahçesinin çevresinde yabanisi var." },
+  mantar: { id: "mantar", name: "Kanlıca mantarı", slot: "Yiyecek", satiety: 10, stack: 6, desc: "Çam altında. Doğru olanı tanımak bilgi ister." },
+  yaban_mersini: { id: "yaban_mersini", name: "Yaban mersini", slot: "Yiyecek", satiety: 8, stack: 8, desc: "Koruda, gölgede biten mor taneler." },
+  kartal_tuyu: { id: "kartal_tuyu", name: "Kartal tüyü", slot: "Eşya", stack: 5, desc: "Uzun ve sert. Nuri fırça yapar, avcılar ok yeleği." },
+  eski_sikke: { id: "eski_sikke", name: "Eski sikke", slot: "Eşya", stack: 5, desc: "Üstünde silik bir taç. Ardıç'tan kalma olabilir." },
   annenin_heybesi: { id: "annenin_heybesi", name: "Annenin heybesi", slot: "Çanta", capacity: 16, desc: "Eski ama sağlam; iç cebine Ölçer işareti dikilmiş. 16 göz." },
 };
 

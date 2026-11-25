@@ -332,3 +332,18 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 .mini-count { font-size: 64px; font-weight: 700; min-height: 1.1em; line-height: 1; color: var(--red); }
 .mini-score { font-family: var(--f-hand); font-size: 72px; font-weight: 700; line-height: 1; color: var(--green); }
 .focus-card { border-color: var(--green); }
+
+/* ---------- Koleksiyon ve keşif ---------- */
+.coll-group { display: flex; flex-direction: column; gap: 6px; }
+.coll { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.coll-item { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border-bottom: 1px dashed var(--paper-edge); }
+.coll-item img, .coll-item svg { flex: none; }
+.coll-item .nm { font-family: var(--f-hand); font-size: 20px; font-weight: 700; line-height: 1.1; }
+.coll-item.unknown .q { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 1.5px dashed var(--pencil); border-radius: 50%; font-family: var(--f-hand); font-size: 22px; color: var(--pencil); }
+.want { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 14px; }
+.want img, .want svg { vertical-align: middle; }
+.entry.done { opacity: .6; }
+.searching { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 0; }
+.searching .lens { font-family: var(--f-hand); font-size: 26px; animation: sway 0.7s ease-in-out infinite alternate; }
+@keyframes sway { from { transform: translateX(-14px) rotate(-6deg); } to { transform: translateX(14px) rotate(6deg); } }
+.found-pic { display: flex; justify-content: center; padding: 6px 0; }

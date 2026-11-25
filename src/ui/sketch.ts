@@ -163,6 +163,18 @@ export function itemIcon(id: string, size = 44): string {
     case "av_yayi": g = `<path d="M14,6 Q38,24 14,42" fill="none" stroke="#7B5A3A" stroke-width="3.5"/>` + L([[14, 6], [14, 42]], 31, 'stroke="#C9B98A"'); break;
     case "deri_zirh": g = P([[12, 8], [20, 12], [28, 12], [36, 8], [38, 40], [10, 40]], "#8A5A30", 32) + L([[24, 12], [24, 40]], 33) + L([[14, 24], [34, 24]], 34, 'stroke-dasharray="2 2"'); break;
     case "zincir_zirh": g = P([[12, 8], [20, 12], [28, 12], [36, 8], [38, 40], [10, 40]], "#A9ADB1", 35) + [0, 1, 2, 3, 4].map(r => [0, 1, 2, 3].map(c => `<circle cx="${15 + c * 6 + (r % 2) * 3}" cy="${18 + r * 5}" r="2" fill="none" stroke-width=".8"/>`).join("")).join(""); break;
+    case "kekik": case "nane": case "adacayi": case "isirgan": {
+      const col = { kekik: "#7A8A4A", nane: "#5E9A55", adacayi: "#9AA89A", isirgan: "#4F6A34" }[id]!;
+      g = L([[24, 44], [24, 8]], 40, 'stroke="#5B4A2A" stroke-width="1.6"');
+      for (let i = 0; i < 4; i++) { const y = 12 + i * 8, w = id === "adacayi" ? 9 : 7;
+        g += P([[24, y + 4], [24 - w, y], [24 - w - 2, y + 4], [24, y + 7]], col, 41 + i) + P([[24, y + 4], [24 + w, y], [24 + w + 2, y + 4], [24, y + 7]], col, 51 + i); }
+      if (id === "isirgan") g += L([[16, 20], [14, 18]], 60) + L([[32, 28], [34, 26]], 61);
+      break;
+    }
+    case "mantar": g = P([[18, 26], [30, 26], [29, 42], [19, 42]], "#EADCC0", 62) + P([[8, 28], [14, 14], [24, 10], [34, 14], [40, 28]], "#C96A2A", 63) + `<circle cx="18" cy="20" r="1.6" fill="#F2DAB0"/><circle cx="29" cy="18" r="1.4" fill="#F2DAB0"/>`; break;
+    case "yaban_mersini": g = [[18, 24], [28, 22], [23, 32], [33, 32], [14, 33]].map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="6" fill="#4A4A7A"/><circle cx="${x - 1.5}" cy="${y - 2}" r="1.2" fill="#9A9AC8" stroke="none"/>`).join("") + L([[28, 22], [34, 10]], 64) + P([[34, 10], [42, 8], [38, 14]], "#5E8A45", 65); break;
+    case "kartal_tuyu": g = P([[10, 42], [18, 30], [30, 14], [40, 6], [36, 18], [24, 32]], "#8A6A45", 66) + L([[10, 42], [38, 8]], 67) + L([[22, 28], [16, 24]], 68) + L([[28, 20], [24, 14]], 69); break;
+    case "eski_sikke": g = `<circle cx="24" cy="24" r="14" fill="#C9A24A"/><circle cx="24" cy="24" r="10" fill="none" stroke-dasharray="2 2"/>` + L([[18, 26], [20, 20], [24, 24], [28, 20], [30, 26]], 70) + L([[18, 28], [30, 28]], 71); break;
     default: g = P([[10, 10], [38, 10], [38, 38], [10, 38]], "#E1D5B8", 36) + `<text x="24" y="30" text-anchor="middle" font-family="var(--f-hand)" font-size="18" fill="var(--ink)">?</text>`;
   }
   return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><g stroke="var(--ink)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${g}</g></svg>`;

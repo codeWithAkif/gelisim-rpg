@@ -12,6 +12,8 @@ import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, SHOP, CRAFTS } from "../content/world";
 import { esc, inkBar, wolfSketch, bodySketch, VITAL_ICONS } from "./sketch";
 import { personPic, itemPic, placePic, motherPic } from "./art";
+import { collected, seenCount, dailyRequests, searchInfo, canSearch } from "../engine/explore";
+import { COLLECTIBLES, COLL_KIND_NAMES, FINDS, SEARCH_MINUTES, type CollKind } from "../content/explore";
 import { APP_VERSION } from "../update";
 import { phase, PHASE_ICONS } from "./daylight";
 import { here, place, activityPlace } from "../engine/travel";
@@ -94,6 +96,7 @@ export function defterScreen(cfg: Config, s: GameState): string {
       <p class="hand blue">${esc(s.name)} · tanınırlık ${rep} · güven ${Math.floor(repOf(s, s.region, "guven"))}</p>
     </section>
     <section class="sec"><h2>Tanıdıklar</h2><div class="people">${people}</div></section>
+    ${collectionSection(s)}
     ${s.knownElements.length ? `<section class="sec"><h2>Annemin sayfaları</h2>${motherPic()}${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` : ""}
     ${sawWolf ? `<section class="sec"><h2>Gözlemler</h2>
       <div class="card"><div class="entry-head"><span class="entry-title">Kurt</span><span class="entry-meta">${wolfMarks.length}/${ENEMIES.kurt.weakPoints.length} zayıf nokta</span></div>
@@ -103,6 +106,24 @@ export function defterScreen(cfg: Config, s: GameState): string {
     <hr class="rule">
     <div class="row" style="justify-content:space-between"><button class="btn small" data-act="menu">Ana menü ve ayarlar</button><span class="muted" style="font-size:13px">Sürüm ${esc(APP_VERSION)}</span></div>
   </div>`;
+}
+
+const KIND_ICON: Record<CollKind, string> = {
+  bitki: `<svg width="40" height="40" viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linecap="round"><path d="M24 42V12"/><path d="M24 22c-8-2-12-8-12-12 6 0 11 4 12 12zM24 30c8-2 12-8 12-12-6 0-11 4-12 12z" fill="#7A9A5A"/></g></svg>`,
+  hayvan: `<svg width="40" height="40" viewBox="0 0 48 48" aria-hidden="true"><g fill="#6B5235" stroke="var(--ink)" stroke-width="1.2"><ellipse cx="24" cy="31" rx="8" ry="7"/><ellipse cx="13" cy="20" rx="3.5" ry="4.5"/><ellipse cx="20" cy="13" rx="3.5" ry="4.5"/><ellipse cx="28" cy="13" rx="3.5" ry="4.5"/><ellipse cx="35" cy="20" rx="3.5" ry="4.5"/></g></svg>`,
+  nesne: `<svg width="40" height="40" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="12" fill="#C9A24A" stroke="var(--ink)" stroke-width="1.4"/></svg>`,
+};
+/** Defterin koleksiyon sayfaları: bitkiler, hayvanlar, nesneler. Bulunmayanlar ipucuyla. */
+function collectionSection(s: GameState): string {
+  const got = collected(s); const sc = seenCount(s);
+  const groups = (["bitki", "hayvan", "nesne"] as CollKind[]).map(k => {
+    const list = COLLECTIBLES.filter(c => c.kind === k);
+    return `<div class="coll-group"><h3>${COLL_KIND_NAMES[k]} <span class="muted tiny">${list.filter(c => got.has(c.id)).length}/${list.length}</span></h3>
+      <div class="coll">${list.map(c => got.has(c.id)
+        ? `<div class="coll-item">${c.item ? itemPic(c.item, 40) : KIND_ICON[k]}<div><div class="nm">${esc(c.name)}</div><div class="tiny muted">${esc(c.note)}</div></div></div>`
+        : `<div class="coll-item unknown"><span class="q">?</span><div><div class="tiny muted">${esc(c.hint)}</div></div></div>`).join("")}</div></div>`;
+  }).join("");
+  return `<section class="sec"><h2>Koleksiyon</h2><p class="muted tiny" style="margin:0">Vadide ${sc.seen}/${sc.total} yer keşfettin. Gittiğin yerde etrafı aramak için İşler'e bak.</p>${groups}</section>`;
 }
 
 function storySection(_cfg: Config, s: GameState): string {
@@ -243,6 +264,31 @@ export function sessionSheet(cfg: Config, s: GameState, actId: string): string {
 }
 
 /* ---------------- İşler (karar) ---------------- */
+/** İşler'in üstü: bulunduğun yerde etrafa bakmak ve köylülerin günlük istekleri. */
+function exploreCards(cfg: Config, s: GameState): string {
+  let out = "";
+  if (!s.journey && FINDS[s.location]) {
+    const inf = searchInfo(s); const can = canSearch(s); const got = collected(s);
+    const known = FINDS[s.location].filter(f => got.has(f.id)).length;
+    out += `<section class="sec card"><div class="entry-head"><h2>Etrafa bak</h2><span class="entry-meta">${inf.left > 0 ? `bugün ${inf.left} bulgu daha` : "bugünlük bitti"}</span></div>
+      <p style="margin:0">${esc(here(s).name)} çevresinde ${known < inf.finds ? `henüz deftere geçmemiş şeyler var (${known}/${inf.finds}).` : "bildiğin her şey burada; yine de toplanacak ot ve iz var."} Keskin göz, burun ve kulak daha çok bulur.</p>
+      <div class="row"><button class="btn" data-act="search" ${can.ok ? "" : "disabled"}>Etrafı ara (${SEARCH_MINUTES} dk)</button>${can.ok ? "" : `<span class="lock">${esc(can.reason ?? "")}</span>`}</div></section>`;
+  }
+  const reqs = dailyRequests(s);
+  if (reqs.length) {
+    out += `<section class="sec"><h2>Bugünün küçük istekleri</h2>${reqs.map(r => {
+      const want = Object.entries(r.def.want).map(([k, n]) => `${itemPic(k, 22)} ${esc(itemInfo(cfg, k).name)} <b>${Math.min(n, s.inventory[k] ?? 0)}/${n}</b>`).join(" · ");
+      const act = r.done ? `<span class="hand" style="color:var(--green)">Getirdin ✓</span>`
+        : r.here && r.have ? `<button class="btn small primary" data-act="deliver" data-id="${r.def.id}">Ver</button>`
+        : r.here ? `<span class="muted tiny">Çantanda yeterince yok.</span>`
+        : `<button class="btn small blue" data-act="show-place" data-id="${r.place}">${esc(place(r.place)?.name ?? "")} · haritada göster</button>`;
+      return `<div class="entry${r.done ? " done" : ""}"><div class="person">${personPic({ id: r.def.npc, name: r.npcName }, 36)}<div><div class="nm" style="font-size:19px">${esc(r.npcName)}</div><div class="rl">${r.def.money} bakır${r.def.gift ? " ve hediye" : ""} · güven</div></div></div>
+        <p style="margin:0">"${esc(r.def.text)}"</p><div class="want">${want}</div><div class="row">${act}</div></div>`;
+    }).join("")}<p class="muted tiny" style="margin:0">İstekler her sabah yenilenir.</p></section>`;
+  }
+  return out;
+}
+
 export function islerScreen(cfg: Config, s: GameState): string {
   const left = Math.floor(minutesLeft(s));
   const list = questList(s).map(q => {
@@ -274,6 +320,7 @@ export function islerScreen(cfg: Config, s: GameState): string {
       <p style="margin:0">${left > 0 ? `Hava kararmadan <b>${Math.floor(left / 60)} saat ${left % 60} dakika</b> var.` : "Gün bitti. Dinlenmezsen yarın hiçbir şey yapamazsın."}</p>
       <div class="row"><button class="btn primary" data-act="sleep">${left > 4 * 60 ? "Erken yat" : "Uyu"}</button>
       <span class="muted tiny">Kaslar uykuda gelişir, yaralar kapanır. Tok uyumak tam dinlenme demek.</span></div></section>
+    ${exploreCards(cfg, s)}
     <section class="sec"><h1>İşler</h1><p class="lede">Köylünün işi küçük, ödülü de küçük olur. Önemli bir iş, onun için değerli bir şey demektir.</p></section>
     <section class="sec">${list}</section>
     <section class="sec"><h2>Köy pazarı</h2>${s.location === SHOP_PLACE ? `<div>${shop}</div>` : `<p class="muted" style="margin:0">Pazar köy meydanında.</p><div class="row"><button class="btn small blue" data-act="show-place" data-id="${SHOP_PLACE}">Haritada göster</button></div>`}</section>

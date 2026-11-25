@@ -6,6 +6,7 @@ import { type GameState, DAY_MINUTES, addRep, hourOf, log } from "./state";
 import { applyGain, type GainReport } from "./progression";
 import { planTravel, place, route } from "./travel";
 import { addItem } from "./inventory";
+import { markSeen } from "./explore";
 import { Rng } from "./rng";
 import { ROADS } from "../content/map";
 import { TRAVEL_EVENTS, type TravelEventDef } from "../content/travel-events";
@@ -138,7 +139,7 @@ export function finishJourney(cfg: Config, s: GameState, now: number): { to: str
   s.minute = Math.min(DAY_MINUTES, s.minute + total);
   s.energy = Math.max(0, s.energy - j.energy * (total / Math.max(1, j.minutes)));
   s.satiety = Math.max(0, s.satiety - h * 4);
-  s.location = j.to; s.journey = undefined;
+  s.location = j.to; s.journey = undefined; markSeen(s, j.to);
   log(s, `Vardın: ${place(j.to)!.name} (${Math.round(total)} dk yol).`, "info");
   return { to: j.to, minutes: total, gains };
 }

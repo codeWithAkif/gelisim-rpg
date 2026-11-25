@@ -44,6 +44,10 @@ export interface GameState {
   journey?: Journey;                           // süren yolculuk                           // süren gerçek zamanlı çalışma
   alerts?: Record<string, boolean>;            // gösterilmiş uyarılar (tekrar etmesin)
   prep?: Record<string, { day: number; scout?: boolean; readWind?: boolean }>; // savaş öncesi yapılmış keşifler
+  seen?: string[];                             // haritada açılmış yerler (yoksa hepsi açık: eski kayıt)
+  collection?: Record<string, number>;         // defterdeki koleksiyon: bulunan → ilk bulunduğu gün
+  searched?: { day: number; found: Record<string, number>; tries: Record<string, number> };
+  requests?: { day: number; ids: string[]; done: string[] };
   log: LogEntry[];
 }
 
@@ -58,7 +62,7 @@ export function newGame(cfg: Config, seed = Date.now() % 2147483647): GameState 
     region: "taspinar", location: "yayla", attrs, rep: {}, inventory: { ekmek: 1, degnek: 1, bez_torba: 1 },
     equipped: { weapon: "degnek", bag: "bez_torba" }, familiarity: { degnek: 30 }, quests: {}, metNpcs: [],
     hp: 0, journal: {}, name: "Yolcu", introDone: false, knownElements: [], mana: -1,
-    story: { reached: [], flags: {} }, log: [],
+    story: { reached: [], flags: {} }, log: [], seen: ["yayla", "zehra_evi", "koru"], collection: {},
   };
   return s;
 }

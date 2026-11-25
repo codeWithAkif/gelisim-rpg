@@ -1,12 +1,15 @@
 import { test, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
 import { newGame } from "../src/engine/state";
+import { markSeen } from "../src/engine/explore";
 import { route, planTravel, travel } from "../src/engine/travel";
 import { planSession } from "../src/engine/session";
 
 test("oyun yaylada başlar; köye yürümek zaman alır, bacağı geliştirir", () => {
   const s = newGame(cfg, 1);
   expect(s.location).toBe("yayla");
+  expect(planTravel(cfg, s, "koy_meydani").ok).toBe(false); // meydanı henüz bilmiyorsun
+  s.quests.mesaj = { status: "aktif" };                      // Hasan'ın işi yolu gösterir
   const r = route("yayla", "koy_meydani")!;
   expect(r.places[0]).toBe("yayla"); expect(r.places.at(-1)).toBe("koy_meydani");
   const p = planTravel(cfg, s, "koy_meydani");
@@ -26,7 +29,7 @@ test("uzak yerler kilitli; çalışmalar yerinde yapılır", () => {
 import { startJourney, journeyProgress, dueEvent, resolveEvent, finishJourney, pauseJourney, resumeJourney, turnBack } from "../src/engine/journey";
 
 test("yolculuk gerçek zamanlıdır: süre dolmadan varılmaz; sürprizler yolculuğu durdurur", () => {
-  const s = newGame(cfg, 4);
+  const s = newGame(cfg, 4); s.quests.mesaj = { status: "aktif" };
   expect(startJourney(cfg, s, "koy_meydani", 0).ok).toBe(true);
   const j = s.journey!; const dur = j.durMs;
   expect(finishJourney(cfg, s, dur / 2)).toBeNull();
@@ -43,7 +46,7 @@ test("yolculuk gerçek zamanlıdır: süre dolmadan varılmaz; sürprizler yolcu
   expect(s.location).toBe("koy_meydani"); expect(s.journey).toBeUndefined();
 });
 test("yoldayken çalışılmaz, pazardan alınmaz; geri dönülebilir", () => {
-  const s = newGame(cfg, 4); s.location = "koy_meydani";
+  const s = newGame(cfg, 4); s.location = "koy_meydani"; markSeen(s, "koy_meydani"); markSeen(s, "nuri_evi");
   startJourney(cfg, s, "dere", 0);
   expect(planSession(cfg, s, "meditasyon", 600_000).ok).toBe(false);
   s.journey!.events = [];

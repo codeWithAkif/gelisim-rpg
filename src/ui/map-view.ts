@@ -10,6 +10,7 @@ import { animScale } from "./settings";
 import { journeyPoint, journeyProgress, journeyLeftMs } from "../engine/journey";
 import { fmtDur } from "../engine/session";
 import { darkness } from "./daylight";
+import { isSeen } from "../engine/explore";
 
 const W = 1000, H = 1400;
 function hash(x: number, y: number) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -125,6 +126,16 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     if (dk > 0.01) out += `<rect x="-400" y="-400" width="1800" height="2200" fill="#141A30" opacity="${(dk * 0.5).toFixed(2)}" pointer-events="none"/>`;
     for (const r of ROADS) {
       const open = isOpen(place(r.a)!) && isOpen(place(r.b)!);
+      const sa = isSeen(s, r.a), sb = isSeen(s, r.b);
+      if (!sa && !sb) continue;
+      if (!sa || !sb) {
+        // bilinmeyen yere giden yol: sadece başı görünür, sonu sise karışır
+        const pts = sa ? r.pts : [...r.pts].reverse(); const half = pts.slice(0, Math.max(2, Math.ceil(pts.length / 2)));
+        const end = half[half.length - 1];
+        out += `<path d="M${half.map(p => p.join(",")).join(" L")}" fill="none" stroke="#6B5235" stroke-width="1.6" stroke-dasharray="2 4" opacity=".55" vector-effect="non-scaling-stroke"/>`;
+        out += `<text x="${end[0]}" y="${end[1] + fs * 0.4}" font-size="${fs * 1.4}" text-anchor="middle" class="map-label faint">?</text>`;
+        continue;
+      }
       out += `<path d="M${r.pts.map(p => p.join(",")).join(" L")}" fill="none" stroke="${open ? "#6B5235" : "#A79C82"}" stroke-width="${r.kind === "yol" ? 2.2 : 1.6}" stroke-dasharray="${r.kind === "yol" ? "6 3" : "3 3"}" vector-effect="non-scaling-stroke" ${open ? "" : 'opacity=".6"'}/>`;
     }
     // seçili yere giden yol
@@ -136,6 +147,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     if (walker && walker.trail.length > 1) out += `<path d="M${walker.trail.map(q => q.join(",")).join(" L")}" fill="none" stroke="#9E3423" stroke-width="3" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
     const regionLabels = view.w > 420;
     for (const p of PLACES) {
+      if (!isSeen(s, p.id)) continue;
       const locked = !isOpen(p);
       if (!locked && view.w > 700) continue; // ülke ölçeğinde köy içi yerler tek etikette toplanır
       out += placeIcon(p, icon * (locked ? 1.4 : 1), locked);
@@ -199,7 +211,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     if (!wasTap || busy) return;
     const w = toWorld(e.clientX, e.clientY); const k = view.w / 300;
     let best: Place | undefined, bd = Infinity;
-    for (const p of PLACES) { if (isOpen(p) && view.w > 700) continue; const d = Math.hypot(p.x - w.x, p.y - w.y); if (d < bd) { bd = d; best = p; } }
+    for (const p of PLACES) { if ((isOpen(p) && view.w > 700) || !isSeen(s, p.id)) continue; const d = Math.hypot(p.x - w.x, p.y - w.y); if (d < bd) { bd = d; best = p; } }
     if (view.w > 700 && Math.hypot(535 - w.x, 830 - w.y) < 30 * k) { view = LEVELS.vadi(s); applyView(); return; }
     if (best && bd < 26 * k) { sel = best.id; renderCard(); drawDyn(); }
   };

@@ -26,6 +26,8 @@ import { showTitle } from "./title";
 import { applySettings } from "./settings";
 import { sfx, buzz, ambience, unlockAudio } from "./feel";
 import { darkness } from "./daylight";
+import { searchHere, deliverRequest } from "../engine/explore";
+import { itemPic } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 
@@ -197,9 +199,31 @@ export function startApp(root: HTMLElement) {
         ui.sel = undefined; persist(); render(); break;
       }
       case "menu": persist(); openTitle(); break;
+      case "search": doSearch(); break;
+      case "deliver": {
+        const r = deliverRequest(cfg, s, id);
+        if (!r.ok) { toast(r.reason ?? ""); break; }
+        sfx("coin"); buzz("light"); persist(); render(); toast(r.text ?? "Teşekkür etti."); break;
+      }
     }
   });
 
+  /** Etrafı aramak: kısa bir arama anı, sonra ne bulunduğu. */
+  function doSearch() {
+    const bg = document.createElement("div"); bg.className = "modal-bg";
+    bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><div class="searching"><span class="lens">⌕ ara…</span><p class="muted" style="margin:0">Otların arasına, taşların altına bakıyorsun.</p></div></div>`;
+    document.body.appendChild(bg); sfx("page"); setTimeout(() => sfx("step"), 400); setTimeout(() => sfx("step"), 800);
+    setTimeout(() => {
+      bg.remove();
+      const r = searchHere(cfg, s); persist(); render();
+      if (!r.ok) { toast(r.reason ?? ""); return; }
+      if (r.found) { sfx(r.first ? "perfect" : "good"); buzz(r.first ? "medium" : "light"); } else sfx("page");
+      const pic = r.found ? (r.found.item ? itemPic(r.found.item, 72) : "") : "";
+      modal(`<p class="hand muted" style="margin:0">${r.found ? (r.first ? "Deftere yeni sayfa!" : "Buldun") : "Bir şey yok"}</p><h2>${esc(r.found?.name ?? "Boş el")}</h2>
+        ${pic ? `<div class="found-pic">${pic}</div>` : ""}<p style="margin:0">${esc(r.text)}</p>${r.found && r.first ? `<p class="hand blue" style="margin:0">${esc(r.found.note)}</p>` : ""}${gainList(cfg, r.gains, 3)}`,
+        [{ label: "Tamam", cls: "primary", fn: () => {} }]);
+    }, 1300);
+  }
   function doWalk(id: string) {
         const r = walkQuest(cfg, s, id);
         if ("error" in r) { toast(r.error); return; }
