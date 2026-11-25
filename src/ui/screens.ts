@@ -12,6 +12,7 @@ import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, SHOP, CRAFTS } from "../content/world";
 import { esc, inkBar, wolfSketch, bodySketch, VITAL_ICONS } from "./sketch";
 import { personPic, itemPic, placePic, motherPic, artUrl } from "./art";
+import { RELICS } from "../content/relics";
 import { collected, seenCount, dailyRequests, searchInfo, canSearch } from "../engine/explore";
 import { COLLECTIBLES, COLL_KIND_NAMES, FINDS, SEARCH_MINUTES, type CollKind } from "../content/explore";
 import { APP_VERSION } from "../update";
@@ -19,7 +20,7 @@ import { phase, PHASE_ICONS } from "./daylight";
 import { here, place, activityPlace } from "../engine/travel";
 import { NPC_PLACE, SHOP_PLACE } from "../content/map";
 
-export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string }
+export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number }
 
 const fmt = (v: number) => (Math.abs(v) < 0.01 ? v.toFixed(3) : Math.abs(v) < 0.1 ? v.toFixed(2) : v.toFixed(1));
 const catColor = (cfg: Config, id?: string) => cfg.cat.get(id ?? "")?.color ?? "var(--pencil)";
@@ -78,7 +79,7 @@ export function statusBar(cfg: Config, s: GameState): string {
 }
 
 /* ---------------- Defter (bilgi) ---------------- */
-export function defterScreen(cfg: Config, s: GameState): string {
+export function defterScreen(cfg: Config, s: GameState, page = 0): string {
   const rep = Math.floor(repOf(s, s.region, "taninirlik"));
   const people = NPCS.map(n => {
     const known = s.metNpcs.includes(n.id) || rep >= (n.minRep ?? 0);
@@ -88,25 +89,32 @@ export function defterScreen(cfg: Config, s: GameState): string {
   const wolfMarks = (s.journal.kurt ?? []).map(id => ENEMIES.kurt.weakPoints.find(w => w.id === id)!).filter(Boolean);
   const analiz = s.attrs.analiz?.level ?? 0;
   const notes = s.log.slice(0, 8).map(l => `<div class="note${l.kind ? " note-" + l.kind : ""}"><small>G${l.day}</small>${esc(l.text)}</div>`).join("");
-  return `<div class="page">
-    ${storySection(cfg, s)}
+  const relics = (s.relics ?? []).map(id => RELICS[id]).filter(Boolean);
+  const pages: { title: string; html: string }[] = [
+    { title: "Hikâye", html: `${storySection(cfg, s)}
     <section class="sec">
       <h1>Taşpınar</h1>
       <p class="lede">Dağ eteğinde, otuz hanelik bir köy. ${rep <= 0 ? "Burada kimse seni tanımıyor." : rep < 5 ? "Birkaç kişi adını duymuş." : rep < 15 ? "Köyde adın anılmaya başladı." : "Köylüler seni selamlıyor."}</p>
       <p class="hand blue">${esc(s.name)} · tanınırlık ${rep} · güven ${Math.floor(repOf(s, s.region, "guven"))}</p>
-    </section>
-    <section class="sec"><h2>Tanıdıklar</h2><div class="people">${people}</div></section>
-    ${collectionSection(s)}
-    ${s.knownElements.length ? `<section class="sec"><h2>Annemin sayfaları</h2>${motherPic()}${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` : ""}
-    ${sawWolf ? `<section class="sec"><h2>Gözlemler</h2>
+    </section>` },
+    { title: "Tanıdıklar", html: `<section class="sec"><h2>Tanıdıklar</h2><div class="people">${people}</div></section>` },
+    { title: "Koleksiyon", html: collectionSection(s) },
+  ];
+  if (s.knownElements.length) pages.push({ title: "Annem", html: `<section class="sec"><h2>Annemin sayfaları</h2>${motherPic()}${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` });
+  if (relics.length) pages.push({ title: "Kadim", html: `<section class="sec"><h2>Kadim eşyalar</h2><p class="muted tiny" style="margin:0">Taşıdığın sürece güçleri seninle.</p>${relics.map(r => `<div class="relic-card"><div class="relic-glow"></div><div><h3>${esc(r.name)}</h3><p class="tiny" style="margin:0">${esc(r.desc)}</p><p class="hand green" style="margin:0">${Object.entries(r.boosts).map(([a, n]) => `${esc(cfg.attr.get(a)?.name ?? a)} +${n}`).join(" · ")}</p><p class="muted tiny" style="margin:0">${esc(r.source)}</p></div></div>`).join("")}</section>` });
+  if (sawWolf) pages.push({ title: "Gözlemler", html: `<section class="sec"><h2>Gözlemler</h2>
       <div class="card"><div class="entry-head"><span class="entry-title">Kurt</span><span class="entry-meta">${wolfMarks.length}/${ENEMIES.kurt.weakPoints.length} zayıf nokta</span></div>
       ${wolfMarks.length === ENEMIES.kurt.weakPoints.length && artUrl("dusman_kurt_anatomi")
         ? `<img class="anatomy" src="${artUrl("dusman_kurt_anatomi")}" alt="Kurt anatomisi"><p class="hand blue" style="margin:0">Üç zayıf noktayı da buldun; Zehra'nın gösterdiği gibi iskeletini de çizdin.</p>`
         : wolfSketch({ detail: analiz, marks: wolfMarks.map(w => ({ name: w.name, at: w.at })), width: 300 })}
-      <p style="margin:0;font-size:14px" class="muted">${analiz < 12 ? "Çizimin kaba. Gözlem yeteneğin geliştikçe detaylar oturur (resim dersi işe yarar)." : "Çizgilerin netleşti; hayvanın yapısını görmeye başladın."}</p></div></section>` : ""}
-    <section class="sec"><h2>Notlar</h2><div class="notes">${notes || `<div class="note">Köye yeni geldin. Çoban Hasan'ın bir derdi var gibi.</div>`}</div></section>
+      <p style="margin:0;font-size:14px" class="muted">${analiz < 12 ? "Çizimin kaba. Gözlem yeteneğin geliştikçe detaylar oturur (resim dersi işe yarar)." : "Çizgilerin netleşti; hayvanın yapısını görmeye başladın."}</p></div></section>` });
+  pages.push({ title: "Notlar", html: `<section class="sec"><h2>Notlar</h2><div class="notes">${notes || `<div class="note">Köye yeni geldin. Çoban Hasan'ın bir derdi var gibi.</div>`}</div></section>
     <hr class="rule">
-    <div class="row" style="justify-content:space-between"><button class="btn small" data-act="menu">Ana menü ve ayarlar</button><span class="muted" style="font-size:13px">Sürüm ${esc(APP_VERSION)}</span></div>
+    <div class="row" style="justify-content:space-between"><button class="btn small" data-act="menu">Ana menü ve ayarlar</button><span class="muted" style="font-size:13px">Sürüm ${esc(APP_VERSION)}</span></div>` });
+  const cur = Math.max(0, Math.min(pages.length - 1, page));
+  return `<div class="book">
+    <nav class="book-tabs" aria-label="Defter sayfaları">${pages.map((p, i) => `<button class="${i === cur ? "on" : ""}" data-page="${i}">${esc(p.title)}</button>`).join("")}</nav>
+    <div class="book-track">${pages.map((p, i) => `<article class="leaf" aria-label="${esc(p.title)}"><div class="page">${p.html}</div><div class="leaf-num">${i + 1}</div></article>`).join("")}</div>
   </div>`;
 }
 
@@ -291,9 +299,12 @@ function exploreCards(cfg: Config, s: GameState): string {
   return out;
 }
 
-export function islerScreen(cfg: Config, s: GameState): string {
+export function islerScreen(cfg: Config, s: GameState, ui: UiState = {}): string {
   const left = Math.floor(minutesLeft(s));
-  const list = questList(s).map(q => {
+  const order = { aktif: 0, yeni: 1, kilitli: 2, bitti: 3 } as const;
+  const all = questList(s).sort((a, b) => order[a.status] - order[b.status]);
+  const doneCount = all.filter(q => q.status === "bitti").length;
+  const list = all.filter(q => q.status !== "bitti" || ui.showDone).map(q => {
     const g = npc(q.def.giverNpc); const imp = cfg.importance(q.def.importance);
     const giver = cfg.giver(g.giver);
     let action = "";
@@ -324,7 +335,8 @@ export function islerScreen(cfg: Config, s: GameState): string {
       <span class="muted tiny">Kaslar uykuda gelişir, yaralar kapanır. Tok uyumak tam dinlenme demek.</span></div></section>
     ${exploreCards(cfg, s)}
     <section class="sec"><h1>İşler</h1><p class="lede">Köylünün işi küçük, ödülü de küçük olur. Önemli bir iş, onun için değerli bir şey demektir.</p></section>
-    <section class="sec">${list}</section>
+    <section class="sec">${list || `<p class="muted" style="margin:0">Şu an açık bir iş yok. Köyü dolaş, insanlarla tanış.</p>`}
+      ${doneCount ? `<div class="row"><button class="btn small" data-act="toggle-done">${ui.showDone ? "Tamamlananları gizle" : `Tamamlananları göster (${doneCount})`}</button></div>` : ""}</section>
     <section class="sec"><h2>Köy pazarı</h2>${s.location === SHOP_PLACE ? `<div>${shop}</div>` : `<p class="muted" style="margin:0">Pazar köy meydanında.</p><div class="row"><button class="btn small blue" data-act="show-place" data-id="${SHOP_PLACE}">Haritada göster</button></div>`}</section>
   </div>`;
 }

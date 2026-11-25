@@ -7,6 +7,8 @@ import { Rng } from "./rng";
 import { COLLECTIBLES, FINDS, FINDS_PER_DAY, SEARCH_MINUTES, REQUESTS, REQUESTS_PER_DAY, type Collectible, type RequestDef } from "../content/explore";
 import { PLACES, ROADS, NPC_PLACE } from "../content/map";
 import { QUESTS, NPCS } from "../content/world";
+import { grantRelic, hasRelic } from "./relics";
+import type { Relic } from "../content/relics";
 
 /* ---------- gezdikçe açılan harita ---------- */
 /** Bir yere varınca o yer ve yolla bağlı komşuları haritada belirir. */
@@ -39,7 +41,7 @@ export function collected(s: GameState): Set<string> {
 export function collectible(id: string): Collectible | undefined { return COLLECTIBLES.find(c => c.id === id); }
 
 /* ---------- etrafı aramak ---------- */
-export interface SearchResult { ok: boolean; reason?: string; found?: Collectible; first?: boolean; count?: number; dropped?: number; gains: GainReport; text: string }
+export interface SearchResult { ok: boolean; reason?: string; found?: Collectible; first?: boolean; count?: number; dropped?: number; gains: GainReport; text: string; relic?: Relic }
 const isNight = (s: GameState) => { const h = hourOf(s); return h >= 20.5 || h < 6.5; };
 function todaySearch(s: GameState) { if (!s.searched || s.searched.day !== s.day) s.searched = { day: s.day, found: {}, tries: {} }; return s.searched; }
 export function searchInfo(s: GameState, place = s.location): { left: number; finds: number } {
@@ -75,6 +77,11 @@ export function searchHere(cfg: Config, s: GameState): SearchResult {
   applyGain(cfg, s, pick.sense, 0.04, gains); applyGain(cfg, s, "analiz", 0.02, gains);
   if (!pick || !rng.chance(findChance(s, pick.sense))) {
     return { ok: true, gains, text: night ? "Karanlıkta pek bir şey seçemedin." : "Uzun uzun baktın ama gözüne bir şey çarpmadı." };
+  }
+  // nadir: vadiyi iyi tanıyan biri, çamurda annenin pusulasını bulabilir
+  if (!hasRelic(s, "olcer_pusulasi") && ["dere", "yayla"].includes(s.location) && collected(s).size >= 6 && rng.chance(30)) {
+    const relic = grantRelic(cfg, s, "olcer_pusulasi", gains)!;
+    return { ok: true, gains, relic, text: "Ayağın çamurda sert bir şeye takıldı. Pirinçten bir pusula; kapağında annenin işareti." };
   }
   const c = collectible(pick.id)!;
   t.found[s.location] = (t.found[s.location] ?? 0) + 1;

@@ -364,3 +364,23 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
   filter: brightness(calc(1 - var(--dark, 0) * .3)); }
 .story-art.small { max-height: 30vh; }
 .backup-code { width: 100%; min-height: 120px; font: 12px/1.35 ui-monospace, monospace; word-break: break-all; background: var(--paper-2); color: var(--ink); border: 1.5px solid var(--ink); border-radius: 6px; padding: 8px; -webkit-user-select: text; user-select: text; }
+.story-after { margin: 0; padding: 8px 12px; border-left: 3px double var(--red); font-style: italic; }
+.relic-card { position: relative; display: flex; gap: 12px; align-items: center; padding: 12px; border: 2px solid #B8862E; border-radius: 10px 4px 10px 4px; background: linear-gradient(135deg, rgba(232,184,74,.18), transparent); animation: relicIn .9s ease-out; overflow: hidden; }
+.relic-card h3 { margin: 0; }
+.relic-glow { flex: none; width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle, #FFE7A0 0%, #F0A040 45%, rgba(200,80,30,0) 72%); animation: relicPulse 1.6s ease-in-out infinite alternate; }
+@keyframes relicIn { from { transform: scale(.85); opacity: 0; filter: brightness(2); } to { transform: none; opacity: 1; filter: none; } }
+@keyframes relicPulse { from { transform: scale(.85); opacity: .7; } to { transform: scale(1.1); opacity: 1; } }
+
+/* ---------- Defter: yana çevrilen sayfalar ---------- */
+main.book-mode { padding: 0; overflow: hidden; display: flex; }
+.book { display: flex; flex-direction: column; width: 100%; min-height: 0; }
+.book-tabs { display: flex; gap: 2px; overflow-x: auto; padding: 8px 10px 0; border-bottom: 1.5px solid var(--ink); scrollbar-width: none; flex: none; }
+.book-tabs::-webkit-scrollbar { display: none; }
+.book-tabs button { flex: none; font-family: var(--f-hand); font-size: 18px; padding: 4px 12px 2px; border: 1.5px solid var(--ink-soft); border-bottom: none; border-radius: 10px 10px 0 0; background: var(--paper-2); color: var(--ink-soft); cursor: pointer; }
+.book-tabs button.on { background: var(--paper); color: var(--ink); border-color: var(--ink); font-weight: 700; position: relative; top: 1.5px; }
+.book-track { flex: 1; min-height: 0; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.book-track::-webkit-scrollbar { display: none; }
+.leaf { position: relative; flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow-y: auto; padding: 18px 16px 36px;
+  background: linear-gradient(90deg, rgba(42,39,34,.10), transparent 14px), var(--paper);
+  box-shadow: inset -10px 0 14px -12px rgba(42,39,34,.35); }
+.leaf-num { position: absolute; right: 14px; bottom: 8px; font-family: var(--f-hand); color: var(--pencil); font-size: 18px; }

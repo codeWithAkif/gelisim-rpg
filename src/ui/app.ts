@@ -2,7 +2,7 @@
 import { config as cfg } from "../engine/config";
 import type { GameState } from "../engine/state";
 import { sleep, eat } from "../engine/progression";
-import { acceptQuest, walkQuest, completeQuest, itemName } from "../engine/quests";
+import { acceptQuest, walkQuest, completeQuest, itemName, type RewardReport } from "../engine/quests";
 import { maxHp } from "../engine/combat";
 import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
@@ -60,6 +60,8 @@ export function startApp(root: HTMLElement) {
     root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
     if (mapApi) { mapState = mapApi.state(); mapApi = undefined; }
     main.classList.toggle("map-mode", tab === "harita");
+    main.classList.toggle("book-mode", tab === "defter");
+    const leafY = tab === "defter" ? main.querySelectorAll<HTMLElement>(".leaf")[ui.page ?? 0]?.scrollTop ?? 0 : 0;
     if (tab === "harita") {
       main.innerHTML = `<div class="map-host"></div>`;
       mapApi = mountMap(main.querySelector<HTMLElement>(".map-host")!, cfg, s, {
@@ -72,10 +74,26 @@ export function startApp(root: HTMLElement) {
         onAct: (_k, qid) => { const q = QUESTS.find(x => x.id === qid)!; if (q.battle) doFight(qid); else doWalk(qid); },
       }, mapState);
     } else
-    main.innerHTML = tab === "defter" ? defterScreen(cfg, s) : tab === "vucut" ? vucutScreen(cfg, s) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : islerScreen(cfg, s);
+    main.innerHTML = tab === "defter" ? defterScreen(cfg, s, ui.page ?? 0) : tab === "vucut" ? vucutScreen(cfg, s) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : islerScreen(cfg, s, ui);
     root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"));
     if (keepScroll) main.scrollTop = y; else main.scrollTop = 0;
+    if (tab === "defter") mountBook(keepScroll ? leafY : 0);
     vitalAlerts();
+  }
+  /** Defter: sayfalar yana kaydırılarak çevrilir; sekmeler sayfaya atlar. */
+  function mountBook(leafY: number) {
+    const track = main.querySelector<HTMLElement>(".book-track"); if (!track) return;
+    const leaves = track.querySelectorAll<HTMLElement>(".leaf"); const tabs = main.querySelectorAll<HTMLButtonElement>(".book-tabs button");
+    ui.page = Math.min(ui.page ?? 0, leaves.length - 1);
+    track.scrollLeft = ui.page * track.clientWidth; leaves[ui.page].scrollTop = leafY;
+    const mark = () => { tabs.forEach((b, i) => b.classList.toggle("on", i === ui.page)); tabs[ui.page!]?.scrollIntoView({ block: "nearest", inline: "nearest" }); };
+    let tm = 0;
+    track.addEventListener("scroll", () => {
+      clearTimeout(tm);
+      tm = window.setTimeout(() => { const p = Math.round(track.scrollLeft / track.clientWidth); if (p !== ui.page) { ui.page = p; sfx("page"); mark(); } }, 80);
+    });
+    tabs.forEach((b, i) => b.addEventListener("click", () => { ui.page = i; mark(); track.scrollTo({ left: i * track.clientWidth, behavior: "smooth" }); }));
+    mark();
   }
   /** Bir değer eşiğin altına ilk düştüğünde uyarı; düzelince yeniden kurulur. */
   function vitalAlerts() {
@@ -200,6 +218,7 @@ export function startApp(root: HTMLElement) {
       }
       case "menu": persist(); openTitle(); break;
       case "search": doSearch(); break;
+      case "toggle-done": ui.showDone = !ui.showDone; render(); break;
       case "deliver": {
         const r = deliverRequest(cfg, s, id);
         if (!r.ok) { toast(r.reason ?? ""); break; }
@@ -217,6 +236,7 @@ export function startApp(root: HTMLElement) {
       bg.remove();
       const r = searchHere(cfg, s); persist(); render();
       if (!r.ok) { toast(r.reason ?? ""); return; }
+      if (r.relic) { sfx("perfect"); buzz("heavy"); modal(`<p class="hand red" style="margin:0">Kadim eşya</p><h2>${esc(r.relic.name)}</h2><div class="relic-card"><div class="relic-glow"></div><p style="margin:0">${esc(r.text)} ${esc(r.relic.desc)}</p></div><h3>Güç sıçraması</h3>${gainList(cfg, r.gains, 6)}`, [{ label: "Deftere işle", cls: "primary", fn: () => {} }]); return; }
       if (r.found) { sfx(r.first ? "perfect" : "good"); buzz(r.first ? "medium" : "light"); } else sfx("page");
       const pic = r.found ? (r.found.item ? itemPic(r.found.item, 72) : "") : "";
       modal(`<p class="hand muted" style="margin:0">${r.found ? (r.first ? "Deftere yeni sayfa!" : "Buldun") : "Bir şey yok"}</p><h2>${esc(r.found?.name ?? "Boş el")}</h2>
@@ -224,11 +244,22 @@ export function startApp(root: HTMLElement) {
         [{ label: "Tamam", cls: "primary", fn: () => {} }]);
     }, 1300);
   }
+  /** Görev ödülü: eşya, para, öğrenilen, kadim eşya ve hikâyenin devamı. */
+  function rewardHtml(r: RewardReport): string {
+    const items = Object.entries(r.items).map(([k, n]) => `${itemName(cfg, k)}${n > 1 ? " ×" + n : ""}`);
+    if (r.money) items.push(`${r.money} bakır`);
+    return `${r.after ? `<p class="story-after">${esc(r.after)}</p>` : ""}
+      <p style="margin:0">${esc(r.note)}</p>
+      <p class="hand blue" style="margin:0">${items.join(", ")}${items.length ? " · " : ""}tanınırlık +${+r.rep.toFixed(1)}</p>
+      ${r.relics.map(x => `<div class="relic-card"><div class="relic-glow"></div><div><p class="hand red" style="margin:0">Kadim eşya</p><h3>${esc(x.name)}</h3><p class="tiny" style="margin:0">${esc(x.desc)}</p></div></div>`).join("")}
+      ${Object.keys(r.gains).length ? `<h3>${r.relics.length ? "Güç sıçraması" : "Öğrendiklerin"}</h3>${gainList(cfg, r.gains, 8)}` : ""}`;
+  }
   function doWalk(id: string) {
         const r = walkQuest(cfg, s, id);
         if ("error" in r) { toast(r.error); return; }
         persist(); render();
-        modal(`<h2>${esc(QUESTS.find(q => q.id === id)!.title)}</h2><p>${esc(r.note)}</p><p class="hand blue">${Object.entries(r.items).map(([k, n]) => `${itemName(cfg, k)}${n > 1 ? " ×" + n : ""}`).join(", ")}${Object.keys(r.items).length ? " · " : ""}tanınırlık +${+r.rep.toFixed(1)}</p>`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
+        sfx(r.relics.length ? "perfect" : "page");
+        modal(`<h2>${esc(QUESTS.find(q => q.id === id)!.title)}</h2>${rewardHtml(r)}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
         return;
         }
   function doFight(id: string) {
@@ -239,11 +270,12 @@ export function startApp(root: HTMLElement) {
           if (o.result === "won") {
             const r = completeQuest(cfg, s, id);
             if (Object.keys(r.dropped).length) toast("Çantan doluydu; bazı ödülleri taşıyamadın.");
-            extra = `<h3>Ödül</h3><p>${esc(r.note)}</p><p class="hand blue">${Object.entries(r.items).map(([k, n]) => `${itemName(cfg, k)}${n > 1 ? " ×" + n : ""}`).join(", ")}${r.money ? ` · ${r.money} bakır` : ""} · tanınırlık +${+r.rep.toFixed(1)}</p>`;
+            extra = `<h3>Ödül</h3>${rewardHtml(r)}`; if (r.relics.length) sfx("perfect");
           }
           persist(); render();
-          modal(`<h2>${o.result === "won" ? "Kurtlar uzaklaştı" : o.result === "fled" ? "Geri çekildin" : "Yenildin"}</h2>
-            <p class="lede">${o.result === "lost" ? "Hasan seni yaralı hâlde bulup köye taşıdı. Dinlenmeden tekrar deneme." : o.result === "fled" ? "Kurtlar hâlâ orada. Hazırlanıp tekrar dene." : "Hasan uzaktan izliyordu; koşarak geldi."}</p>
+          const boss = id === "akyele";
+          modal(`<h2>${o.result === "won" ? (boss ? "Akyele düştü" : "Kurtlar uzaklaştı") : o.result === "fled" ? "Geri çekildin" : "Yenildin"}</h2>
+            <p class="lede">${o.result === "lost" ? (boss ? "Sürü seni inden kovaladı; köylüler seni yarı baygın buldu. Hazırlanmadan dönme." : "Hasan seni yaralı hâlde bulup köye taşıdı. Dinlenmeden tekrar deneme.") : o.result === "fled" ? (boss ? "İnden sağ çıktın. Akyele seni artık tanıyor." : "Kurtlar hâlâ orada. Hazırlanıp tekrar dene.") : boss ? "Kalan kurtlar uluyarak kuzeye kaçtı." : "Hasan uzaktan izliyordu; koşarak geldi."}</p>
             <h3>Savaşta gelişen</h3>${gainList(cfg, o.gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
         }, persist), () => { persist(); render(); });
           }

@@ -193,7 +193,7 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
   const units: Unit[] = [{ uid: "p", side: "player", name: "Sen", x: st.at[0], y: st.at[1], hp: s.hp, maxHp: hpMax, moveLeft: 0, acted: false, slowed: 0 }];
   enemyIds.forEach((id, i) => {
     const d = ENEMIES[id]; const [x, y] = m.enemies[i % m.enemies.length];
-    units.push({ uid: "e" + i, side: "enemy", def: id, name: `${d.name} ${i + 1}`, x, y, hp: d.hp, maxHp: d.hp, moveLeft: 0, acted: false, slowed: 0, alert: night || !!plan.ambushed });
+    units.push({ uid: "e" + i, side: "enemy", def: id, name: d.scale ? d.name : `${d.name} ${i + 1}`, x, y, hp: d.hp, maxHp: d.hp, moveLeft: 0, acted: false, slowed: 0, alert: night || !!plan.ambushed });
   });
   const traps: Record<string, number> = {};
   for (const [x, y] of plan.traps.slice(0, 2)) traps[key(x, y)] = 1;
@@ -249,7 +249,7 @@ function playerArmor(s: GameState): number {
   return GAME_ITEMS[a]?.armor ?? CONFIG_ARMOR[a] ?? 0;
 }
 export function knownWeakPoints(cfg: Config, s: GameState, enemyDef: string): WeakPoint[] {
-  const seen = s.journal?.[enemyDef] ?? [];
+  const seen = s.journal?.[ENEMIES[enemyDef]?.anatomyOf ?? enemyDef] ?? [];
   return ENEMIES[enemyDef].weakPoints.filter(w => seen.includes(w.id));
 }
 /** Gözlemle açılabilecek zayıf noktalar (yeterli bilgi var mı). */
@@ -454,7 +454,7 @@ export function throwTorch(b: Battle, x: number, y: number): string | null {
 export function observe(cfg: Config, s: GameState, b: Battle, target: Unit): string {
   const p = player(b); if (b.phase !== "player" || p.acted) return "";
   p.acted = true; b.stats.observed++;
-  s.journal ??= {}; const seen = (s.journal[target.def!] ??= []);
+  s.journal ??= {}; const seen = (s.journal[ENEMIES[target.def!].anatomyOf ?? target.def!] ??= []);
   const found = discoverable(cfg, s, target.def!).filter(w => !seen.includes(w.id));
   found.forEach(w => seen.push(w.id));
   const total = ENEMIES[target.def!].weakPoints.length;
@@ -626,7 +626,7 @@ export function finishBattle(cfg: Config, s: GameState, b: Battle): BattleOutcom
   s.satiety = Math.max(0, s.satiety - 6);
   const p = player(b);
   s.hp = b.phase === "lost" ? 1 : p.hp;
-  const head = b.phase === "won" ? "Kurtları uzaklaştırdın." : b.phase === "fled" ? "Geri çekildin; kurtlar hâlâ orada." : "Yaralı hâlde kendini köye zor attın.";
+  const head = b.phase === "won" ? (b.units.some(u => u.def === "akyele") ? "Akyele düştü; sürü dağıldı." : "Kurtları uzaklaştırdın.") : b.phase === "fled" ? "Geri çekildin; kurtlar hâlâ orada." : "Yaralı hâlde kendini köye zor attın.";
   const text = `${head} ${summarize(cfg, gains, 4)}`;
   log(s, text, "battle");
   return { result: b.phase, gains, minutes, text };

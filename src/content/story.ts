@@ -50,6 +50,8 @@ export const CHAPTERS: Chapter[] = [
       { id: "ates_kurt", title: "Ateş ve kurt", hint: "Bir savaşı büyü kullanarak kazan (İşler → Meraya devriye).", reached: s => (s.story.flags.buyuluZafer ?? 0) > 0,
         effects: { flag: "zaferGun" },
         text: "Kurtlar ateşi görünce dağıldı. Hasan uzaktan bakıp bir dua mırıldandı. Köyde biri yasak bir şey gördüğünü fısıldıyor." },
+      { id: "suru_basi", title: "Sürünün başı", hint: "Kurtların neden çoğaldığını bul: Hasan'ın 'Kurtlar nereden geliyor?' işi.", reached: s => done(s, "akyele"),
+        text: "Akyele düştü, sürü dağıldı. Ama donmuş karacayı unutamıyorsun: kuzeyde bir şey ısıyı çekiyor, ve annenin defterindeki kor taşı şimdi senin cebinde." },
       { id: "mektup", title: "Annenin mektubu", hint: "Bir gece dinlen; Zehra seni bekliyor.", reached: s => has(s, "ates_kurt") && s.day > (s.story.flags.zaferGun ?? 1e9),
         text: "Zehra annenin bıraktığı mühürlü mektubu sana verdi: \"Isıyı çeken biri var. Kuzeyde değil, aramızda. Karaçam'daki tüccar Selim'e git; kimin için çalıştığını o bilir.\" Bölüm 1 burada bitiyor." },
     ],

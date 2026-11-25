@@ -25,6 +25,7 @@ export const GAME_ITEMS: Record<string, GameItem> = {
   ip: { id: "ip", name: "Kenevir ipi", slot: "Malzeme", stack: 10, price: 1, desc: "Sağlam bir sicim. Dikiş ve tuzak için." },
   bez_torba: { id: "bez_torba", name: "Bez torba", slot: "Çanta", capacity: 8, desc: "Omza asılan kaba bir torba. 8 göz." },
   deri_canta: { id: "deri_canta", name: "Deri çanta", slot: "Çanta", capacity: 12, desc: "Kendi diktiğin, iki bölmeli deri çanta. 12 göz." },
+  kurt_postu: { id: "kurt_postu", name: "Akyele'nin postu", slot: "Zırh", armor: 2, desc: "Kalın, beyaz yeleli bir post. Soğuğu ve dişleri tutar." },
   // keşifle toplananlar (content/explore.ts)
   kekik: { id: "kekik", name: "Kekik", slot: "Malzeme", stack: 10, desc: "Yaylanın taşlarında biter. Zehra çayına katar." },
   isirgan: { id: "isirgan", name: "Isırgan", slot: "Malzeme", stack: 10, desc: "Dere kenarında, eldivensiz toplanmaz. Yara merhemine girer." },
@@ -76,6 +77,8 @@ export interface WeakPoint { id: string; name: string; need: Record<string, numb
 export interface EnemyDef {
   id: string; name: string; species: "hayvan" | "insan"; hp: number; damage: [number, number];
   move: number; evasion: number; accuracy: number; armor: number; weakPoints: WeakPoint[]; desc: string;
+  anatomyOf?: string;   // zayıf nokta bilgisi hangi türle ortak (deftere aynı sayfaya işlenir)
+  scale?: number; tint?: string; // savaşta çizim: boy ve renk
 }
 export const ENEMIES: Record<string, EnemyDef> = {
   kurt: {
@@ -89,15 +92,22 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
 };
 
+ENEMIES.akyele = {
+  ...ENEMIES.kurt, id: "akyele", name: "Akyele", hp: 40, damage: [4, 8], evasion: 20, accuracy: 66, armor: 1, anatomyOf: "kurt", scale: 1.3, tint: "brightness(1.35) saturate(.4)",
+  desc: "Boynunda beyaz bir yele. Kuzeyden inen sürünün başı; açlığı onu cesur, yaşı onu kurnaz yapmış.",
+};
+
 /** Yol pususu için küçük harita. */
 export const AMBUSH_MAP = "patika";
 
 export interface QuestDef {
   id: string; title: string; giverNpc: string; importance: "basit" | "onemli" | "hayati";
   text: string; minutes: number; battle?: { enemies: string[]; map: string };
-  rewards: { items?: Record<string, number>; money?: number; note: string };
+  rewards: { items?: Record<string, number>; money?: number; note: string; gains?: Record<string, number>; relics?: string[] };
   requires?: string[];
   repeatable?: boolean;
+  retiredBy?: string;    // bu iş bitince görev listeden kalkar (ör. sürü dağılınca devriye)
+  afterText?: string;    // bitince ne öğrendin (hikâye)
   at: string;            // işin yapıldığı yer (haber verilecek kişi ya da savaş alanı)
   doneText?: string;     // yerinde yapılınca düğme metni
 }
@@ -119,10 +129,29 @@ export const QUESTS: QuestDef[] = [
     rewards: { items: { annenin_heybesi: 1 }, note: "Zehra'nın sandığından annenin elinden çıkmış bir sayfa ve onun eski heybesi." },
   },
   {
-    id: "devriye", title: "Meraya devriye", giverNpc: "hasan", importance: "basit", minutes: 60, requires: ["kurt"], repeatable: true, at: "yayla",
-    text: "Kurtlar tamamen gitmedi. Hasan geceleri meraya bir göz atmanı istiyor; karşılığında ne bulursa paylaşacak.",
+    id: "devriye", title: "Meraya devriye", giverNpc: "hasan", importance: "basit", minutes: 60, requires: ["kurt"], repeatable: true, retiredBy: "akyele", at: "yayla",
+    text: "Kurtlar tamamen gitmedi; biri ölünce yenisi geliyor. Hasan geceleri meraya bir göz atmanı istiyor.",
     battle: { enemies: ["kurt", "kurt"], map: "mera" },
-    rewards: { items: { peynir: 1 }, money: 1, note: "Bir parça peynir ve bir bakır." },
+    rewards: { items: { deri: 1 }, money: 2, note: "Hasan kurdun postundan bir parça tabaklayıp verdi, üstüne iki bakır." },
+  },
+  {
+    id: "kurt_izi", title: "Kurtlar nereden geliyor?", giverNpc: "hasan", importance: "onemli", minutes: 60, requires: ["kurt"], at: "koru", doneText: "İzleri sür",
+    text: "\"Bu dağda otuz yıldır çobanım, hiç bu kadar kurt görmedim,\" diyor Hasan. İzler Meşe korusunun kuzeyine çıkıyor. Nereden geldiklerini bul.",
+    rewards: { money: 3, gains: { iz_surme: 1.5, koku: 0.8 }, note: "İzleri sürmek sana iz okumayı öğretti. Hasan üç bakır verdi." },
+    afterText: "İzler korunun kuzeyinde, eski bir kaya yarığında bitiyor. Yarığın ağzında, yazın ortasında donmuş bir karaca yatıyor; tüyleri kırağı tutmuş. Kurtlar avlarının peşinden aşağı inmiş.",
+  },
+  {
+    id: "donmus_av", title: "Donmuş karaca", giverNpc: "zehra", importance: "onemli", minutes: 30, requires: ["kurt_izi", "annenin_izi"], at: "zehra_evi", doneText: "Zehra'ya anlat",
+    text: "Yazın ortasında donmuş bir hayvan. Zehra'ya ne gördüğünü anlat.",
+    rewards: { money: 4, gains: { anatomi_hayvan: 1.5, analiz: 1 }, note: "Zehra karacanın nasıl öldüğünü gösterirken kurtların yapısını da anlattı." },
+    afterText: "Zehra uzun süre sustu. \"Kuzeyde ısı çekiliyor. Önce otlar, sonra karacalar, sonra kurtlar iniyor. Sürüyü Akyele dediğimiz yaşlı bir dişi yönetiyor; boynunda beyaz yele var. O düşerse sürü dağılır, yoksa her gece yenisi gelir.\"",
+  },
+  {
+    id: "akyele", title: "Sürünün başı", giverNpc: "ayse", importance: "hayati", minutes: 120, requires: ["donmus_av"], at: "koru",
+    text: "Muhtar Ayşe köyü topladı: kurtlar artık köyün tavuklarına iniyor. Akyele'nin inine git ve sürüyü dağıt. Kolay olmayacak; hazırlanmadan gitme.",
+    battle: { enemies: ["akyele", "kurt", "kurt"], map: "in" },
+    rewards: { items: { kurt_postu: 1 }, money: 15, relics: ["kor_tasi", "akyele_disi"], note: "Köy on beş bakır topladı. Akyele'nin postu artık senin." },
+    afterText: "Akyele düşünce sürü kuzeye kaçtı; geceler sessizleşti. İnin dibinde, karların arasında sönmemiş bir kor parlıyordu: annenin defterindeki çizimin aynısı.",
   },
 ];
 
@@ -154,6 +183,25 @@ export const MAPS: Record<string, BattleMap> = {
     ],
     enemies: [[2, 1], [4, 1]],
     flock: [3, 9],
+  },
+  in: {
+    name: "Akyele'nin ini",
+    rows: [
+      "^^*^^**",
+      "^,..,^*",
+      "*,~.,,^",
+      "*..^..*",
+      ",,.,.,*",
+      "*,.,,.*",
+      "**.,.**",
+      "*,...,*",
+    ],
+    starts: [
+      { name: "Yarığın ağzı", at: [3, 7], note: "Dar giriş; kurtlar ancak önden gelir ama geri çekilecek yer yok." },
+      { name: "Yan kayalık", at: [5, 4], note: "Kayaların arkası; pusu kurmaya uygun, ama ağaçlar görüşü kapatır." },
+    ],
+    enemies: [[3, 1], [1, 2], [5, 2]],
+    flock: [3, 7],
   },
   patika: {
     name: "Patika",

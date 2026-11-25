@@ -48,6 +48,7 @@ export interface GameState {
   collection?: Record<string, number>;         // defterdeki koleksiyon: bulunan → ilk bulunduğu gün
   searched?: { day: number; found: Record<string, number>; tries: Record<string, number> };
   requests?: { day: number; ids: string[]; done: string[] };
+  relics?: string[];                           // kadim eşyalar
   log: LogEntry[];
 }
 
