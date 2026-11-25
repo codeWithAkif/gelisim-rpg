@@ -36,11 +36,14 @@ function hiss(dur: number, vol: number, freq: number, q = 1, delay = 0, type: Bi
   src.connect(f).connect(g).connect(dest ?? master); src.start(t, Math.random()); src.stop(t + dur + 0.02);
 }
 
-export type Sfx = "tap" | "page" | "step" | "hit" | "crit" | "miss" | "hurt" | "whoosh" | "fire" | "good" | "perfect" | "bad" | "beat" | "win" | "lose" | "coin" | "spark" | "draw";
+export type Sfx = "thunk" | "clang" | "splash" | "tap" | "page" | "step" | "hit" | "crit" | "miss" | "hurt" | "whoosh" | "fire" | "good" | "perfect" | "bad" | "beat" | "win" | "lose" | "coin" | "spark" | "draw";
 export function sfx(k: Sfx) {
   if (!settings().sound) return;
   switch (k) {
     case "tap": tone(900, 700, 0.05, 0.12, "triangle"); break;
+    case "thunk": tone(120, 60, 0.2, 0.55, "sine"); hiss(0.12, 0.35, 600, 0.7, 0, "lowpass"); break;
+    case "clang": tone(1250, 1200, 0.5, 0.18, "triangle"); tone(1880, 1820, 0.35, 0.1, "sine", 0.01); hiss(0.05, 0.2, 4000, 1); break;
+    case "splash": hiss(0.35, 0.22, 1400, 0.6); hiss(0.2, 0.12, 3200, 1, 0.05); break;
     case "page": hiss(0.22, 0.18, 2600, 0.6); hiss(0.12, 0.1, 5000, 0.8, 0.08); break;
     case "step": hiss(0.08, 0.16, 500, 1.2, 0, "lowpass"); break;
     case "beat": tone(180, 90, 0.12, 0.35, "sine"); hiss(0.05, 0.08, 3000, 1); break;
@@ -120,4 +123,11 @@ export function ambience(on: boolean, night = false) {
 export function unlockAudio() {
   const go = () => { ac(); window.removeEventListener("pointerdown", go); };
   window.addEventListener("pointerdown", go);
+}
+
+/** Çalgı notası (0–5): pentatonik, kopuz gibi tellerde. */
+export function note(i: number) {
+  if (!settings().sound) return;
+  const f = [294, 330, 392, 440, 523, 587][i % 6];
+  tone(f, f * 0.995, 0.6, 0.22, "triangle"); tone(f * 2, f * 2, 0.25, 0.05, "sine");
 }

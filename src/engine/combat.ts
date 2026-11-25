@@ -396,10 +396,11 @@ export function pushTarget(b: Battle, target: Unit): { to: XY; into: string; blo
   if (t === "camur") return { to, into: "çamur", blocked: false };
   return { to, into: TERRAIN[t].name.toLowerCase(), blocked: false };
 }
-export function playerPush(cfg: Config, s: GameState, b: Battle, target: Unit): string | null {
+/** quality: sürükleme hareketinin kalitesi (0–1); verilmezse etkisiz. */
+export function playerPush(cfg: Config, s: GameState, b: Battle, target: Unit, quality?: number): string | null {
   const p = player(b);
   if (b.phase !== "player" || p.acted || dist(p.x, p.y, target.x, target.y) !== 1) return null;
-  const rng = new Rng(b.seed); const chance = pushChance(cfg, s, b, target); const pt = pushTarget(b, target);
+  const rng = new Rng(b.seed); const chance = Math.max(5, Math.min(95, pushChance(cfg, s, b, target) + (quality === undefined ? 0 : (quality - 0.5) * 30))); const pt = pushTarget(b, target);
   p.acted = true; p.moveLeft = 0; s.energy = Math.max(0, s.energy - 6); b.stats.pushes++;
   const from: XY = [target.x, target.y];
   let text: string;
@@ -592,11 +593,17 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
 }
 
 /** Bu düşman turunda oyuncuya saldırı gelecek mi? (Tur deterministik; kopyada denenir.) */
-export function willBeAttacked(cfg: Config, s: GameState, b: Battle): boolean {
+export function willBeAttacked(cfg: Config, s: GameState, b: Battle): boolean { return incomingAttack(cfg, s, b) !== null; }
+/** Saldıracak ilk düşmanın saldırı anındaki yeri (kaçış yönü için); saldırı yoksa null. */
+export function incomingAttack(cfg: Config, s: GameState, b: Battle): { from: XY; to: XY } | null {
   const bc = structuredClone(b), sc = structuredClone(s); bc.events = [];
-  const pid = player(bc).uid;
+  const p = player(bc); const pid = p.uid; const pos = new Map(bc.units.map(u => [u.uid, [u.x, u.y] as XY]));
   enemyTurn(cfg, sc, bc);
-  return bc.events.some(e => e.k === "attack" && e.target === pid);
+  for (const e of bc.events) {
+    if (e.k === "move") pos.set(e.uid, e.path[e.path.length - 1]);
+    if (e.k === "attack" && e.target === pid) return { from: pos.get(e.uid)!, to: [p.x, p.y] };
+  }
+  return null;
 }
 
 export interface BattleOutcome { result: Battle["phase"]; gains: GainReport; minutes: number; text: string }

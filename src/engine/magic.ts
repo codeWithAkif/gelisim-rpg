@@ -81,7 +81,8 @@ export function previewSpell(cfg: Config, s: GameState, b: Battle, spellId: stri
 }
 
 /** Büyüyü yapar. Mana bozulsa da yarısı harcanır; deneme ustalığı yine geliştirir. */
-export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string, tx: number, ty: number): string | null {
+/** quality: işaret çiziminin kalitesi (0–1); verilmezse çizim oynanmamış sayılır. */
+export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string, tx: number, ty: number, quality?: number): string | null {
   const sp = cfg.spell.get(spellId); const p = player(b);
   if (!sp || b.phase !== "player" || p.acted) return null;
   const opt = spellOptions(cfg, s).find(o => o.spell.id === spellId);
@@ -95,7 +96,10 @@ export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string,
   let text: string;
   const hits: { uid: string; dmg: number }[] = [];
   const from: XY = [p.x, p.y];
-  if (rng.chance(pv.fizzle)) {
+  // işaret kötü çizildiyse büyü dağılır; iyi çizim odak kaymasını da azaltır
+  const fizzle = quality === undefined ? rng.chance(pv.fizzle) : quality < 0.3 || rng.chance(pv.fizzle * (1 - quality));
+  const power = quality === undefined ? 1 : 0.8 + 0.4 * quality;
+  if (fizzle) {
     b.events.push({ k: "cast", spell: sp.id, from, to: [tx, ty], fizzle: true, hits });
     s.mana = Math.max(0, s.mana - Math.ceil((sp.manaCost ?? 0) / 2));
     text = `${sp.name} elinde dağıldı; odağın kaydı.`;
@@ -106,7 +110,7 @@ export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string,
     b.events.push({ k: "cast", spell: sp.id, from, to: [tx, ty], fizzle: false, hits }); // hits aşağıda dolar
     for (const e of pv.targets) {
       if (single && !rng.chance(pv.hit)) { parts.push(`${e.name} son anda sıçradı.`); continue; }
-      const dmg = rng.int(pv.dmg[0], pv.dmg[1]);
+      const dmg = Math.round(rng.int(pv.dmg[0], pv.dmg[1]) * power);
       if (dmg > 0) { e.hp = Math.max(0, e.hp - dmg); parts.push(`${e.name} ${dmg} hasar aldı.`); hits.push({ uid: e.uid, dmg }); }
       if (fx.slow) e.slowed = Math.max(e.slowed, fx.slow);
       if (fx.blind) e.blind = Math.max(e.blind ?? 0, fx.blind);

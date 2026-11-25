@@ -57,10 +57,12 @@ export function portrait(name: string, size = 46, known = true): string {
 }
 
 /** Kurt eskizi: gözlem yeteneği arttıkça çizim gelişir, bilinen zayıf noktalar kırmızıyla işaretlenir. */
+/** Kurt hattı (200 × 130 kutuda, sola bakar). */
+export const WOLF_OUTLINE: [number, number][] = [[10, 58], [26, 50], [40, 40], [47, 26], [54, 38], [61, 30], [64, 44], [82, 52], [112, 46], [142, 48], [166, 52], [182, 48], [196, 36], [192, 54], [176, 64], [171, 92], [175, 118], [165, 118], [158, 94], [150, 80], [120, 82], [98, 84], [88, 118], [78, 118], [79, 90], [70, 80], [60, 72], [46, 70], [30, 66], [12, 62]];
 export function wolfSketch(opts: { detail: number; marks: { name: string; at: [number, number] }[]; width?: number; seed?: number; labels?: boolean }): string {
   const { detail, marks, width = 200, seed = 7, labels = true } = opts;
   const amp = detail < 12 ? 4 : detail < 25 ? 2 : 1.2;
-  const outline: [number, number][] = [[10, 58], [26, 50], [40, 40], [47, 26], [54, 38], [61, 30], [64, 44], [82, 52], [112, 46], [142, 48], [166, 52], [182, 48], [196, 36], [192, 54], [176, 64], [171, 92], [175, 118], [165, 118], [158, 94], [150, 80], [120, 82], [98, 84], [88, 118], [78, 118], [79, 90], [70, 80], [60, 72], [46, 70], [30, 66], [12, 62]];
+  const outline = WOLF_OUTLINE;
   let body = `<path d="${roughPath(outline, amp, seed, true)}" fill="${detail >= 25 ? "rgba(42,39,34,.06)" : "none"}"/>`;
   if (detail >= 12) {
     body += `<path d="${roughPath(outline, amp * 1.2, seed + 9, true)}" opacity=".45"/>`;

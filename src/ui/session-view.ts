@@ -76,7 +76,7 @@ export function openSessionRun(cfg: Config, s: GameState, onDone: (r: SessionRes
       void playMini(mini, miniEase(s, mini), esc(ss.label), sc => {
         const c = structuredClone(s.session!); (c.scores ??= []).push(sc);
         return `Bu çalışmanın verimi <b>×${boostOf(c).toFixed(1)}</b> oldu.`;
-      }).then(sc => {
+      }, { element: (() => { const e = cfg.act.get(ss.id)?.params?.element; return typeof e === "string" ? e : undefined; })() }).then(sc => {
         playing = false;
         if (s.session) { s.session.startMs += Date.now() - paused; if (sc >= 0) recordPlay(s, sc); persist(); onShift?.(); }
         timer = window.setInterval(draw, 1000); draw();

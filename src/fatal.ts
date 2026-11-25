@@ -60,7 +60,7 @@ function layoutReport(): { ok: boolean; text: string } {
 export function checkLayout(onOk: () => void) {
   let tries = 0;
   const tick = () => {
-    if (document.querySelector(".intro, .battle[role=dialog], .modal-bg, .session-screen")) { if (tries++ < 60) setTimeout(tick, 2000); else onOk(); return; }
+    if (document.querySelector(".intro, .battle[role=dialog], .modal-bg, .session-screen, .minigame")) { if (tries++ < 60) setTimeout(tick, 2000); else onOk(); return; }
     const rep = layoutReport();
     if (rep.ok) onOk(); else showProblem("Ekran düzgün yerleşmedi", rep.text);
   };

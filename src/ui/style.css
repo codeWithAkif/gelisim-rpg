@@ -316,7 +316,6 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 /* ---------- Savaşta zamanlama komutu ---------- */
 .qt { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.12); touch-action: none; }
 .qt-box { position: relative; display: flex; flex-direction: column; align-items: center; background: var(--paper); border: 2px solid var(--ink); border-radius: 14px 22px 14px 22px; padding: 6px 14px 10px; box-shadow: 3px 3px 0 rgba(42,39,34,.25); }
-.battle-canvas .qt canvas { position: static; inset: auto; width: 200px; height: 200px; }
 .qt-label { font-size: 26px; font-weight: 700; margin-top: -8px; }
 .qt.dodge .qt-label { color: var(--red); }
 .qt-result { position: absolute; top: 34%; left: 0; right: 0; text-align: center; background: var(--paper); border-radius: 8px; font-size: 30px; font-weight: 700; animation: pop .25s ease-out; }
@@ -347,3 +346,14 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 .searching .lens { font-family: var(--f-hand); font-size: 26px; animation: sway 0.7s ease-in-out infinite alternate; }
 @keyframes sway { from { transform: translateX(-14px) rotate(-6deg); } to { transform: translateX(14px) rotate(6deg); } }
 .found-pic { display: flex; justify-content: center; padding: 6px 0; }
+
+/* ---------- Savaşta parmak hareketleri ---------- */
+.gx-box { gap: 4px; padding: 8px 10px 10px; }
+.gx-stage { position: relative; touch-action: none; }
+.gx-stage canvas { position: absolute !important; inset: 0 !important; z-index: 2; touch-action: none; }
+.gx-aim { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border: 2.5px dashed var(--red); border-radius: 50%; animation: aimPulse 0.9s ease-in-out infinite alternate; z-index: 1; }
+@keyframes aimPulse { from { transform: scale(0.85); } to { transform: scale(1.15); } }
+.gx-bar { height: 4px; width: 100%; background: var(--red); border-radius: 2px; align-self: flex-start; }
+.gx.hit .gx-box { animation: gxHit .25s ease-out; }
+@keyframes gxHit { 0% { transform: translate(0,0); } 25% { transform: translate(-6px,3px); } 50% { transform: translate(5px,-3px); } 75% { transform: translate(-3px,2px); } 100% { transform: translate(0,0); } }
+.gx .qt-result { top: auto; bottom: 34px; }

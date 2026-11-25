@@ -6,10 +6,11 @@ import {
   type Battle, type BattleOutcome, type Plan, type Scenario, type Stance, type XY,
   createBattle, player, enemies, reachable, movePlayer, playerAttack, observe, enemyTurn, tryFlee, finishBattle,
   previewAttack, knownWeakPoints, dist, visible, sightRange, threatMap, unitById, playerPush, pushChance, pushTarget,
-  playerDefend, canThrowTorch, throwTorch, key, WIND_NAMES, willBeAttacked,
+  playerDefend, canThrowTorch, throwTorch, key, WIND_NAMES, incomingAttack,
 } from "../engine/combat";
-import { attackWindow, dodgeWindow } from "../engine/timing";
-import { quickTiming } from "./timing-view";
+import { slashPrompt, dodgePrompt, runePrompt, pushPrompt } from "./gesture-view";
+import { skillEase } from "../engine/timing";
+import { spellRunes } from "../engine/gesture";
 import { settings } from "./settings";
 import { sfx, buzz } from "./feel";
 import { TERRAIN, ENEMIES, MAPS } from "../content/world";
@@ -39,6 +40,9 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
   const panel = el.querySelector<HTMLElement>("#bPanel")!;
   const R = new MapRenderer(canvas);
 
+  const stage = () => el.querySelector<HTMLElement>(".battle-canvas")!;
+  /** İki altıgen arası ekran açısı (derece): a'dan b'ye. */
+  const screenAngle = (a: XY, b2: XY) => { const p = R.center(...a), q = R.center(...b2); return Math.atan2(q.cy - p.cy, q.cx - p.cx) * 180 / Math.PI; };
   function refreshView() {
     const p = player(b);
     const sightR = sightRange(cfg, s, b);
@@ -179,7 +183,8 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     mode = { k: "normal" }; stance = "normal";
     busy = true; renderPanel();
     await R.wait(200);
-    if (settings().timing && willBeAttacked(cfg, s, b)) b.dodgeQ = await quickTiming(el.querySelector<HTMLElement>(".battle-canvas")!, "dodge", dodgeWindow(s));
+    const inc = settings().timing ? incomingAttack(cfg, s, b) : null;
+    if (inc) b.dodgeQ = await dodgePrompt(stage(), { from: screenAngle(inc.to, inc.from), ease: skillEase(s, "refleks") * 0.7 + skillEase(s, "esneklik") * 0.3 });
     enemyTurn(cfg, s, b); busy = false;
     await play();
     if (!b.units.some(u => u.uid === selected && u.hp > 0 && !u.fled)) selected = enemies(b)[0]?.uid ?? null;
@@ -224,15 +229,32 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     switch (t.dataset.b) {
       case "attack": if (tgt) void (async () => {
         let q: number | undefined;
-        if (settings().timing) { busy = true; q = await quickTiming(el.querySelector<HTMLElement>(".battle-canvas")!, "attack", attackWindow(s)); busy = false; }
+        if (settings().timing) {
+          busy = true; const wp = aim ? ENEMIES[tgt.def!].weakPoints.find(w => w.id === aim) : undefined;
+          q = await slashPrompt(stage(), { aimName: wp?.name, aimAt: wp?.at, detail: s.attrs.analiz?.level ?? 10, ease: skillEase(s, "refleks") * 0.5 + skillEase(s, "kilic") * 0.5 });
+          busy = false;
+        }
         playerAttack(cfg, s, b, tgt, aim, stance, q); stance = "normal"; after();
       })(); break;
       case "stance": stance = stance === "guclu" ? "normal" : "guclu"; renderPanel(); break;
-      case "push": if (tgt) { playerPush(cfg, s, b, tgt); after(); } break;
+      case "push": if (tgt) void (async () => {
+        let q: number | undefined; const p = player(b);
+        if (settings().timing) { busy = true; const pt = pushTarget(b, tgt); q = await pushPrompt(stage(), { dir: screenAngle([p.x, p.y], [tgt.x, tgt.y]), ease: skillEase(s, "ust_govde"), into: pt.into && pt.into !== "çayır" ? pt.into : undefined }); busy = false; }
+        playerPush(cfg, s, b, tgt, q); after();
+      })(); break;
       case "observe": if (tgt) { observe(cfg, s, b, tgt); after(); } break;
       case "defend": playerDefend(b); after(); break;
       case "torch": mode = { k: "torch" }; renderPanel(); break;
-      case "cast": if (mode.k === "spell" && mode.target) { castSpell(cfg, s, b, mode.id, mode.target[0], mode.target[1]); mode = { k: "normal" }; after(); } break;
+      case "cast": if (mode.k === "spell" && mode.target) void (async () => {
+        const m = mode as { k: "spell"; id: string; target: XY }; const sp = cfg.spell.get(m.id)!;
+        let q: number | undefined; const runes = spellRunes(cfg, sp.sources.map(x => x.id));
+        if (settings().timing && runes.length) {
+          busy = true; const lv = sp.mastery ? s.attrs[sp.mastery]?.level ?? 0 : 0;
+          q = await runePrompt(stage(), { runes, spellName: sp.name, ease: skillEase(s, sp.mastery ?? "odak") * 0.6 + skillEase(s, "odak") * 0.4, guide: Math.max(0.15, Math.min(0.8, 0.8 - (lv - 5) / 40)) });
+          busy = false;
+        }
+        castSpell(cfg, s, b, m.id, m.target[0], m.target[1], q); mode = { k: "normal" }; after();
+      })(); break;
       case "cancel": mode = { k: "normal" }; renderPanel(); break;
       case "end": endTurn(); break;
       case "flee": if (tryFlee(b)) finish(); break;

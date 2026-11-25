@@ -3,24 +3,26 @@
 // refleksi yüksek karakterde savuşturma penceresi geniştir, ressamın çizgi toleransı büyüktür.
 import type { GameState } from "./state";
 
-export type MiniKind = "ritim" | "nefes" | "kivilcim" | "savustur" | "nisan" | "cizgi" | "hafiza";
+export type MiniKind = "kosu" | "yuzme" | "odun" | "tirmanma" | "dans" | "ezgi" | "ocak" | "mum" | "isaret" | "savustur" | "yay" | "cizgi" | "hafiza";
 
-/** Hangi çalışma hangi mini oyunla oynanır. */
+/** Hangi çalışma hangi mini oyunla oynanır: her iş kendine benzer. */
 const MINI_OF: Record<string, MiniKind> = {
-  kosu: "ritim", yuzme: "ritim", odun: "ritim", tirmanma: "ritim", dans: "ritim", muzik: "ritim", sarki: "nefes", demirci: "ritim",
-  meditasyon: "nefes", calisma_hava: "nefes", calisma_su: "nefes",
-  calisma_ates: "kivilcim", calisma_toprak: "kivilcim", calisma_ayaz: "kivilcim", calisma_simsek: "kivilcim",
+  kosu: "kosu", yuzme: "yuzme", odun: "odun", tirmanma: "tirmanma", dans: "dans", muzik: "ezgi", sarki: "ezgi", demirci: "ocak",
+  meditasyon: "mum",
+  calisma_ates: "isaret", calisma_su: "isaret", calisma_toprak: "isaret", calisma_hava: "isaret", calisma_ayaz: "isaret", calisma_simsek: "isaret",
   kilic_idman: "savustur",
-  okculuk_idman: "nisan", avcilik: "nisan",
+  okculuk_idman: "yay", avcilik: "yay",
   resim: "cizgi", anatomi: "cizgi", botanik: "cizgi",
   satranc: "hafiza", hitabet_ders: "hafiza",
 };
 /** Mini oyunu kolaylaştıran özellik. */
 const EASE_ATTR: Record<MiniKind, string> = {
-  ritim: "refleks", nefes: "odak", kivilcim: "odak", savustur: "refleks", nisan: "gorus", cizgi: "el_becerisi", hafiza: "hafiza",
+  kosu: "kardiyo", yuzme: "nefes", odun: "ust_govde", tirmanma: "kavrama", dans: "esneklik", ezgi: "hafiza", ocak: "refleks",
+  mum: "odak", isaret: "odak", savustur: "refleks", yay: "gorus", cizgi: "el_becerisi", hafiza: "hafiza",
 };
 export const MINI_NAMES: Record<MiniKind, string> = {
-  ritim: "Ritim", nefes: "Nefes", kivilcim: "Kıvılcım", savustur: "Savuştur", nisan: "Nişan", cizgi: "Çizgi", hafiza: "Hafıza",
+  kosu: "Patika koşusu", yuzme: "Kulaç", odun: "Balta", tirmanma: "Tutamak", dans: "Adım", ezgi: "Ezgi", ocak: "Örs",
+  mum: "Mum", isaret: "İşaret", savustur: "Savuştur", yay: "Yay", cizgi: "Çizgi", hafiza: "Hafıza",
 };
 export function miniFor(actId: string): MiniKind | undefined { return MINI_OF[actId]; }
 

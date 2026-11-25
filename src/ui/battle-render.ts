@@ -3,6 +3,7 @@
 import { TERRAIN, ENEMIES, type Terrain } from "../content/world";
 import type { Unit, Weather, XY } from "../engine/combat";
 import { animScale } from "./settings";
+import { artUrl } from "./art";
 
 const SQ3 = Math.sqrt(3);
 const TAU = Math.PI * 2;
@@ -25,7 +26,7 @@ export interface Overlay {
   markers?: { at: XY; label: string; active?: boolean }[]; unknown?: XY[];
   selected?: string | null; hiddenUnits?: Set<string>; trapMode?: boolean;
 }
-interface DS { x: number; y: number; face: number; alpha: number; lying: number; offX: number; offY: number; flash: number; walk: number; pose?: "defend" | "swing" }
+interface DS { x: number; y: number; face: number; alpha: number; lying: number; offX: number; offY: number; flash: number; walk: number; pose?: "defend" | "swing" | "leap" }
 interface Floater { x: number; y: number; text: string; color: string; size: number; t0: number; dur: number }
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; t0: number; color: string }
 interface Projectile { from: { x: number; y: number }; to: { x: number; y: number }; t0: number; dur: number; kind: "ates" | "mesale" | "buz" | "genel" }
@@ -39,7 +40,16 @@ export class MapRenderer {
   private locked = false;
   private floaters: Floater[] = []; private parts: Particle[] = []; private projs: Projectile[] = [];
   private tweens: Tween[] = []; private hiddenFire = new Set<string>();
-  private shakeT = 0; private raf = 0; private now = 0;
+  private shakeT = 0; private shakeAmp = 6; private raf = 0; private now = 0;
+  private splats: { x: number; y: number; r: number; t0: number; color: string; seed: number }[] = [];
+  private slashes: { x1: number; y1: number; x2: number; y2: number; t0: number; color: string }[] = [];
+  private zoom: { x: number; y: number; t0: number; k: number } | null = null;
+  private imgs = new Map<string, HTMLImageElement | null>();
+  /** Poz görseli (src/assets/art/poz_*.webp ya da dusman_*.webp); yoksa null ve kodla çizilir. */
+  private img(key: string): HTMLImageElement | null {
+    if (!this.imgs.has(key)) { const u = artUrl(key); this.imgs.set(key, u ? Object.assign(new Image(), { src: u }) : null); }
+    const im = this.imgs.get(key)!; return im && im.complete && im.naturalWidth ? im : null;
+  }
   constructor(private canvas: HTMLCanvasElement) { this.ctx = canvas.getContext("2d")!; }
 
   /* ---------- yerleşim ---------- */
@@ -105,20 +115,33 @@ export class MapRenderer {
   async animAttack(uid: string, targetUid: string, res: { hit: boolean; crit: boolean; dmg: number; power?: boolean; ambush?: boolean }) {
     const a = this.ds.get(uid), b = this.ds.get(targetUid); if (!a || !b) return;
     a.face = b.x >= a.x ? 1 : -1;
-    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1, reach = this.size * (res.power ? 0.55 : 0.38);
-    a.pose = "swing";
-    let struck = false;
-    await this.tween(res.power ? 420 : 320, t => {
-      const k = Math.sin(t * Math.PI); a.offX = dx / L * reach * k; a.offY = dy / L * reach * k;
-      if (!struck && t > 0.5) {
-        struck = true;
-        if (res.hit) { b.flash = 1; if (res.crit) this.shake(); this.burst(b.x, b.y - this.size * 0.4, res.crit ? "#9E3423" : "#5B5447", res.crit ? 14 : 6); }
-        const txt = !res.hit ? "ıska" : `${res.crit ? "Kritik! " : ""}−${res.dmg}`;
-        this.float(b.x, b.y - this.size * 0.9, (res.ambush && res.hit ? "Pusu! " : "") + txt, !res.hit ? "#8B8270" : res.crit ? "#9E3423" : "#2A2722", res.crit ? 1.35 : 1);
-      }
-    });
+    const wolf = uid !== "p";
+    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1, reach = this.size * (wolf ? 0.7 : res.power ? 0.55 : 0.38);
+    a.pose = wolf ? "leap" : "swing";
+    const dur = wolf ? 420 : res.power ? 420 : 320;
+    // 1) atılış: kurt yay çizerek sıçrar, insan öne savurur
+    await this.tween(dur * 0.55, t => { const k = ease(t); a.offX = dx / L * reach * k; a.offY = dy / L * reach * k - (wolf ? Math.sin(t * Math.PI / 2) * this.size * 0.45 : 0); });
+    // 2) çarpma anı
+    const hx = b.x, hy = b.y - this.size * 0.4;
+    if (res.hit) {
+      b.flash = 1;
+      const big = res.crit || (wolf && res.dmg >= 5);
+      this.shake(big ? 11 : 5, big ? 380 : 240);
+      this.burst(hx, hy, res.crit ? "#9E3423" : wolf ? "#9E3423" : "#5B5447", res.crit ? 22 : 9);
+      this.splat(hx, hy + this.size * 0.4, res.crit ? this.size * 0.5 : this.size * 0.28, wolf ? "rgba(140,30,20,.55)" : "rgba(42,39,34,.55)");
+      if (!wolf) { const nx = -dy / L, ny = dx / L; this.slashes.push({ x1: hx - nx * this.size * 0.7 - dx / L * this.size * 0.3, y1: hy - ny * this.size * 0.7, x2: hx + nx * this.size * 0.7 + dx / L * this.size * 0.3, y2: hy + ny * this.size * 0.7, t0: performance.now(), color: res.crit ? "#9E3423" : "#2A2722" }); }
+      if (res.crit) this.zoom = { x: hx, y: hy, t0: performance.now(), k: 0.28 };
+    }
+    const txt = !res.hit ? "ıska" : `${res.crit ? "Kritik! " : ""}−${res.dmg}`;
+    this.float(b.x, b.y - this.size * 0.9, (res.ambush && res.hit ? "Pusu! " : "") + txt, !res.hit ? "#8B8270" : res.crit || wolf ? "#9E3423" : "#2A2722", res.crit ? 1.7 : res.hit ? 1.2 : 1);
+    if (res.crit) await this.wait(170); // vuruş anı kısa bir duraksama
+    // 3) geri çekilme
+    const ox = a.offX, oy = a.offY;
+    await this.tween(dur * 0.45, t => { const k = 1 - ease(t); a.offX = ox * k; a.offY = oy * k; });
     a.offX = a.offY = 0; a.pose = undefined;
   }
+  /** Yere mürekkep/kan lekesi: birkaç saniyede solar. */
+  splat(x: number, y: number, r: number, color: string) { this.splats.push({ x, y, r, t0: performance.now(), color, seed: Math.random() * 1000 }); if (this.splats.length > 30) this.splats.shift(); }
   async animProjectile(from: XY, to: XY, kind: Projectile["kind"]) {
     const a = this.center(...from), b = this.center(...to);
     const p: Projectile = { from: { x: a.cx, y: a.cy - this.size * 0.5 }, to: { x: b.cx, y: b.cy - this.size * 0.2 }, t0: performance.now(), dur: 450 * animScale(), kind };
@@ -153,7 +176,7 @@ export class MapRenderer {
     const t0 = performance.now();
     for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = 0.4 + Math.random() * 1.4; this.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.8, life: 450 + Math.random() * 300, t0, color }); }
   }
-  shake() { this.shakeT = performance.now(); }
+  shake(amp = 6, _ms = 260) { this.shakeT = performance.now(); this.shakeAmp = amp; }
 
   /* ---------- döngü ---------- */
   start() { const loop = (t: number) => { this.frame(t); this.raf = requestAnimationFrame(loop); }; this.raf = requestAnimationFrame(loop); }
@@ -193,7 +216,8 @@ export class MapRenderer {
     const c = this.ctx; const v = this.view; if (!v) return;
     c.save();
     c.clearRect(0, 0, this.cw, this.ch);
-    if (this.shakeT && this.now - this.shakeT < 260) { const k = 1 - (this.now - this.shakeT) / 260; c.translate((Math.random() - 0.5) * 6 * k, (Math.random() - 0.5) * 6 * k); }
+    if (this.shakeT && this.now - this.shakeT < 320) { const k = 1 - (this.now - this.shakeT) / 320; c.translate((Math.random() - 0.5) * this.shakeAmp * k, (Math.random() - 0.5) * this.shakeAmp * k); }
+    if (this.zoom) { const k = (this.now - this.zoom.t0) / 650; if (k >= 1) this.zoom = null; else { const z = 1 + this.zoom.k * (k < 0.2 ? k / 0.2 : 1 - (k - 0.2) / 0.8); c.translate(this.zoom.x, this.zoom.y); c.scale(z, z); c.translate(-this.zoom.x, -this.zoom.y); } }
     const sz = this.size * 0.985; const o = this.over;
     const sightOk = (x: number, y: number) => !v.sight || hexDist(v.sight.at[0], v.sight.at[1], x, y) <= v.sight.range;
     // birimleri satıra göre grupla (görüntü konumuna göre)
@@ -252,7 +276,19 @@ export class MapRenderer {
       c.fillStyle = g; c.fillRect(0, 0, this.cw, this.ch);
     }
     if (v.weather === "sis") { for (let i = 0; i < 5; i++) { const y = ((i * 97 + this.now * 0.01) % (this.ch + 80)) - 40; const g = c.createLinearGradient(0, y - 30, 0, y + 30); g.addColorStop(0, "rgba(245,245,240,0)"); g.addColorStop(0.5, "rgba(245,245,240,.22)"); g.addColorStop(1, "rgba(245,245,240,0)"); c.fillStyle = g; c.fillRect(0, y - 30, this.cw, 60); } }
-    // 5) mermiler, parçacıklar, yazılar
+    // 5) lekeler, kesikler, mermiler, parçacıklar, yazılar
+    for (const sp of [...this.splats]) {
+      const k = (this.now - sp.t0) / 3500; if (k >= 1) { this.splats.splice(this.splats.indexOf(sp), 1); continue; }
+      c.globalAlpha = 1 - k; c.fillStyle = sp.color;
+      for (let i = 0; i < 6; i++) { const a = hash(i, sp.seed | 0) * TAU, d = hash(sp.seed | 0, i) * sp.r; c.beginPath(); c.ellipse(sp.x + Math.cos(a) * d, sp.y + Math.sin(a) * d * 0.45, sp.r * (0.25 + hash(i, 7) * 0.35), sp.r * 0.18, 0, 0, TAU); c.fill(); }
+      c.globalAlpha = 1;
+    }
+    for (const sl of [...this.slashes]) {
+      const k = (this.now - sl.t0) / 320; if (k >= 1) { this.slashes.splice(this.slashes.indexOf(sl), 1); continue; }
+      const e = Math.min(1, k * 3); c.globalAlpha = 1 - k; c.strokeStyle = sl.color; c.lineCap = "round";
+      for (let i = 0; i < 3; i++) { c.lineWidth = (5 - i * 1.5) * (1 - k * 0.5); c.beginPath(); c.moveTo(sl.x1, sl.y1 + i * 3); c.lineTo(sl.x1 + (sl.x2 - sl.x1) * e, sl.y1 + (sl.y2 - sl.y1) * e + i * 3); c.stroke(); }
+      c.globalAlpha = 1;
+    }
     for (const p of [...this.projs]) {
       const k = (this.now - p.t0) / p.dur; if (k >= 1) { this.projs.splice(this.projs.indexOf(p), 1); continue; }
       const x = p.from.x + (p.to.x - p.from.x) * k, y = p.from.y + (p.to.y - p.from.y) * k - Math.sin(k * Math.PI) * this.size * 1.4;
@@ -267,7 +303,8 @@ export class MapRenderer {
     for (const f of [...this.floaters]) {
       const k = (this.now - f.t0) / f.dur; if (k >= 1) { this.floaters.splice(this.floaters.indexOf(f), 1); continue; }
       c.globalAlpha = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25;
-      c.font = `700 ${Math.round(this.size * 0.75 * f.size)}px Caveat, cursive`; c.textAlign = "center";
+      const pop = k < 0.12 ? 1.5 - k / 0.12 * 0.5 : 1;
+      c.font = `700 ${Math.round(this.size * 0.75 * f.size * pop)}px Caveat, cursive`; c.textAlign = "center";
       c.lineWidth = 3; c.strokeStyle = "rgba(234,224,200,.95)"; c.strokeText(f.text, f.x, f.y - k * this.size * 0.9);
       c.fillStyle = f.color; c.fillText(f.text, f.x, f.y - k * this.size * 0.9); c.globalAlpha = 1;
     }
@@ -378,7 +415,13 @@ export class MapRenderer {
     if (d.alpha > 0.5 && !d.lying) this.unitHud(u, x, y, k);
   }
   private human(k: number, d: DS, bob: number, u: Unit) {
-    const c = this.ctx; const f = d.face; const step = Math.sin(d.walk) * 3 * k;
+    const c = this.ctx; const f = d.face;
+    const im = (d.pose === "swing" && this.img("poz_kahraman_vurus")) || ((u.defending || d.pose === "defend") && this.img("poz_kahraman_savunma")) || this.img("poz_kahraman_durus");
+    if (im) {
+      const h = 44 * k, w = h * im.naturalWidth / im.naturalHeight;
+      c.scale(f, 1); if (d.flash > 0) c.filter = `sepia(1) saturate(4) hue-rotate(-30deg)`;
+      c.drawImage(im, -w / 2, -h + bob, w, h); c.filter = "none"; d.flash = Math.max(0, d.flash - 0.05); return;
+    } const step = Math.sin(d.walk) * 3 * k;
     c.lineCap = "round"; c.lineJoin = "round"; c.strokeStyle = "#2A2722"; c.lineWidth = 1.6 * k;
     c.beginPath(); c.moveTo(-2 * k, 0); c.lineTo(-2 * k + step * 0.4, -11 * k); c.moveTo(2 * k, 0); c.lineTo(2 * k - step * 0.4, -11 * k); c.stroke();
     c.beginPath(); c.moveTo(-6 * k, -11 * k + bob); c.lineTo(6 * k, -11 * k + bob); c.lineTo(4.5 * k, -25 * k + bob); c.lineTo(-4.5 * k, -25 * k + bob); c.closePath();
@@ -398,7 +441,15 @@ export class MapRenderer {
     d.flash = Math.max(0, d.flash - 0.05);
   }
   private wolf(k: number, d: DS, u: Unit) {
-    const c = this.ctx; c.scale(d.face, 1);
+    const c = this.ctx;
+    const im = (d.pose === "leap" && this.img("poz_kurt_atilma")) || this.img("dusman_kurt");
+    if (im) {
+      // görseller sola bakar; kurt yönüne göre çevrilir
+      const w = 58 * k, h = w * im.naturalHeight / im.naturalWidth;
+      c.scale(-d.face, 1); if (d.flash > 0) c.filter = `sepia(1) saturate(4) hue-rotate(-30deg) brightness(${1 - d.flash * 0.2})`;
+      c.drawImage(im, -w / 2, -h * 0.95, w, h); c.filter = "none"; d.flash = Math.max(0, d.flash - 0.05); return;
+    }
+    c.scale(d.face, 1);
     const step = Math.sin(d.walk) * 3 * k; const crouch = u.alert ? 0 : 2 * k;
     c.lineCap = "round"; c.lineJoin = "round"; c.strokeStyle = "#2A2722"; c.lineWidth = 1.4 * k;
     // bacaklar

@@ -32,7 +32,7 @@ export function showTitle(o: TitleOpts) {
       <section class="sec"><h3>Savaş canlandırmaları</h3><div class="choices">
         ${chip("anim", "yavas", "Yavaş")}${chip("anim", "normal", "Normal")}${chip("anim", "hizli", "Hızlı")}${chip("anim", "kapali", "Kapalı")}</div>
         <p class="muted tiny" style="margin:0">Yürüme, saldırı, ateş topu ve hasar yazılarının hızı.</p></section>
-      ${toggle("timing", "Savaşta zamanlama", "Vuruşta ve kaçışta doğru anı yakalama komutları. Kapalıysa savaş eskisi gibi zar ile.")}
+      ${toggle("timing", "Savaşta parmak hareketleri", "Kurdun üstünden kesik çekmek, kaçmak için kaydırmak, büyü işaretini çizmek, itmek için sürüklemek. Kapalıysa savaş eskisi gibi zar ile.")}
       ${toggle("sound", "Ses efektleri", "Vuruş, adım, kâğıt hışırtısı.")}
       ${toggle("ambient", "Ortam sesi", "Gündüz kuşlar ve rüzgâr, gece cırcırböcekleri.")}
       ${toggle("haptic", "Titreşim", "Vuruşta, kritikte ve yaralanınca.")}
