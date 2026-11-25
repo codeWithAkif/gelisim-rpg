@@ -1,0 +1,2343 @@
+{
+  "format": "gelisim-oyun-config",
+  "version": 1,
+  "exportedAt": "2026-11-25T05:21:48.096Z",
+  "attributeCategories": [
+    {
+      "color": "#C0573E",
+      "id": "fiziksel",
+      "name": "Fiziksel"
+    },
+    {
+      "color": "#3E8EC0",
+      "id": "algisal",
+      "name": "Algısal"
+    },
+    {
+      "color": "#7A5FC4",
+      "id": "zihinsel",
+      "name": "Zihinsel"
+    },
+    {
+      "color": "#C49A2E",
+      "id": "sosyal",
+      "name": "Sosyal"
+    },
+    {
+      "color": "#2E9E8A",
+      "id": "buyu",
+      "name": "Büyü"
+    },
+    {
+      "color": "#6E7F3A",
+      "id": "bilgi",
+      "name": "Bilgi & Ustalık"
+    }
+  ],
+  "environmentCategories": [
+    {
+      "color": "#8A6A3F",
+      "id": "arazi",
+      "name": "Arazi"
+    },
+    {
+      "color": "#3F7FB5",
+      "id": "hava",
+      "name": "Hava"
+    },
+    {
+      "color": "#B58A2E",
+      "id": "isik",
+      "name": "Işık & Zaman"
+    },
+    {
+      "color": "#4F8F4A",
+      "id": "bitki",
+      "name": "Bitki & Yapı"
+    }
+  ],
+  "attributes": [
+    {
+      "id": "ust_govde",
+      "name": "Üst gövde kası",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "desc": "Kılıç ve balta hasarı, kaldırma, tırmanma",
+      "transfers": [
+        {
+          "to": "kavrama",
+          "w": 0.1
+        }
+      ],
+      "derivedTerms": []
+    },
+    {
+      "id": "bacak",
+      "name": "Bacak kası",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "desc": "Koşma hızı, zıplama, tekme, yük taşıma",
+      "transfers": [
+        {
+          "to": "kardiyo",
+          "w": 0.1
+        }
+      ],
+      "derivedTerms": [
+        {
+          "to": "kacinma",
+          "w": 0.03
+        }
+      ]
+    },
+    {
+      "id": "core",
+      "name": "Gövde (core)",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "desc": "Denge, darbeye dayanma, güç aktarımı",
+      "transfers": [
+        {
+          "to": "bacak",
+          "w": 0.05
+        }
+      ],
+      "derivedTerms": []
+    },
+    {
+      "id": "kavrama",
+      "name": "Kavrama gücü",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "desc": "Silah düşürmeme, tırmanma, yay çekme",
+      "transfers": [
+        {
+          "to": "ust_govde",
+          "w": 0.1
+        }
+      ],
+      "derivedTerms": []
+    },
+    {
+      "id": "kardiyo",
+      "name": "Dayanıklılık",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "desc": "Uzun dövüş, uzun koşu",
+      "transfers": [
+        {
+          "to": "nefes",
+          "w": 0.3
+        }
+      ],
+      "derivedTerms": []
+    },
+    {
+      "id": "nefes",
+      "name": "Nefes kapasitesi",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "desc": "Su altı, büyü süresi, nefesli çalgı",
+      "transfers": [
+        {
+          "to": "mana",
+          "w": 0.2
+        }
+      ],
+      "derivedTerms": [
+        {
+          "to": "buyu_sure",
+          "w": 0.2
+        }
+      ]
+    },
+    {
+      "id": "esneklik",
+      "name": "Esneklik",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.08,
+      "decayFloor": 60,
+      "desc": "Kaçınma, sakatlanma riskini azaltır",
+      "transfers": [
+        {
+          "to": "refleks",
+          "w": 0.05
+        }
+      ],
+      "derivedTerms": [
+        {
+          "to": "kacinma",
+          "w": 0.08
+        }
+      ]
+    },
+    {
+      "id": "refleks",
+      "name": "Refleks",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "desc": "Savuşturma, ok yakalama",
+      "transfers": [],
+      "derivedTerms": [
+        {
+          "to": "kacinma",
+          "w": 0.1
+        },
+        {
+          "to": "kritik",
+          "w": 0.03
+        }
+      ]
+    },
+    {
+      "id": "el_becerisi",
+      "name": "El becerisi",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "desc": "Kilit açma, kesin nişan",
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "agri",
+      "name": "Ağrı toleransı",
+      "cat": "fiziksel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.02,
+      "decayFloor": 60,
+      "desc": "Yaralıyken performans",
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "gorus",
+      "name": "Görüş keskinliği",
+      "cat": "algisal",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.01,
+      "decayFloor": 60,
+      "transfers": [
+        {
+          "to": "analiz",
+          "w": 0.1
+        }
+      ],
+      "derivedTerms": [
+        {
+          "to": "isabet",
+          "w": 0.15
+        }
+      ]
+    },
+    {
+      "id": "cevresel",
+      "name": "Çevresel görüş",
+      "cat": "algisal",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.02,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": [
+        {
+          "to": "kacinma",
+          "w": 0.06
+        }
+      ]
+    },
+    {
+      "id": "isitme",
+      "name": "İşitme",
+      "cat": "algisal",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.01,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "koku",
+      "name": "Koku & tat",
+      "cat": "algisal",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.01,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "mekansal",
+      "name": "Mekânsal algı",
+      "cat": "algisal",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.02,
+      "decayFloor": 60,
+      "transfers": [
+        {
+          "to": "okculuk",
+          "w": 0.05
+        }
+      ],
+      "derivedTerms": [
+        {
+          "to": "isabet",
+          "w": 0.1
+        }
+      ]
+    },
+    {
+      "id": "odak",
+      "name": "Odak",
+      "cat": "zihinsel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [
+        {
+          "to": "mana",
+          "w": 0.15
+        },
+        {
+          "to": "stres",
+          "w": 0.05
+        }
+      ],
+      "derivedTerms": [
+        {
+          "to": "buyu_sure",
+          "w": 0.2
+        },
+        {
+          "to": "isabet",
+          "w": 0.1
+        }
+      ]
+    },
+    {
+      "id": "hafiza",
+      "name": "Hafıza",
+      "cat": "zihinsel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.02,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "analiz",
+      "name": "Analiz / gözlem",
+      "cat": "zihinsel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.02,
+      "decayFloor": 60,
+      "transfers": [
+        {
+          "to": "taktik",
+          "w": 0.2
+        }
+      ],
+      "derivedTerms": [
+        {
+          "to": "kritik",
+          "w": 0.06
+        }
+      ]
+    },
+    {
+      "id": "taktik",
+      "name": "Taktik öngörü",
+      "cat": "zihinsel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.02,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "irade",
+      "name": "İrade",
+      "cat": "zihinsel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.01,
+      "decayFloor": 60,
+      "transfers": [
+        {
+          "to": "mana",
+          "w": 0.25
+        }
+      ],
+      "derivedTerms": []
+    },
+    {
+      "id": "stres",
+      "name": "Stres yönetimi",
+      "cat": "zihinsel",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [
+        {
+          "to": "odak",
+          "w": 0.1
+        }
+      ],
+      "derivedTerms": []
+    },
+    {
+      "id": "hitabet",
+      "name": "Hitabet",
+      "cat": "sosyal",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": [
+        {
+          "to": "ikna",
+          "w": 0.4
+        }
+      ]
+    },
+    {
+      "id": "insan_okuma",
+      "name": "İnsan okuma",
+      "cat": "sosyal",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.02,
+      "decayFloor": 60,
+      "transfers": [
+        {
+          "to": "hitabet",
+          "w": 0.1
+        }
+      ],
+      "derivedTerms": [
+        {
+          "to": "ikna",
+          "w": 0.2
+        }
+      ]
+    },
+    {
+      "id": "aldatma",
+      "name": "Aldatma",
+      "cat": "sosyal",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "gorgu",
+      "name": "Görgü",
+      "cat": "sosyal",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.02,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": [
+        {
+          "to": "ikna",
+          "w": 0.1
+        }
+      ]
+    },
+    {
+      "id": "mana",
+      "name": "Büyü kapasitesi",
+      "cat": "buyu",
+      "base": 10,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "desc": "Nefes ve iradeden beslenir",
+      "transfers": [],
+      "derivedTerms": [
+        {
+          "to": "buyu_sure",
+          "w": 0.6
+        }
+      ]
+    },
+    {
+      "id": "ates",
+      "name": "Ateş büyüsü",
+      "cat": "buyu",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "su_buyu",
+      "name": "Su büyüsü",
+      "cat": "buyu",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "toprak_buyu",
+      "name": "Toprak büyüsü",
+      "cat": "buyu",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "kilic",
+      "name": "Kılıç ustalığı",
+      "cat": "bilgi",
+      "base": 5,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": [
+        {
+          "to": "kritik",
+          "w": 0.08
+        }
+      ]
+    },
+    {
+      "id": "okculuk",
+      "name": "Okçuluk",
+      "cat": "bilgi",
+      "base": 5,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": [
+        {
+          "to": "isabet",
+          "w": 0.4
+        }
+      ]
+    },
+    {
+      "id": "anatomi_insan",
+      "name": "Anatomi: insan",
+      "cat": "bilgi",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.005,
+      "decayFloor": 60,
+      "desc": "Türe özel anatomi bilgisi",
+      "transfers": [],
+      "derivedTerms": [
+        {
+          "to": "kritik",
+          "w": 0.1
+        }
+      ]
+    },
+    {
+      "id": "anatomi_hayvan",
+      "name": "Anatomi: hayvan",
+      "cat": "bilgi",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.005,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "iz_surme",
+      "name": "İz sürme",
+      "cat": "bilgi",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "simya",
+      "name": "Simya & botanik",
+      "cat": "bilgi",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.01,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "demircilik",
+      "name": "Demircilik",
+      "cat": "bilgi",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "hava_buyu",
+      "name": "Hava büyüsü",
+      "cat": "buyu",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "simsek_buyu",
+      "name": "Şimşek büyüsü",
+      "cat": "buyu",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    },
+    {
+      "id": "ayaz_buyu",
+      "name": "Ayaz büyüsü",
+      "cat": "buyu",
+      "base": 0,
+      "max": 100,
+      "learnRate": 1,
+      "diminish": 1,
+      "decayRate": 0.05,
+      "decayFloor": 60,
+      "transfers": [],
+      "derivedTerms": []
+    }
+  ],
+  "activities": [
+    {
+      "id": "kosu",
+      "name": "Koşu",
+      "kind": "aktivite",
+      "duration": 60,
+      "fatigue": 15,
+      "realUse": 1,
+      "teacherRep": 0,
+      "gains": [
+        {
+          "attribute": "bacak",
+          "w": 0.6
+        },
+        {
+          "attribute": "irade",
+          "w": 0.1
+        },
+        {
+          "attribute": "kardiyo",
+          "w": 1
+        },
+        {
+          "attribute": "nefes",
+          "w": 0.5
+        }
+      ]
+    },
+    {
+      "id": "yuzme",
+      "name": "Yüzme",
+      "kind": "aktivite",
+      "duration": 60,
+      "fatigue": 18,
+      "realUse": 1,
+      "teacherRep": 0,
+      "gains": [
+        {
+          "attribute": "esneklik",
+          "w": 0.3
+        },
+        {
+          "attribute": "kardiyo",
+          "w": 0.8
+        },
+        {
+          "attribute": "nefes",
+          "w": 1
+        },
+        {
+          "attribute": "ust_govde",
+          "w": 0.4
+        }
+      ]
+    },
+    {
+      "id": "tirmanma",
+      "name": "Tırmanma",
+      "kind": "aktivite",
+      "duration": 60,
+      "fatigue": 20,
+      "realUse": 1,
+      "teacherRep": 0,
+      "gains": [
+        {
+          "attribute": "core",
+          "w": 0.5
+        },
+        {
+          "attribute": "kavrama",
+          "w": 1
+        },
+        {
+          "attribute": "mekansal",
+          "w": 0.3
+        },
+        {
+          "attribute": "ust_govde",
+          "w": 0.6
+        }
+      ]
+    },
+    {
+      "id": "odun",
+      "name": "Odun kesmek",
+      "kind": "aktivite",
+      "duration": 60,
+      "fatigue": 16,
+      "realUse": 1,
+      "teacherRep": 0,
+      "gains": [
+        {
+          "attribute": "core",
+          "w": 0.3
+        },
+        {
+          "attribute": "kavrama",
+          "w": 0.4
+        },
+        {
+          "attribute": "ust_govde",
+          "w": 0.8
+        }
+      ]
+    },
+    {
+      "id": "kilic_idman",
+      "name": "Kılıç idmanı",
+      "kind": "aktivite",
+      "duration": 60,
+      "fatigue": 14,
+      "realUse": 1,
+      "teacherRep": 0,
+      "gains": [
+        {
+          "attribute": "analiz",
+          "w": 0.1
+        },
+        {
+          "attribute": "kilic",
+          "w": 1
+        },
+        {
+          "attribute": "refleks",
+          "w": 0.4
+        },
+        {
+          "attribute": "ust_govde",
+          "w": 0.3
+        }
+      ]
+    },
+    {
+      "id": "kilic_dovus",
+      "name": "Kılıç dövüşü",
+      "kind": "kullanim",
+      "duration": 10,
+      "fatigue": 25,
+      "realUse": 2.5,
+      "teacherRep": 0,
+      "gains": [
+        {
+          "attribute": "agri",
+          "w": 0.3
+        },
+        {
+          "attribute": "analiz",
+          "w": 0.3
+        },
+        {
+          "attribute": "kilic",
+          "w": 1
+        },
+        {
+          "attribute": "refleks",
+          "w": 0.6
+        },
+        {
+          "attribute": "stres",
+          "w": 0.4
+        }
+      ]
+    },
+    {
+      "id": "okculuk_idman",
+      "name": "Okçuluk idmanı",
+      "kind": "aktivite",
+      "duration": 60,
+      "fatigue": 8,
+      "realUse": 1,
+      "teacherRep": 0,
+      "gains": [
+        {
+          "attribute": "gorus",
+          "w": 0.4
+        },
+        {
+          "attribute": "kavrama",
+          "w": 0.3
+        },
+        {
+          "attribute": "odak",
+          "w": 0.3
+        },
+        {
+          "attribute": "okculuk",
+          "w": 1
+        }
+      ]
+    },
+    {
+      "id": "meditasyon",
+      "name": "Meditasyon",
+      "kind": "aktivite",
+      "duration": 30,
+      "fatigue": -5,
+      "realUse": 1,
+      "teacherRep": 0,
+      "gains": [
+        {
+          "attribute": "irade",
+          "w": 0.6
+        },
+        {
+          "attribute": "nefes",
+          "w": 0.3
+        },
+        {
+          "attribute": "odak",
+          "w": 1
+        },
+        {
+          "attribute": "stres",
+          "w": 0.4
+        }
+      ]
+    },
+    {
+      "id": "resim",
+      "name": "Resim dersi",
+      "kind": "ders",
+      "duration": 60,
+      "fatigue": 4,
+      "realUse": 1,
+      "teacherRep": 5,
+      "requirement": "Ressam öğretmen",
+      "gains": [
+        {
+          "attribute": "analiz",
+          "w": 1
+        },
+        {
+          "attribute": "anatomi_insan",
+          "w": 0.2
+        },
+        {
+          "attribute": "el_becerisi",
+          "w": 0.4
+        },
+        {
+          "attribute": "gorus",
+          "w": 0.5
+        }
+      ]
+    },
+    {
+      "id": "anatomi",
+      "name": "Anatomi / şifacılık dersi",
+      "kind": "ders",
+      "duration": 60,
+      "fatigue": 5,
+      "realUse": 1,
+      "teacherRep": 15,
+      "requirement": "Şifacı öğretmen",
+      "gains": [
+        {
+          "attribute": "anatomi_insan",
+          "w": 1
+        },
+        {
+          "attribute": "el_becerisi",
+          "w": 0.2
+        },
+        {
+          "attribute": "hafiza",
+          "w": 0.3
+        }
+      ]
+    },
+    {
+      "id": "muzik",
+      "name": "Müzik dersi (çalgı)",
+      "kind": "ders",
+      "duration": 60,
+      "fatigue": 4,
+      "realUse": 1,
+      "teacherRep": 5,
+      "gains": [
+        {
+          "attribute": "el_becerisi",
+          "w": 0.4
+        },
+        {
+          "attribute": "hafiza",
+          "w": 0.2
+        },
+        {
+          "attribute": "odak",
+          "w": 0.4
+        },
+        {
+          "attribute": "refleks",
+          "w": 0.5
+        }
+      ]
+    },
+    {
+      "id": "sarki",
+      "name": "Şarkı / nefesli çalgı",
+      "kind": "ders",
+      "duration": 60,
+      "fatigue": 5,
+      "realUse": 1,
+      "teacherRep": 5,
+      "gains": [
+        {
+          "attribute": "hitabet",
+          "w": 0.2
+        },
+        {
+          "attribute": "nefes",
+          "w": 0.8
+        },
+        {
+          "attribute": "odak",
+          "w": 0.2
+        }
+      ]
+    },
+    {
+      "id": "dans",
+      "name": "Dans dersi",
+      "kind": "ders",
+      "duration": 60,
+      "fatigue": 12,
+      "realUse": 1,
+      "teacherRep": 20,
+      "gains": [
+        {
+          "attribute": "core",
+          "w": 0.5
+        },
+        {
+          "attribute": "esneklik",
+          "w": 0.7
+        },
+        {
+          "attribute": "gorgu",
+          "w": 0.4
+        },
+        {
+          "attribute": "refleks",
+          "w": 0.3
+        }
+      ]
+    },
+    {
+      "id": "satranc",
+      "name": "Satranç / strateji",
+      "kind": "ders",
+      "duration": 60,
+      "fatigue": 3,
+      "realUse": 1,
+      "teacherRep": 10,
+      "gains": [
+        {
+          "attribute": "analiz",
+          "w": 0.4
+        },
+        {
+          "attribute": "odak",
+          "w": 0.3
+        },
+        {
+          "attribute": "taktik",
+          "w": 1
+        }
+      ]
+    },
+    {
+      "id": "avcilik",
+      "name": "Avcılık",
+      "kind": "aktivite",
+      "duration": 120,
+      "fatigue": 12,
+      "realUse": 1,
+      "teacherRep": 0,
+      "gains": [
+        {
+          "attribute": "anatomi_hayvan",
+          "w": 0.5
+        },
+        {
+          "attribute": "isitme",
+          "w": 0.3
+        },
+        {
+          "attribute": "iz_surme",
+          "w": 1
+        },
+        {
+          "attribute": "koku",
+          "w": 0.3
+        },
+        {
+          "attribute": "okculuk",
+          "w": 0.3
+        }
+      ]
+    },
+    {
+      "id": "hitabet_ders",
+      "name": "Retorik dersi",
+      "kind": "ders",
+      "duration": 60,
+      "fatigue": 3,
+      "realUse": 1,
+      "teacherRep": 30,
+      "gains": [
+        {
+          "attribute": "hitabet",
+          "w": 1
+        },
+        {
+          "attribute": "insan_okuma",
+          "w": 0.3
+        },
+        {
+          "attribute": "irade",
+          "w": 0.1
+        }
+      ]
+    },
+    {
+      "id": "demirci",
+      "name": "Demirci çıraklığı",
+      "kind": "ders",
+      "duration": 60,
+      "fatigue": 18,
+      "realUse": 1,
+      "teacherRep": 5,
+      "gains": [
+        {
+          "attribute": "demircilik",
+          "w": 1
+        },
+        {
+          "attribute": "kavrama",
+          "w": 0.5
+        },
+        {
+          "attribute": "ust_govde",
+          "w": 0.5
+        }
+      ]
+    },
+    {
+      "id": "botanik",
+      "name": "Botanik dersi",
+      "kind": "ders",
+      "duration": 60,
+      "fatigue": 3,
+      "realUse": 1,
+      "teacherRep": 10,
+      "gains": [
+        {
+          "attribute": "hafiza",
+          "w": 0.3
+        },
+        {
+          "attribute": "koku",
+          "w": 0.3
+        },
+        {
+          "attribute": "simya",
+          "w": 1
+        }
+      ]
+    }
+  ],
+  "derived": [
+    {
+      "id": "kritik",
+      "name": "Kritik şansı",
+      "unit": "%",
+      "base": 2,
+      "min": 0,
+      "max": 60,
+      "desc": "Rastgele değil: bilgi + beceri + an",
+      "terms": [
+        {
+          "attribute": "analiz",
+          "w": 0.06
+        },
+        {
+          "attribute": "anatomi_insan",
+          "w": 0.1
+        },
+        {
+          "attribute": "kilic",
+          "w": 0.08
+        },
+        {
+          "attribute": "refleks",
+          "w": 0.03
+        }
+      ]
+    },
+    {
+      "id": "kacinma",
+      "name": "Kaçınma",
+      "unit": "%",
+      "base": 3,
+      "min": 0,
+      "max": 50,
+      "terms": [
+        {
+          "attribute": "bacak",
+          "w": 0.03
+        },
+        {
+          "attribute": "cevresel",
+          "w": 0.06
+        },
+        {
+          "attribute": "esneklik",
+          "w": 0.08
+        },
+        {
+          "attribute": "refleks",
+          "w": 0.1
+        }
+      ]
+    },
+    {
+      "id": "isabet",
+      "name": "Menzilli isabet",
+      "unit": "%",
+      "base": 30,
+      "min": 0,
+      "max": 98,
+      "terms": [
+        {
+          "attribute": "gorus",
+          "w": 0.15
+        },
+        {
+          "attribute": "mekansal",
+          "w": 0.1
+        },
+        {
+          "attribute": "odak",
+          "w": 0.1
+        },
+        {
+          "attribute": "okculuk",
+          "w": 0.4
+        }
+      ]
+    },
+    {
+      "id": "buyu_sure",
+      "name": "Büyü süresi",
+      "unit": " sn",
+      "base": 5,
+      "min": 0,
+      "max": 120,
+      "terms": [
+        {
+          "attribute": "mana",
+          "w": 0.6
+        },
+        {
+          "attribute": "nefes",
+          "w": 0.2
+        },
+        {
+          "attribute": "odak",
+          "w": 0.2
+        }
+      ]
+    },
+    {
+      "id": "ikna",
+      "name": "İkna şansı",
+      "unit": "%",
+      "base": 5,
+      "min": 0,
+      "max": 90,
+      "terms": [
+        {
+          "attribute": "gorgu",
+          "w": 0.1
+        },
+        {
+          "attribute": "hitabet",
+          "w": 0.4
+        },
+        {
+          "attribute": "insan_okuma",
+          "w": 0.2
+        }
+      ]
+    }
+  ],
+  "environment": [
+    {
+      "id": "yagmur",
+      "name": "Yağmur",
+      "cat": "hava",
+      "desc": "Ateş zayıflar, yay ipi gevşer, iz silinir",
+      "modifiersPct": [
+        {
+          "target": "ates",
+          "w": -40
+        },
+        {
+          "target": "isitme",
+          "w": -30
+        },
+        {
+          "target": "koku",
+          "w": -40
+        },
+        {
+          "target": "isabet",
+          "w": -15
+        },
+        {
+          "target": "el_ates",
+          "w": -40
+        },
+        {
+          "target": "el_simsek",
+          "w": 15
+        },
+        {
+          "target": "buhar",
+          "w": 20
+        }
+      ]
+    },
+    {
+      "id": "ruzgar",
+      "name": "Rüzgâr",
+      "cat": "hava",
+      "desc": "Okları saptırır, kokuyu taşır",
+      "modifiersPct": [
+        {
+          "target": "koku",
+          "w": 25
+        },
+        {
+          "target": "isabet",
+          "w": -20
+        },
+        {
+          "target": "el_hava",
+          "w": 30
+        },
+        {
+          "target": "c_sis",
+          "w": -50
+        }
+      ]
+    },
+    {
+      "id": "sis",
+      "name": "Sis",
+      "cat": "hava",
+      "desc": "Pusu kolaylaşır",
+      "modifiersPct": [
+        {
+          "target": "gorus",
+          "w": -60
+        },
+        {
+          "target": "isitme",
+          "w": 15
+        }
+      ]
+    },
+    {
+      "id": "sicak",
+      "name": "Aşırı sıcak",
+      "cat": "hava",
+      "modifiersPct": [
+        {
+          "target": "kardiyo",
+          "w": -20
+        },
+        {
+          "target": "odak",
+          "w": -10
+        },
+        {
+          "target": "el_ayaz",
+          "w": -25
+        },
+        {
+          "target": "c_buz",
+          "w": -30
+        }
+      ]
+    },
+    {
+      "id": "soguk",
+      "name": "Dondurucu soğuk",
+      "cat": "hava",
+      "modifiersPct": [
+        {
+          "target": "el_becerisi",
+          "w": -25
+        },
+        {
+          "target": "su_buyu",
+          "w": 20
+        },
+        {
+          "target": "el_ayaz",
+          "w": 25
+        },
+        {
+          "target": "c_buz",
+          "w": 20
+        }
+      ]
+    },
+    {
+      "id": "gece",
+      "name": "Gece",
+      "cat": "isik",
+      "modifiersPct": [
+        {
+          "target": "cevresel",
+          "w": -30
+        },
+        {
+          "target": "gorus",
+          "w": -50
+        },
+        {
+          "target": "isitme",
+          "w": 10
+        }
+      ]
+    },
+    {
+      "id": "gunes_arkada",
+      "name": "Güneş arkada",
+      "cat": "isik",
+      "desc": "Rakibin gözü kamaşır",
+      "modifiersPct": [
+        {
+          "target": "isabet",
+          "w": 10
+        },
+        {
+          "target": "kacinma",
+          "w": 5
+        }
+      ]
+    },
+    {
+      "id": "yuksek_zemin",
+      "name": "Yüksek zemin",
+      "cat": "arazi",
+      "modifiersPct": [
+        {
+          "target": "isabet",
+          "w": 15
+        },
+        {
+          "target": "kritik",
+          "w": 5
+        }
+      ]
+    },
+    {
+      "id": "camur",
+      "name": "Çamur",
+      "cat": "arazi",
+      "modifiersPct": [
+        {
+          "target": "bacak",
+          "w": -20
+        },
+        {
+          "target": "kacinma",
+          "w": -25
+        }
+      ]
+    },
+    {
+      "id": "buz",
+      "name": "Buzlu zemin",
+      "cat": "arazi",
+      "modifiersPct": [
+        {
+          "target": "core",
+          "w": -20
+        },
+        {
+          "target": "kacinma",
+          "w": -15
+        }
+      ]
+    },
+    {
+      "id": "dar_gecit",
+      "name": "Dar geçit",
+      "cat": "arazi",
+      "desc": "Sayı üstünlüğünü yok eder",
+      "modifiersPct": [
+        {
+          "target": "taktik",
+          "w": 10
+        }
+      ]
+    },
+    {
+      "id": "kayalik",
+      "name": "Kayalık",
+      "cat": "arazi",
+      "modifiersPct": [
+        {
+          "target": "toprak_buyu",
+          "w": 30
+        },
+        {
+          "target": "el_toprak",
+          "w": 30
+        },
+        {
+          "target": "magma",
+          "w": 15
+        }
+      ]
+    },
+    {
+      "id": "uzun_ot",
+      "name": "Uzun ot / çalılık",
+      "cat": "bitki",
+      "desc": "Saklanma, ama hışırtı",
+      "modifiersPct": [
+        {
+          "target": "kacinma",
+          "w": 5
+        }
+      ]
+    },
+    {
+      "id": "kuru_orman",
+      "name": "Kuru orman",
+      "cat": "bitki",
+      "desc": "Yangın tuzağı kurulabilir",
+      "modifiersPct": [
+        {
+          "target": "ates",
+          "w": 30
+        },
+        {
+          "target": "el_ates",
+          "w": 30
+        },
+        {
+          "target": "yangin_kasirgasi",
+          "w": 50
+        }
+      ]
+    }
+  ],
+  "elements": [
+    {
+      "id": "el_ates",
+      "name": "Ateş",
+      "color": "#D2552F",
+      "state": "Plazma",
+      "temperature": 800,
+      "density": 0.3,
+      "conductivity": 0.1,
+      "manaCost": 6,
+      "mastery": "ates",
+      "desc": "Isı verir. Oksijen ister: suda ve havasız yerde söner."
+    },
+    {
+      "id": "el_ayaz",
+      "name": "Ayaz",
+      "color": "#7FB8D9",
+      "state": "Enerji",
+      "temperature": -40,
+      "density": 0,
+      "conductivity": 0,
+      "manaCost": 6,
+      "mastery": "ayaz_buyu",
+      "desc": "Isı çeker. Kendi başına madde değil; dokunduğunu soğutur."
+    },
+    {
+      "id": "el_su",
+      "name": "Su",
+      "color": "#2F7FC2",
+      "state": "Sıvı",
+      "temperature": 15,
+      "density": 1000,
+      "conductivity": 0.6,
+      "manaCost": 4,
+      "mastery": "su_buyu",
+      "desc": "Akar, ısıyı emer, elektriği iletir."
+    },
+    {
+      "id": "el_toprak",
+      "name": "Toprak",
+      "color": "#8A6236",
+      "state": "Katı",
+      "temperature": 15,
+      "density": 1600,
+      "conductivity": 0.2,
+      "manaCost": 5,
+      "mastery": "toprak_buyu",
+      "desc": "Ağır ve kararlı. Kayalık zeminde bol."
+    },
+    {
+      "id": "el_hava",
+      "name": "Hava",
+      "color": "#9AB7A8",
+      "state": "Gaz",
+      "temperature": 15,
+      "density": 1.2,
+      "conductivity": 0,
+      "manaCost": 3,
+      "mastery": "hava_buyu",
+      "desc": "Basınç farkıyla itme. Kokuyu, sesi, ateşi taşır."
+    },
+    {
+      "id": "el_simsek",
+      "name": "Şimşek",
+      "color": "#D9B62F",
+      "state": "Enerji",
+      "temperature": 3000,
+      "density": 0,
+      "conductivity": 1,
+      "manaCost": 8,
+      "mastery": "simsek_buyu",
+      "desc": "İletken yolu seçer; suda ve metalde yayılır."
+    }
+  ],
+  "combos": [
+    {
+      "id": "magma",
+      "name": "Magma",
+      "color": "#C4401E",
+      "kind": "birlesim",
+      "state": "Sıvı",
+      "temperature": 1200,
+      "density": 2600,
+      "manaMult": 1.6,
+      "minMastery": 25,
+      "stability": 20,
+      "desc": "Erimiş kaya. Yavaş akar, değdiğini yakar, soğuyunca sertleşir.",
+      "ingredients": [
+        {
+          "id": "el_ates",
+          "ratio": 2
+        },
+        {
+          "id": "el_toprak",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 27.200000000000003
+    },
+    {
+      "id": "buhar",
+      "name": "Buhar",
+      "color": "#B8C4CC",
+      "kind": "tepkime",
+      "state": "Gaz",
+      "temperature": 100,
+      "density": 0.6,
+      "manaMult": 1.2,
+      "minMastery": 10,
+      "stability": 8,
+      "desc": "Su ateşe değince oluşur; ateşi söndürür, görüşü kapatır, haşlar.",
+      "ingredients": [
+        {
+          "id": "el_ates",
+          "ratio": 1
+        },
+        {
+          "id": "el_su",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 12
+    },
+    {
+      "id": "c_buz",
+      "name": "Buz",
+      "color": "#9FD3E8",
+      "kind": "birlesim",
+      "state": "Katı",
+      "temperature": -10,
+      "density": 917,
+      "manaMult": 1.3,
+      "minMastery": 15,
+      "stability": 60,
+      "desc": "Donmuş su. Duvar, zemin kayganlığı, delici parça.",
+      "ingredients": [
+        {
+          "id": "el_ayaz",
+          "ratio": 1
+        },
+        {
+          "id": "el_su",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 13
+    },
+    {
+      "id": "c_camur",
+      "name": "Çamur",
+      "color": "#6F5A3A",
+      "kind": "birlesim",
+      "state": "Sıvı",
+      "temperature": 15,
+      "density": 1700,
+      "manaMult": 1.2,
+      "minMastery": 10,
+      "stability": 120,
+      "desc": "Hareketi yavaşlatır, ağır zırhı batırır.",
+      "ingredients": [
+        {
+          "id": "el_su",
+          "ratio": 1
+        },
+        {
+          "id": "el_toprak",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 10.799999999999999
+    },
+    {
+      "id": "kum_firtinasi",
+      "name": "Kum fırtınası",
+      "color": "#C9A86A",
+      "kind": "birlesim",
+      "state": "Gaz",
+      "temperature": 30,
+      "density": 5,
+      "manaMult": 1.4,
+      "minMastery": 20,
+      "stability": 15,
+      "desc": "Görüşü kapatır, gözü yakar, deriyi aşındırır.",
+      "ingredients": [
+        {
+          "id": "el_hava",
+          "ratio": 2
+        },
+        {
+          "id": "el_toprak",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 15.399999999999999
+    },
+    {
+      "id": "yangin_kasirgasi",
+      "name": "Yangın kasırgası",
+      "color": "#E07A2E",
+      "kind": "birlesim",
+      "state": "Plazma",
+      "temperature": 900,
+      "density": 0.5,
+      "manaMult": 1.8,
+      "minMastery": 35,
+      "stability": 10,
+      "desc": "Hava ateşi besler ve döndürür; kuru ormanda kontrolden çıkar.",
+      "ingredients": [
+        {
+          "id": "el_ates",
+          "ratio": 1
+        },
+        {
+          "id": "el_hava",
+          "ratio": 2
+        }
+      ],
+      "manaTotal": 21.6
+    },
+    {
+      "id": "plazma",
+      "name": "Plazma",
+      "color": "#E7D06A",
+      "kind": "birlesim",
+      "state": "Plazma",
+      "temperature": 5000,
+      "density": 0.1,
+      "manaMult": 2,
+      "minMastery": 45,
+      "stability": 3,
+      "desc": "Aşırı ısınmış iyonlaşmış gaz. Çok güçlü, çok kararsız.",
+      "ingredients": [
+        {
+          "id": "el_ates",
+          "ratio": 1
+        },
+        {
+          "id": "el_simsek",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 28
+    },
+    {
+      "id": "elektrikli_su",
+      "name": "Elektrikli su",
+      "color": "#4F9ADB",
+      "kind": "tepkime",
+      "state": "Sıvı",
+      "temperature": 20,
+      "density": 1000,
+      "manaMult": 1.1,
+      "minMastery": 15,
+      "stability": 5,
+      "desc": "Su şimşeği iletir: suyun içindeki herkese yayılır.",
+      "ingredients": [
+        {
+          "id": "el_simsek",
+          "ratio": 1
+        },
+        {
+          "id": "el_su",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 13.200000000000001
+    },
+    {
+      "id": "obsidyen",
+      "name": "Obsidyen",
+      "color": "#2E2A33",
+      "kind": "tepkime",
+      "state": "Katı",
+      "temperature": 30,
+      "density": 2400,
+      "manaMult": 1.2,
+      "minMastery": 30,
+      "stability": 9999,
+      "desc": "Magmanın suyla hızla soğuması. Cam gibi keskin kenar.",
+      "ingredients": [
+        {
+          "id": "el_su",
+          "ratio": 1
+        },
+        {
+          "id": "magma",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 37.440000000000005
+    },
+    {
+      "id": "c_sis",
+      "name": "Sis",
+      "color": "#C7CED2",
+      "kind": "tepkime",
+      "state": "Gaz",
+      "temperature": 8,
+      "density": 1.3,
+      "manaMult": 1.1,
+      "minMastery": 10,
+      "stability": 90,
+      "desc": "Buhar soğuyunca yoğuşur. Görüşü kapatır, sesi boğar.",
+      "ingredients": [
+        {
+          "id": "buhar",
+          "ratio": 1
+        },
+        {
+          "id": "el_ayaz",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 19.8
+    },
+    {
+      "id": "firtina",
+      "name": "Fırtına",
+      "color": "#5A6F9A",
+      "kind": "birlesim",
+      "state": "Gaz",
+      "temperature": 10,
+      "density": 1.2,
+      "manaMult": 2.2,
+      "minMastery": 50,
+      "stability": 30,
+      "desc": "Rüzgâr, yağmur ve yıldırım. Geniş alan, düşük kontrol.",
+      "ingredients": [
+        {
+          "id": "el_hava",
+          "ratio": 2
+        },
+        {
+          "id": "el_simsek",
+          "ratio": 1
+        },
+        {
+          "id": "el_su",
+          "ratio": 1
+        }
+      ],
+      "manaTotal": 39.6
+    }
+  ],
+  "spells": [
+    {
+      "id": "ates_topu",
+      "name": "Ateş topu",
+      "mastery": "ates",
+      "minMastery": 5,
+      "manaCost": 8,
+      "castTime": 1.5,
+      "range": 25,
+      "area": 1,
+      "damage": 18,
+      "duration": 0,
+      "focusNeed": 15,
+      "effect": "Çarptığı yeri tutuşturur; yağmurda zayıflar.",
+      "sources": [
+        {
+          "id": "el_ates",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "magma_akintisi",
+      "name": "Magma akıntısı",
+      "mastery": "toprak_buyu",
+      "minMastery": 30,
+      "manaCost": 40,
+      "castTime": 4,
+      "range": 12,
+      "area": 3,
+      "damage": 30,
+      "duration": 20,
+      "focusNeed": 40,
+      "effect": "Zeminde akan yakıcı şerit; yokuş aşağı hızlanır.",
+      "sources": [
+        {
+          "id": "magma",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "buz_duvari",
+      "name": "Buz duvarı",
+      "mastery": "ayaz_buyu",
+      "minMastery": 20,
+      "manaCost": 22,
+      "castTime": 3,
+      "range": 8,
+      "area": 0,
+      "damage": 0,
+      "duration": 60,
+      "focusNeed": 25,
+      "effect": "Geçidi kapatır; ateşle erir, ezici darbeyle kırılır.",
+      "sources": [
+        {
+          "id": "c_buz",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "id": "buhar_perdesi",
+      "name": "Buhar perdesi",
+      "mastery": "su_buyu",
+      "minMastery": 10,
+      "manaCost": 12,
+      "castTime": 2,
+      "range": 10,
+      "area": 5,
+      "damage": 4,
+      "duration": 15,
+      "focusNeed": 15,
+      "effect": "Görüşü kapatır, yakındakileri haşlar.",
+      "sources": [
+        {
+          "id": "buhar",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "simsek_zinciri",
+      "name": "Şimşek zinciri",
+      "mastery": "simsek_buyu",
+      "minMastery": 25,
+      "manaCost": 20,
+      "castTime": 1,
+      "range": 20,
+      "area": 0,
+      "damage": 22,
+      "duration": 0,
+      "focusNeed": 30,
+      "effect": "İletkenden iletkene atlar; metal zırhlı ve ıslak hedefler fazla yer.",
+      "sources": [
+        {
+          "id": "el_simsek",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "elektrik_golu",
+      "name": "Elektrik gölü",
+      "mastery": "simsek_buyu",
+      "minMastery": 25,
+      "manaCost": 18,
+      "castTime": 2,
+      "range": 15,
+      "area": 4,
+      "damage": 15,
+      "duration": 6,
+      "focusNeed": 25,
+      "effect": "Su birikintisini tuzağa çevirir.",
+      "sources": [
+        {
+          "id": "elektrikli_su",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "camur_tuzagi",
+      "name": "Çamur tuzağı",
+      "mastery": "toprak_buyu",
+      "minMastery": 12,
+      "manaCost": 14,
+      "castTime": 2,
+      "range": 15,
+      "area": 3,
+      "damage": 0,
+      "duration": 30,
+      "focusNeed": 15,
+      "effect": "Hedefi yavaşlatır, ağır zırhlıyı batırır.",
+      "sources": [
+        {
+          "id": "c_camur",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "obsidyen_hancer",
+      "name": "Obsidyen hançer",
+      "mastery": "toprak_buyu",
+      "minMastery": 35,
+      "manaCost": 20,
+      "castTime": 3,
+      "range": 0,
+      "area": 0,
+      "damage": 25,
+      "duration": 0,
+      "focusNeed": 35,
+      "effect": "Kalıcı, çok keskin ama kırılgan bir bıçak üretir.",
+      "sources": [
+        {
+          "id": "obsidyen",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "sis_ortusu",
+      "name": "Sis örtüsü",
+      "mastery": "su_buyu",
+      "minMastery": 15,
+      "manaCost": 16,
+      "castTime": 3,
+      "range": 0,
+      "area": 15,
+      "damage": 0,
+      "duration": 90,
+      "focusNeed": 20,
+      "effect": "Geniş alanda görüşü sıfırlar; pusu için.",
+      "sources": [
+        {
+          "id": "c_sis",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "yildirim_firtinasi",
+      "name": "Yıldırım fırtınası",
+      "mastery": "hava_buyu",
+      "minMastery": 55,
+      "manaCost": 90,
+      "castTime": 8,
+      "range": 40,
+      "area": 20,
+      "damage": 40,
+      "duration": 30,
+      "focusNeed": 70,
+      "effect": "Geniş alan, rastgele hedefler; kendine de çarpabilir.",
+      "sources": [
+        {
+          "id": "firtina",
+          "amount": 3
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "dede_kilici",
+      "name": "Dedenin kılıcı",
+      "slot": "Silah",
+      "weight": 1.4,
+      "durability": 100,
+      "familiarity": 1.3,
+      "value": 40,
+      "desc": "Köylüden aile yadigârı",
+      "bonuses": [
+        {
+          "target": "kritik",
+          "w": 3
+        }
+      ]
+    },
+    {
+      "id": "av_yayi",
+      "name": "Av yayı",
+      "slot": "Silah",
+      "weight": 0.9,
+      "durability": 100,
+      "familiarity": 1,
+      "value": 15,
+      "bonuses": [
+        {
+          "target": "isabet",
+          "w": 5
+        }
+      ]
+    },
+    {
+      "id": "deri_zirh",
+      "name": "Deri zırh",
+      "slot": "Zırh",
+      "weight": 6,
+      "durability": 100,
+      "familiarity": 1,
+      "value": 30,
+      "bonuses": [
+        {
+          "target": "kacinma",
+          "w": -2
+        }
+      ]
+    },
+    {
+      "id": "zincir_zirh",
+      "name": "Zincir zırh",
+      "slot": "Zırh",
+      "weight": 14,
+      "durability": 100,
+      "familiarity": 1,
+      "value": 120,
+      "desc": "Yüzülemez, sıcakta yorar",
+      "bonuses": [
+        {
+          "target": "kardiyo",
+          "w": -8
+        },
+        {
+          "target": "kacinma",
+          "w": -10
+        }
+      ]
+    }
+  ],
+  "reputation": {
+    "dimensions": [
+      {
+        "decay": 2,
+        "desc": "Kaç kişi seni duymuş",
+        "id": "taninirlik",
+        "max": 100,
+        "min": 0,
+        "name": "Tanınırlık",
+        "spreadDays": 3
+      },
+      {
+        "decay": 1,
+        "desc": "Sözünü tutar mısın",
+        "id": "guven",
+        "max": 100,
+        "min": -100,
+        "name": "Güven",
+        "spreadDays": 5
+      },
+      {
+        "decay": 1,
+        "desc": "Yeteneğin konuşuluyor mu",
+        "id": "saygi",
+        "max": 100,
+        "min": 0,
+        "name": "Saygı",
+        "spreadDays": 4
+      },
+      {
+        "decay": 3,
+        "desc": "Tehlikeli biri olarak mı biliniyorsun",
+        "id": "korku",
+        "max": 100,
+        "min": 0,
+        "name": "Korku",
+        "spreadDays": 2
+      },
+      {
+        "decay": 0.5,
+        "desc": "Adil misin, zayıfı korur musun",
+        "id": "onur",
+        "max": 100,
+        "min": -100,
+        "name": "Onur",
+        "spreadDays": 6
+      }
+    ],
+    "questImportance": [
+      {
+        "id": "basit",
+        "mult": 1,
+        "name": "Basit",
+        "repGain": 1
+      },
+      {
+        "id": "onemli",
+        "mult": 4,
+        "name": "Önemli",
+        "repGain": 4
+      },
+      {
+        "id": "hayati",
+        "mult": 10,
+        "name": "Hayati",
+        "repGain": 12
+      }
+    ],
+    "givers": [
+      {
+        "basic": "Ekmek, peynir, bir gece barınak",
+        "id": "koylu",
+        "important": "Temiz giysi, el yapımı bıçak",
+        "minRep": 0,
+        "name": "Köylü",
+        "vital": "Dedenin savaş kılıcı (aile yadigârı)",
+        "wealth": 1
+      },
+      {
+        "basic": "Birkaç bakır, öğün",
+        "id": "muhtar",
+        "important": "Ücretsiz konaklama, tanıklık",
+        "minRep": 5,
+        "name": "Köy muhtarı",
+        "vital": "Köyün koruyucusu unvanı, toprak",
+        "wealth": 2
+      },
+      {
+        "basic": "İndirim",
+        "id": "tuccar",
+        "important": "Kervanla güvenli yolculuk, nadir mal",
+        "minRep": 15,
+        "name": "Tüccar",
+        "vital": "Ortaklık, şehirlerde bağlantılar",
+        "wealth": 4
+      },
+      {
+        "basic": "Ders",
+        "id": "lonca",
+        "important": "Üyelik, özel teknik",
+        "minRep": 25,
+        "name": "Lonca ustası",
+        "vital": "Ustalık sırrı",
+        "wealth": 4
+      },
+      {
+        "basic": "Gümüş",
+        "id": "lord",
+        "important": "At, iyi zırh, malikânede yer",
+        "minRep": 45,
+        "name": "Lord",
+        "vital": "Şövalyelik",
+        "wealth": 7
+      },
+      {
+        "basic": "Altın",
+        "id": "kral",
+        "important": "Ünlü demircinin işi",
+        "minRep": 75,
+        "name": "Kral",
+        "vital": "Toprak, soyluluk, hazineden efsanevi eşya",
+        "wealth": 10
+      }
+    ]
+  }
+}
