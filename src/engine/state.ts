@@ -31,6 +31,7 @@ export interface GameState {
   quests: Record<string, QuestState>;
   metNpcs: string[];
   hp: number;
+  journal: Record<string, string[]>;           // düşman → deftere işlenmiş zayıf noktalar
   log: LogEntry[];
 }
 
@@ -44,13 +45,14 @@ export function newGame(cfg: Config, seed = Date.now() % 2147483647): GameState 
     version: SAVE_VERSION, seed, day: 1, minute: 60, energy: 90, satiety: 70, money: 6,
     region: "taspinar", attrs, rep: {}, inventory: { ekmek: 1, degnek: 1 },
     equipped: { weapon: "degnek" }, familiarity: { degnek: 30 }, quests: {}, metNpcs: [],
-    hp: 0, log: [],
+    hp: 0, journal: {}, log: [],
   };
   return s;
 }
 
 /** Config'e sonradan eklenen özellikleri eski kayda ekler. */
 export function migrate(cfg: Config, s: GameState): GameState {
+  s.journal ??= {};
   for (const a of cfg.data.attributes) {
     if (!s.attrs[a.id]) { const lv = a.base ?? 0; s.attrs[a.id] = { level: lv, pending: 0, peak: lv, lastUsedDay: s.day }; }
   }

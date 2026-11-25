@@ -51,7 +51,7 @@ export interface EnemyDef {
 }
 export const ENEMIES: Record<string, EnemyDef> = {
   kurt: {
-    id: "kurt", name: "Kurt", species: "hayvan", hp: 26, damage: [3, 6], move: 4, evasion: 18, accuracy: 62, armor: 0,
+    id: "kurt", name: "Kurt", species: "hayvan", hp: 22, damage: [3, 6], move: 4, evasion: 16, accuracy: 60, armor: 0,
     desc: "Aç ve cesur. Sürüyle avlanır, yandan dolanmayı sever.",
     weakPoints: [
       { id: "boyun", name: "Boyun", need: { analiz: 12, anatomi_hayvan: 3 }, critBonus: 12, at: [0.25, 0.42] },

@@ -71,10 +71,10 @@ export function doActivity(cfg: Config, s: GameState, actId: string, mult = 1): 
 }
 
 /** Savaş gibi gerçek kullanım: aktivitenin realUse çarpanıyla, tekrar sayısı kadar. */
-export function realUse(cfg: Config, s: GameState, actId: string, reps: number): GainReport {
+export function realUse(cfg: Config, s: GameState, actId: string, reps: number, scale = 1): GainReport {
   const act = cfg.act.get(actId); const report: GainReport = {};
   if (!act) return report;
-  const m = act.realUse ?? 1;
+  const m = (act.realUse ?? 1) * scale;
   for (let i = 0; i < reps; i++) for (const g of act.gains) applyGain(cfg, s, g.attribute, g.w * m, report);
   return report;
 }
