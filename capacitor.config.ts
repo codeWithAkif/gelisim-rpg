@@ -8,6 +8,7 @@ const config: CapacitorConfig = {
   plugins: {
     // Güncellemeleri kendimiz GitHub Releases'tan yönetiyoruz (src/update.ts); Capgo bulutu kullanılmaz.
     CapacitorUpdater: { autoUpdate: false, appReadyTimeout: 15000 },
+    LocalNotifications: { smallIcon: "ic_stat_defter", iconColor: "#9E3423" },
   },
 };
 export default config;

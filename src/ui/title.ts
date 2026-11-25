@@ -29,6 +29,7 @@ export function showTitle(o: TitleOpts) {
       <section class="sec"><h3>Savaş canlandırmaları</h3><div class="choices">
         ${chip("anim", "yavas", "Yavaş")}${chip("anim", "normal", "Normal")}${chip("anim", "hizli", "Hızlı")}${chip("anim", "kapali", "Kapalı")}</div>
         <p class="muted tiny" style="margin:0">Yürüme, saldırı, ateş topu ve hasar yazılarının hızı.</p></section>
+      <section class="sec"><h3>Bildirimler</h3><div class="choices"><button class="choice ${settings().notify ? "on" : ""}" data-notify="1"><b>Açık</b><span class="tiny">Çalışma bitince telefona haber ver</span></button><button class="choice ${settings().notify ? "" : "on"}" data-notify="0"><b>Kapalı</b></button></div></section>
       <section class="sec"><h3>Yazı boyutu</h3><div class="choices">${chip("text", "normal", "Normal")}${chip("text", "buyuk", "Büyük")}</div></section>
       <p class="muted tiny">Ayarlar kaydından ayrı tutulur; yeni oyuna başlamak ayarları silmez.</p>
       <section class="sec"><h3>Güncelleme</h3>${(() => { const u = lastUpdateStatus(); return u ? `<p class="${u.ok ? "" : "red"}" style="margin:0">${esc(u.text)}</p><p class="muted tiny" style="margin:0">${new Date(u.at).toLocaleString("tr-TR")}</p>` : `<p class="muted" style="margin:0">Henüz denetlenmedi.</p>`; })()}
@@ -43,6 +44,7 @@ export function showTitle(o: TitleOpts) {
   el.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b) return;
     if (b.dataset.set) { saveSettings({ ...settings(), [b.dataset.set]: b.dataset.val } as Settings); render(); return; }
+    if (b.dataset.notify) { saveSettings({ ...settings(), notify: b.dataset.notify === "1" }); render(); return; }
     switch (b.dataset.x) {
       case "continue": el.remove(); o.onContinue(); return;
       case "start": case "wipe": el.remove(); o.onNew(); return;

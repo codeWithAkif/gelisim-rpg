@@ -1,7 +1,7 @@
 // Oyuncu ayarları (kayıttan ayrı tutulur; yeni oyun başlatmak ayarları silmez).
-export interface Settings { anim: "yavas" | "normal" | "hizli" | "kapali"; text: "normal" | "buyuk" }
+export interface Settings { anim: "yavas" | "normal" | "hizli" | "kapali"; text: "normal" | "buyuk"; notify: boolean }
 const KEY = "gelisim-ayarlar";
-const DEF: Settings = { anim: "normal", text: "normal" };
+const DEF: Settings = { anim: "normal", text: "normal", notify: true };
 let cache: Settings | null = null;
 
 export function settings(): Settings {

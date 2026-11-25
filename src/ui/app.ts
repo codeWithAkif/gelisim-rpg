@@ -6,7 +6,7 @@ import { acceptQuest, walkQuest, completeQuest, itemName } from "../engine/quest
 import { maxHp } from "../engine/combat";
 import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
-import { QUESTS } from "../content/world";
+import { QUESTS, CRAFTS } from "../content/world";
 import { itemInfo, equip, unequip, drop, buy, bagOf } from "../engine/inventory";
 import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
 import { openSessionSheet, openSessionRun } from "./session-view";
@@ -21,6 +21,7 @@ import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { showIntro } from "./intro";
 import { applyDaylight } from "./daylight";
+import { notifyAt, clearNotify } from "../notify";
 import { showTitle } from "./title";
 import { applySettings } from "./settings";
 import { currentChapter } from "../engine/story";
@@ -78,7 +79,15 @@ export function startApp(root: HTMLElement) {
     if (fresh.length) toast(fresh[0].text);
     for (const k of Object.keys(s.alerts)) if (!now.has(k)) delete s.alerts[k];
   }
+  /** Oturum bitiş anına telefon bildirimi kurar. */
+  function scheduleNotify() {
+    const ss = s.session; if (!ss) return;
+    const name = ss.kind === "craft" ? itemInfo(cfg, (CRAFTS.find(c => c.id === ss.id)?.product) ?? "").name : ss.label;
+    notifyAt(ss.kind === "craft" ? "El işin bitti" : "Çalışman bitti", `${name} tamamlandı. Kazancını görmek için defterini aç.`, ss.startMs + ss.durMs)
+      .then(r => { if (r === "izin-yok") toast("Bildirim izni verilmedi; Ayarlar'dan açabilirsin."); });
+  }
   function sessionDone(r: SessionResult) {
+    clearNotify();
     if (r.kind === "craft") {
       if (r.early) { toast("Yarıda bıraktın; malzemeler çantanda."); persist(); render(); return; }
       const p = itemInfo(cfg, r.product!);
@@ -146,13 +155,13 @@ export function startApp(root: HTMLElement) {
         openSessionSheet(cfg, s, id, ms => {
           const p = startSession(cfg, s, id, ms, Date.now());
           if (!p.ok) { toast(p.reason ?? "Başlayamadın"); return; }
-          persist(); render(); openSessionRun(cfg, s, sessionDone, persist);
+          persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist);
         });
         break;
       case "craft": {
         const r = startCraft(cfg, s, id, Date.now());
         if (!r.ok) { toast(r.reason ?? "Başlayamadın"); break; }
-        persist(); render(); openSessionRun(cfg, s, sessionDone, persist); break;
+        persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist); break;
       }
       case "pick": ui.sel = ui.sel === id ? undefined : id; render(); break;
       case "eat": { const it = itemInfo(cfg, id); if (eat(s, id, it.satiety ?? 20)) { toast(`${it.name} yedin. Tokluk +${it.satiety}.`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); } break; }
