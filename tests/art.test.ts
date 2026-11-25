@@ -10,7 +10,7 @@ test("her görsel bilinen bir kişi, yer ya da eşyaya ait ve küçük boyutlu",
   for (const f of readdirSync(DIR)) {
     expect(f, f).toMatch(/^(portre|yer|esya|hikaye|dusman)_[a-z0-9_]+\.webp$/);
     const [, kind, id] = f.match(/^([a-z]+)_(.+)\.webp$/)!;
-    if (kind === "portre") expect(NPCS.some(n => n.id === id), f).toBe(true);
+    if (kind === "portre") expect(id === "anne" || NPCS.some(n => n.id === id), f).toBe(true);
     if (kind === "yer") expect(PLACES.some(p => p.id === id), f).toBe(true);
     if (kind === "esya") expect(items.has(id), f).toBe(true);
     expect(statSync(`${DIR}/${f}`).size, f).toBeLessThan(200_000);

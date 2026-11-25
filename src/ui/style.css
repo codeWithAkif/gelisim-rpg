@@ -310,3 +310,5 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 .art-place img { object-position: 50% 45%; }
 .art-thumb { flex: none; height: 84px; margin: -4px -6px 0; }
 .art-thumb img { object-position: 50% 55%; }
+.art-mother { width: 150px; height: 150px; margin: 0 auto; overflow: hidden; border-radius: 50%; -webkit-mask-image: radial-gradient(circle, #000 55%, transparent 72%); mask-image: radial-gradient(circle, #000 55%, transparent 72%); }
+.art-mother img { width: 100%; height: 100%; object-fit: cover; opacity: .85; filter: sepia(.25) brightness(calc(1 - var(--dark, 0) * .3)); }

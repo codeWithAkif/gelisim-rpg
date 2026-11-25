@@ -11,7 +11,7 @@ import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount } from "../eng
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, SHOP, CRAFTS } from "../content/world";
 import { esc, inkBar, wolfSketch, bodySketch, VITAL_ICONS } from "./sketch";
-import { personPic, itemPic, placePic } from "./art";
+import { personPic, itemPic, placePic, motherPic } from "./art";
 import { APP_VERSION } from "../update";
 import { phase, PHASE_ICONS } from "./daylight";
 import { here, place, activityPlace } from "../engine/travel";
@@ -94,7 +94,7 @@ export function defterScreen(cfg: Config, s: GameState): string {
       <p class="hand blue">${esc(s.name)} · tanınırlık ${rep} · güven ${Math.floor(repOf(s, s.region, "guven"))}</p>
     </section>
     <section class="sec"><h2>Tanıdıklar</h2><div class="people">${people}</div></section>
-    ${s.knownElements.length ? `<section class="sec"><h2>Annemin sayfaları</h2>${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` : ""}
+    ${s.knownElements.length ? `<section class="sec"><h2>Annemin sayfaları</h2>${motherPic()}${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` : ""}
     ${sawWolf ? `<section class="sec"><h2>Gözlemler</h2>
       <div class="card"><div class="entry-head"><span class="entry-title">Kurt</span><span class="entry-meta">${wolfMarks.length}/${ENEMIES.kurt.weakPoints.length} zayıf nokta</span></div>
       ${wolfSketch({ detail: analiz, marks: wolfMarks.map(w => ({ name: w.name, at: w.at })), width: 300 })}

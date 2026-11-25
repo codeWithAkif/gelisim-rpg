@@ -24,6 +24,12 @@ export function itemPic(id: string, size = 44): string {
   return `<img class="art-item" src="${url}" width="${size}" height="${size}" alt="" loading="lazy">`;
 }
 
+/** Annenin portresi: "Annemin sayfaları" bölümünün başında, bir anı gibi soluk. */
+export function motherPic(): string {
+  const url = ART["portre_anne"];
+  return url ? `<div class="art-mother"><img src="${url}" alt="Annem" loading="lazy"></div>` : "";
+}
+
 /** Yer görseli (yoksa boş). */
 export function placePic(id: string, name: string, cls = "art-place"): string {
   const url = ART["yer_" + id];
