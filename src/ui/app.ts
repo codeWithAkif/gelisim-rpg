@@ -27,6 +27,7 @@ import { applySettings } from "./settings";
 import { sfx, buzz, ambience, unlockAudio } from "./feel";
 import { darkness } from "./daylight";
 import { searchHere, deliverRequest } from "../engine/explore";
+import { sell, partner, stake, invest, withdraw, nightlyFinance } from "../engine/finance";
 import { itemPic, artUrl } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
@@ -198,11 +199,12 @@ export function startApp(root: HTMLElement) {
       case "unequip": { const r = unequip(cfg, s, id as "weapon" | "armor"); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "sleep": {
         if (s.journey) { toast("Yoldayken uyuyamazsın."); break; }
-        const hpBefore = s.hp; const rep = sleep(cfg, s);
+        const hpBefore = s.hp; const rep = sleep(cfg, s); const fin = nightlyFinance(s);
         const m = maxHp(cfg, s); s.hp = Math.min(m, Math.round(hpBefore + m * 0.6));
         persist(); render(false);
         modal(`<h2>Gün ${s.day - 1} bitti</h2><p class="lede">${rep.recovery < 1 ? "Aç yattın; vücudun tam dinlenemedi." : "Tok ve yorgun uyudun. Vücut gece çalıştı."}</p>
           <h3>Gece işlenen</h3>${gainList(cfg, rep.applied, 8)}
+          ${fin.length ? `<h3>Ortaklıklar</h3>${fin.map(l => `<div class="ledger-row"><small>${esc(l.partner)}</small><span>${esc(l.text)}</span><b class="${l.amount >= 0 ? "green" : "red"}">${l.amount >= 0 ? "+" : ""}${l.amount}</b></div>`).join("")}` : ""}
 `,
           [{ label: "Güne başla", cls: "primary", fn: () => storyTick() }]);
         break;
@@ -218,6 +220,12 @@ export function startApp(root: HTMLElement) {
       }
       case "menu": persist(); openTitle(); break;
       case "search": doSearch(); break;
+      case "sell": {
+        const r = sell(cfg, s, id);
+        if (!r.ok) { toast(r.reason ?? ""); break; }
+        sfx("coin"); buzz("light"); toast(`${itemInfo(cfg, id).name} sattın: +${r.price} bakır`); persist(); render(); break;
+      }
+      case "partner": openPartner(id); break;
       case "market": tab = "isler"; render(false); setTimeout(() => main.querySelector(".shop-item")?.closest("section")?.scrollIntoView({ behavior: "smooth" }), 50); break;
       case "toggle-done": ui.showDone = !ui.showDone; render(); break;
       case "deliver": {
@@ -228,6 +236,20 @@ export function startApp(root: HTMLElement) {
     }
   });
 
+  /** Ortaklık: şartlar, payın, yatır ya da çek. */
+  function openPartner(id: string) {
+    const p = partner(id)!; const st = stake(s, id); const lock = p.unlock(s);
+    const steps = [10, 25, 50].map(n => Math.max(n, st ? 0 : p.min)).filter((n, i, a) => a.indexOf(n) === i && st + n <= p.max && n <= s.money);
+    const risk = p.risk * (p.safer?.(s) ? 0.5 : 1);
+    const btns: { label: string; cls?: string; fn: () => void }[] = steps.map(n => ({ label: `${n} yatır`, cls: "primary", fn: () => { const r = invest(s, id, n); toast(r.ok ? `${p.name}: ${n} bakır yatırdın.` : r.reason ?? ""); if (r.ok) sfx("coin"); persist(); render(); } }));
+    if (st) btns.push({ label: `Payını çek (${st})`, fn: () => { const r = withdraw(s, id); toast(r.ok ? `${r.amount} bakır geri aldın.` : r.reason ?? ""); if (r.ok) sfx("coin"); persist(); render(); } });
+    btns.push({ label: "Kapat", fn: () => {} });
+    modal(`<p class="hand muted" style="margin:0">Ortaklık</p><h2>${esc(p.name)}</h2><p style="margin:0">${esc(p.desc)}</p>
+      <div class="odds"><span>Günlük getiri <b>~%${Math.round(p.rate * 100)}</b></span><span>Kötü gece <b>%${Math.round(risk * 100)}</b></span><span>Kötü gecede kayıp <b>~%${Math.round(p.loss * 100)}</b></span></div>
+      ${p.safer?.(s) ? `<p class="tiny green" style="margin:0">Yaptıkların sayesinde risk yarıya indi.</p>` : ""}
+      <p class="hand blue" style="margin:0">${lock && !st ? esc(lock) : st ? `Payın: ${st} bakır · şimdiye kadar +${s.partners![id].earned}` : `En az ${p.min}, en çok ${p.max} bakır koyabilirsin. Cebinde ${s.money} var.`}</p>
+      <p class="muted tiny" style="margin:0">Paylar her gece uyuyunca gelir. Payını istediğin zaman, ortağının yanındayken geri alabilirsin.</p>`, lock && !st ? [{ label: "Kapat", fn: () => {} }] : btns);
+  }
   /** Etrafı aramak: kısa bir arama anı, sonra ne bulunduğu. */
   function doSearch() {
     const bg = document.createElement("div"); bg.className = "modal-bg";

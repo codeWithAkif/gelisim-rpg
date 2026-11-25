@@ -193,7 +193,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     const n = acts.some(x => x.primary) ? null : nextHint(s);
     const nextRow = n && n.id ? `<div class="here-act next"><div><b>${esc(n.label)}</b>${n.sub ? `<div class="tiny muted">${esc(n.sub)}</div>` : ""}</div><button class="btn small blue" data-sel="${n.id}">Göster</button></div>` : "";
     return `<div class="here-acts">${nextRow}${acts.map(x => `<div class="here-act${x.primary ? " main" : ""}"><div><b>${esc(x.label)}</b>${x.sub ? `<div class="tiny muted">${esc(x.sub)}</div>` : ""}${x.disabled ? `<div class="tiny red">${esc(x.disabled)}</div>` : ""}</div>
-      <button class="btn small ${x.primary ? "red" : x.act === "accept" ? "primary" : ""}" data-act="${x.act}" data-id="${esc(x.id)}" ${x.disabled ? "disabled" : ""}>${x.act === "accept" ? "Üstlen" : x.act === "fight" ? "Hazırlan" : x.act === "walk" ? "Yap" : x.act === "deliver" ? "Ver" : x.act === "search" ? "Ara" : x.act === "market" ? "Aç" : "Başla"}</button></div>`).join("")}</div>`;
+      <button class="btn small ${x.primary ? "red" : x.act === "accept" ? "primary" : ""}" data-act="${x.act}" data-id="${esc(x.id)}" ${x.disabled ? "disabled" : ""}>${x.act === "accept" ? "Üstlen" : x.act === "fight" ? "Hazırlan" : x.act === "walk" ? "Yap" : x.act === "deliver" ? "Ver" : x.act === "search" ? "Ara" : x.act === "market" ? "Aç" : x.act === "partner" ? "Görüş" : "Başla"}</button></div>`).join("")}</div>`;
   }
   function renderCard() {
     if (s.journey) {

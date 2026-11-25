@@ -394,3 +394,8 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .map-card.here { max-height: 56%; }
 .place-more summary { cursor: pointer; }
 .place-more[open] { display: flex; flex-direction: column; gap: 4px; }
+.ledger { display: flex; flex-direction: column; }
+.ledger-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed var(--paper-edge); font-size: 14px; }
+.ledger-row small { color: var(--pencil); font-family: var(--f-hand); }
+.ledger-row b { font-family: var(--f-hand); font-size: 18px; font-variant-numeric: tabular-nums; }
+.ledger-row b.green { color: var(--green); } .ledger-row b.red { color: var(--red); }

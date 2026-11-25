@@ -8,6 +8,7 @@ import { maxHp } from "../engine/combat";
 import { maxMana } from "../engine/derived";
 import { planSession, SESSION_OPTIONS, wounded, TIME_SCALE, fmtDur } from "../engine/session";
 import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount } from "../engine/inventory";
+import { canSell, dayFactor, PARTNERS, stake } from "../engine/finance";
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, MARKETS, CRAFTS } from "../content/world";
 import { esc, inkBar, wolfSketch, humanSketch, bodySketch, VITAL_ICONS } from "./sketch";
@@ -117,6 +118,11 @@ export function defterScreen(cfg: Config, s: GameState, page = 0): string {
         ? `<img class="anatomy" src="${artUrl("dusman_kurt_anatomi")}" alt="Kurt anatomisi"><p class="hand blue" style="margin:0">Üç zayıf noktayı da buldun; Zehra'nın gösterdiği gibi iskeletini de çizdin.</p>`
         : wolfSketch({ detail: analiz, marks: wolfMarks.map(w => ({ name: w.name, at: w.at })), width: 300 })}
       <p style="margin:0;font-size:14px" class="muted">${analiz < 12 ? "Çizimin kaba. Gözlem yeteneğin geliştikçe detaylar oturur (resim dersi işe yarar)." : "Çizgilerin netleşti; hayvanın yapısını görmeye başladın."}</p></div></section>` });
+  const parts = PARTNERS.filter(p => stake(s, p.id) > 0);
+  if (parts.length || (s.ledger ?? []).length) pages.push({ title: "Hesap", html: `<section class="sec"><h2>Hesap defteri</h2>
+    <p class="hand blue" style="margin:0">Cebinde ${s.money} bakır${parts.length ? ` · ortaklıklarda ${parts.reduce((a, p) => a + stake(s, p.id), 0)} bakır` : ""}</p>
+    ${parts.map(p => { const st = s.partners![p.id]; return `<div class="card"><div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${st.amount} bakır</span></div><p class="tiny" style="margin:0">Gün ${st.since}'den beri · şimdiye kadar +${st.earned} bakır kazandırdı.</p></div>`; }).join("")}
+    <h3>Son hareketler</h3><div class="ledger">${(s.ledger ?? []).slice(0, 14).map(l => `<div class="ledger-row"><small>G${l.day}</small><span>${esc(l.text)}</span><b class="${l.amount >= 0 ? "green" : "red"}">${l.amount >= 0 ? "+" : ""}${l.amount}</b></div>`).join("") || `<p class="muted">Henüz bir hareket yok.</p>`}</div></section>` });
   pages.push({ title: "Notlar", html: `<section class="sec"><h2>Notlar</h2><div class="notes">${notes || `<div class="note">Köye yeni geldin. Çoban Hasan'ın bir derdi var gibi.</div>`}</div></section>
     <hr class="rule">
     <div class="row" style="justify-content:space-between"><button class="btn small" data-act="menu">Ana menü ve ayarlar</button><span class="muted" style="font-size:13px">Sürüm ${esc(APP_VERSION)}</span></div>` });
@@ -289,6 +295,17 @@ export function sessionSheet(cfg: Config, s: GameState, actId: string): string {
 }
 
 /* ---------------- İşler (karar) ---------------- */
+/** Pazarda satılabilecekler: günün fiyatıyla; aynı maldan çok satınca fiyat düşer. */
+function sellList(cfg: Config, s: GameState): string {
+  const ids = [...new Set(stacks(cfg, s).map(x => x.id))];
+  const rows = ids.map(id => {
+    const it = itemInfo(cfg, id); const c = canSell(cfg, s, id); const n = freeCount(cfg, s, id);
+    return `<div class="shop-item">${itemPic(id, 40)}<div><div class="nm">${esc(it.name)}${n > 1 ? ` <span class="muted tiny">×${n}</span>` : ""}</div><div class="muted tiny">${c.ok ? (dayFactor(s, s.location, id) > 1.1 ? "Bugün fiyatı iyi." : dayFactor(s, s.location, id) < 0.9 ? "Bugün fiyatı düşük." : "") : esc(c.reason ?? "")}</div></div>
+      <button class="btn small price" data-act="sell" data-id="${id}" ${c.ok ? "" : "disabled"}><span class="coin">${VITAL_ICONS.coin}</span>+${c.price}</button></div>`;
+  }).join("");
+  return `<h3>Sat</h3><p class="muted tiny" style="margin:0">Fiyatlar her gün değişir; aynı maldan çok satarsan düşer. Şehir otu ve kürkü köyden iyi alır.</p>${rows || `<p class="muted" style="margin:0">Satacak bir şeyin yok.</p>`}`;
+}
+
 /** İşler'in üstü: bulunduğun yerde etrafa bakmak ve köylülerin günlük istekleri. */
 function exploreCards(cfg: Config, s: GameState): string {
   let out = "";
@@ -354,6 +371,6 @@ export function islerScreen(cfg: Config, s: GameState, ui: UiState = {}): string
     <section class="sec"><h1>İşler</h1><p class="lede">${s.region && s.region !== "taspinar" ? "Önce bulunduğun yerin işleri; uzaktakiler aşağıda." : "Köylünün işi küçük, ödülü de küçük olur. Önemli bir iş, onun için değerli bir şey demektir."}</p></section>
     <section class="sec">${list || `<p class="muted" style="margin:0">Şu an açık bir iş yok. Köyü dolaş, insanlarla tanış.</p>`}
       ${doneCount ? `<div class="row"><button class="btn small" data-act="toggle-done">${ui.showDone ? "Tamamlananları gizle" : `Tamamlananları göster (${doneCount})`}</button></div>` : ""}</section>
-    <section class="sec"><h2>${esc(market?.name ?? "Pazar")}</h2>${market ? `<div>${shop}</div>` : `<p class="muted" style="margin:0">Burada pazar yok. ${s.region === "taspinar" ? "Köy pazarı meydanda." : s.region === "karacam" ? "Karaçam çarşısına git." : ""}</p>${s.region === "taspinar" ? `<div class="row"><button class="btn small blue" data-act="show-place" data-id="${SHOP_PLACE}">Haritada göster</button></div>` : ""}`}</section>
+    <section class="sec"><h2>${esc(market?.name ?? "Pazar")}</h2>${market ? `<h3>Al</h3><div>${shop}</div>${sellList(cfg, s)}` : `<p class="muted" style="margin:0">Burada pazar yok. ${s.region === "taspinar" ? "Köy pazarı meydanda." : s.region === "karacam" ? "Karaçam çarşısına git." : ""}</p>${s.region === "taspinar" ? `<div class="row"><button class="btn small blue" data-act="show-place" data-id="${SHOP_PLACE}">Haritada göster</button></div>` : ""}`}</section>
   </div>`;
 }

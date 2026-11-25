@@ -50,6 +50,9 @@ export interface GameState {
   requests?: { day: number; ids: string[]; done: string[] };
   relics?: string[];                           // kadim eşyalar
   pet?: { id: string; name: string; bond: number }; // evcil hayvan: bağ büyüdükçe işe yarar
+  market?: { day: number; sold: Record<string, number> };          // bugün ne sattın (fiyat düşer)
+  partners?: Record<string, { amount: number; since: number; earned: number }>; // ortaklıklar
+  ledger?: { day: number; text: string; amount: number }[];         // hesap defteri
   log: LogEntry[];
 }
 

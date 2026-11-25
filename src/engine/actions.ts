@@ -8,9 +8,10 @@ import { nextMilestone } from "./story";
 import { NPC_PLACE } from "../content/map";
 import { FINDS, SEARCH_MINUTES } from "../content/explore";
 import { MARKETS } from "../content/world";
+import { partnerAt, stake } from "./finance";
 
 export interface PlaceAction {
-  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place";
+  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place" | "partner";
   id: string; label: string; sub?: string; disabled?: string; primary?: boolean;
 }
 /** Bulunduğun yerde yapılabilecekler, önem sırasıyla. */
@@ -24,7 +25,9 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
   for (const r of dailyRequests(s)) if (r.place === placeId && !r.done)
     out.push({ act: "deliver", id: r.def.id, label: `${r.npcName}'in isteği`, sub: r.def.text, disabled: r.have ? undefined : "Çantanda yeterince yok" });
   if (FINDS[placeId]) { const c = placeId === s.location ? canSearch(s) : { ok: true }; out.push({ act: "search", id: "", label: `Etrafı ara (${SEARCH_MINUTES} dk)`, disabled: c.ok ? undefined : c.reason }); }
-  if (MARKETS[placeId]) out.push({ act: "market", id: placeId, label: MARKETS[placeId].name, sub: "Alışveriş için" });
+  if (MARKETS[placeId]) out.push({ act: "market", id: placeId, label: MARKETS[placeId].name, sub: "Al, sat" });
+  for (const p of partnerAt(placeId)) { const lock = p.unlock(s); const st = stake(s, p.id);
+    if (!lock || st) out.push({ act: "partner", id: p.id, label: `Ortaklık: ${p.name}`, sub: st ? `Payın: ${st} bakır` : `En az ${p.min} bakır` }); }
   for (const a of cfg.data.activities) {
     if (a.kind === "kullanim") continue;
     const where = activityPlace(a.id);
