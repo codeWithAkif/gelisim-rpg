@@ -2,10 +2,11 @@
 // Savaş ekranı ve hazırlık ekranı aynı çiziciyi kullanır.
 import { TERRAIN, ENEMIES, type Terrain } from "../content/world";
 import type { Unit, Weather, XY } from "../engine/combat";
+import { animScale } from "./settings";
 
 const SQ3 = Math.sqrt(3);
 const TAU = Math.PI * 2;
-const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+const reducedMotion = () => animScale() === 0;
 function hash(x: number, y: number) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 const ease = (t: number) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
@@ -90,9 +91,9 @@ export class MapRenderer {
   /* ---------- canlandırmalar (Promise döner) ---------- */
   private tween(dur: number, step: (t: number) => void): Promise<void> {
     if (reducedMotion()) { step(1); return Promise.resolve(); }
-    return new Promise(res => this.tweens.push({ t0: performance.now(), dur, step, done: res }));
+    return new Promise(res => this.tweens.push({ t0: performance.now(), dur: dur * animScale(), step, done: res }));
   }
-  wait(ms: number) { return reducedMotion() ? Promise.resolve() : new Promise<void>(r => setTimeout(r, ms)); }
+  wait(ms: number) { return reducedMotion() ? Promise.resolve() : new Promise<void>(r => setTimeout(r, ms * animScale())); }
   async animMove(uid: string, path: XY[]) {
     const d = this.ds.get(uid); if (!d || path.length < 2) return;
     for (let i = 1; i < path.length; i++) {
@@ -120,7 +121,7 @@ export class MapRenderer {
   }
   async animProjectile(from: XY, to: XY, kind: Projectile["kind"]) {
     const a = this.center(...from), b = this.center(...to);
-    const p: Projectile = { from: { x: a.cx, y: a.cy - this.size * 0.5 }, to: { x: b.cx, y: b.cy - this.size * 0.2 }, t0: performance.now(), dur: 450, kind };
+    const p: Projectile = { from: { x: a.cx, y: a.cy - this.size * 0.5 }, to: { x: b.cx, y: b.cy - this.size * 0.2 }, t0: performance.now(), dur: 450 * animScale(), kind };
     if (reducedMotion()) return;
     this.projs.push(p);
     await this.wait(p.dur);

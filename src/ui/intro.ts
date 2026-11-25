@@ -2,7 +2,7 @@
 import { INTRO, type IntroPage } from "../content/story";
 import { esc, roughPath } from "./sketch";
 
-function art(kind: IntroPage["art"]): string {
+export function art(kind: IntroPage["art"]): string {
   const g = (d: string, extra = "") => `<path d="${d}" ${extra}/>`;
   let body = "";
   if (kind === "defter") {

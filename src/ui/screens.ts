@@ -85,7 +85,7 @@ export function defterScreen(cfg: Config, s: GameState): string {
 
     <section class="sec"><h2>Notlar</h2><div class="notes">${notes || `<div class="note">Köye yeni geldin. Çoban Hasan'ın bir derdi var gibi.</div>`}</div></section>
     <hr class="rule">
-    <div class="row" style="justify-content:space-between"><button class="btn small red" data-act="reset">Yeni oyuna başla</button><span class="muted" style="font-size:13px">Sürüm ${esc(APP_VERSION)}</span></div>
+    <div class="row" style="justify-content:space-between"><button class="btn small" data-act="menu">Ana menü ve ayarlar</button><span class="muted" style="font-size:13px">Sürüm ${esc(APP_VERSION)}</span></div>
   </div>`;
 }
 

@@ -12,6 +12,9 @@ import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, gainLis
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { showIntro } from "./intro";
+import { showTitle } from "./title";
+import { applySettings } from "./settings";
+import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 
 type Tab = "defter" | "vucut" | "calis" | "isler";
@@ -124,12 +127,7 @@ export function startApp(root: HTMLElement) {
         if (slot === "Silah") s.equipped.weapon = id; else if (slot === "Zırh") s.equipped.armor = id;
         s.familiarity[id] ??= 0; toast(slot === "Silah" ? "Yeni silaha alışman zaman alacak." : "Kuşandın."); persist(); render(); break;
       }
-      case "reset":
-        modal(`<h2>Yeni oyun</h2><p>Bu defterdeki her şey silinecek: gelişimin, tanıdıkların, eşyaların.</p>`, [
-          { label: "Vazgeç", fn: () => {} },
-          { label: "Sil ve baştan başla", cls: "red", fn: () => { reset(); s = newGame(cfg); s.hp = maxHp(cfg, s); persist(); tab = "defter"; render(false); beginIntro(); } },
-        ]);
-        break;
+      case "menu": persist(); openTitle(); break;
     }
   });
 
@@ -138,8 +136,20 @@ export function startApp(root: HTMLElement) {
   }
 
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
+  function newGameNow() { reset(); s = newGame(cfg); s.hp = maxHp(cfg, s); persist(); tab = "defter"; ui.lastResult = undefined; render(false); beginIntro(); }
+  function openTitle() {
+    const started = s.introDone;
+    showTitle({
+      hasSave: started,
+      summary: `${s.name} · Gün ${s.day} · ${currentChapter(s).title}`,
+      onContinue: () => { render(false); storyTick(); },
+      onNew: newGameNow,
+    });
+  }
+
+  applySettings();
   render(false);
   persist();
-  if (!s.introDone) beginIntro(); else storyTick();
+  openTitle();
 
 }
