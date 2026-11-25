@@ -8,7 +8,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI: NATIVE_VERSION yalnız yerel (native) değişiklikte artar; APP_VERSION her yayında
-        versionCode (System.getenv("NATIVE_VERSION") ?: "1").toInteger()
+        versionCode Integer.parseInt(System.getenv("NATIVE_VERSION") ?: "1")
         versionName System.getenv("APP_VERSION") ?: "0.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
