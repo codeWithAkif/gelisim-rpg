@@ -49,6 +49,7 @@ export interface GameState {
   searched?: { day: number; found: Record<string, number>; tries: Record<string, number> };
   requests?: { day: number; ids: string[]; done: string[] };
   relics?: string[];                           // kadim eşyalar
+  pet?: { id: string; name: string; bond: number }; // evcil hayvan: bağ büyüdükçe işe yarar
   log: LogEntry[];
 }
 

@@ -14,7 +14,7 @@ import { ENEMIES, GAME_ITEMS, MAPS, MAP_CHARS, TERRAIN, CONFIG_WEAPON_DAMAGE, CO
 export type Weather = "acik" | "yagmur" | "sis";
 export type XY = [number, number];
 export interface Unit {
-  uid: string; side: "player" | "enemy"; def?: string; name: string;
+  uid: string; side: "player" | "enemy" | "ally"; def?: string; name: string;
   x: number; y: number; hp: number; maxHp: number;
   moveLeft: number; acted: boolean; slowed: number; fled?: boolean;
   blind?: number; scared?: boolean;
@@ -33,7 +33,8 @@ export type BattleEvent =
   | { k: "trap"; uid: string; dmg: number }
   | { k: "alert"; uid: string }
   | { k: "throw"; from: XY; to: XY; lit: boolean }
-  | { k: "defend" };
+  | { k: "defend" }
+  | { k: "shoot"; from: XY; to: XY; target: string; hit: boolean; crit: boolean; dmg: number };
 
 export interface Battle {
   w: number; h: number; tiles: Terrain[][];
@@ -44,7 +45,7 @@ export interface Battle {
   units: Unit[]; turn: number;
   phase: "player" | "enemy" | "won" | "lost" | "fled";
   seed: number; log: string[]; events: BattleEvent[];
-  stats: { attacks: number; hits: number; crits: number; observed: number; dmgTaken: number; moves: number; casts: number; castMastery: Record<string, number>; ambushes: number; pushes: number };
+  stats: { attacks: number; hits: number; crits: number; observed: number; dmgTaken: number; moves: number; casts: number; castMastery: Record<string, number>; ambushes: number; pushes: number; shots?: number; petHits?: number };
   fire: Record<string, number>;   // "x,y" → kalan yanma turu
   walls: Record<string, number>;  // "x,y" → kalan buz duvarı turu
   traps: Record<string, number>;  // "x,y" → kurulu tuzak
@@ -165,6 +166,7 @@ export function assessPlan(cfg: Config, s: GameState, sc: Scenario, p: Plan): Ad
 
 /* ---------- kurulum ---------- */
 export function player(b: Battle) { return b.units.find(u => u.side === "player")!; }
+export function allies(b: Battle) { return b.units.filter(u => u.side === "ally" && u.hp > 0 && !u.fled); }
 export function enemies(b: Battle) { return b.units.filter(u => u.side === "enemy" && u.hp > 0 && !u.fled); }
 export function unitAt(b: Battle, x: number, y: number) { return b.units.find(u => u.hp > 0 && !u.fled && u.x === x && u.y === y); }
 export function unitById(b: Battle, uid: string) { return b.units.find(u => u.uid === uid); }
@@ -195,6 +197,11 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
     const d = ENEMIES[id]; const [x, y] = m.enemies[i % m.enemies.length];
     units.push({ uid: "e" + i, side: "enemy", def: id, name: d.scale ? d.name : `${d.name} ${i + 1}`, x, y, hp: d.hp, maxHp: d.hp, moveLeft: 0, acted: false, slowed: 0, alert: night || !!plan.ambushed });
   });
+  if (s.pet) {
+    const d = ENEMIES[s.pet.id]; const free = [[st.at[0] - 1, st.at[1]], [st.at[0] + 1, st.at[1]], [st.at[0], st.at[1] - 1], [st.at[0], st.at[1] + 1]]
+      .find(([x, y]) => inside({ w: m.rows[0].length, h: m.rows.length }, x, y) && m.rows[y][x] !== "=" && !units.some(u => u.x === x && u.y === y));
+    if (d && free) { const hp = petHp(s); units.push({ uid: "pet", side: "ally", def: s.pet.id, name: s.pet.name, x: free[0], y: free[1], hp, maxHp: hp, moveLeft: 0, acted: false, slowed: 0 }); }
+  }
   const traps: Record<string, number> = {};
   for (const [x, y] of plan.traps.slice(0, 2)) traps[key(x, y)] = 1;
   const b: Battle = {
@@ -536,6 +543,7 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
   b.phase = "enemy"; const rng = new Rng(b.seed); const p = player(b);
   const out: string[] = tickEnvironment(b, rng);
   checkEnd(b);
+  if (b.phase === "enemy") { allyTurn(cfg, s, b, rng, out); checkEnd(b); if ((b.phase as Battle["phase"]) === "won") { b.seed = rng.seed; out.forEach(t => b.log.unshift(t)); return out; } }
   for (const e of b.phase === "enemy" ? enemies(b) : []) {
     const d = ENEMIES[e.def!];
     // habersiz kurtlar sürüye doğru sinsice ilerler
@@ -584,12 +592,82 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
       } else out.push(p.defending ? `${e.name} atıldı; değneğe çarpıp geri sekti.` : `${e.name} atıldı, son anda kaçtın.`);
       b.events.push({ k: "attack", uid: e.uid, target: p.uid, hit, crit: false, dmg });
       if (p.hp <= 0) break;
+    } else if (e.alert) {
+      // oyuncu yanında değilse yanındaki köpeğe dişlerini geçirir
+      const a = allies(b).find(x => dist(e.x, e.y, x.x, x.y) === 1);
+      if (a) {
+        const hit = rng.chance(Math.max(10, d.accuracy - ENEMIES[a.def!].evasion - (blind ? 30 : 0)));
+        const dmg = hit ? rng.int(d.damage[0], d.damage[1]) : 0;
+        if (hit) { a.hp = Math.max(0, a.hp - dmg); out.push(`${e.name} ısırdı: ${a.name}, ${dmg} hasar.`); }
+        b.events.push({ k: "attack", uid: e.uid, target: a.uid, hit, crit: false, dmg });
+        if (a.hp <= 0) { a.fled = true; a.hp = 0; out.push(`${a.name} inleyerek savaştan kaçtı.`); b.events.push({ k: "flee", uid: a.uid }); }
+      }
     }
   }
   b.seed = rng.seed; out.forEach(t => b.log.unshift(t)); b.dodgeQ = undefined;
   b.turn++; checkEnd(b);
   if (b.phase === "enemy") startPlayerTurn(cfg, s, b);
   return out;
+}
+
+/* ---------- evcil hayvan ---------- */
+export function petHp(s: GameState) { return 14 + Math.floor((s.pet?.bond ?? 0) / 5); }
+/** Köpek kendi turunda en yakın kurda koşar, yanındaysa ısırır. Bağ büyüdükçe isabet ve hasar artar. */
+function allyTurn(cfg: Config, s: GameState, b: Battle, rng: Rng, out: string[]) {
+  const bond = s.pet?.bond ?? 0;
+  for (const a of allies(b)) {
+    const foes = enemies(b); if (!foes.length) return;
+    let e = foes.sort((x, y) => dist(a.x, a.y, x.x, x.y) - dist(a.x, a.y, y.x, y.y))[0];
+    if (dist(a.x, a.y, e.x, e.y) > 1) {
+      const r = reachable(b, a, 4); let best: XY | null = null, bd = dist(a.x, a.y, e.x, e.y);
+      for (const k of r.keys()) { const [x, y] = k.split(",").map(Number); const d = dist(x, y, e.x, e.y); if (d < bd) { bd = d; best = [x, y]; } }
+      if (best) { const path = pathTo(b, a, 4, best[0], best[1]); b.events.push({ k: "move", uid: a.uid, path: [[a.x, a.y], ...path] }); a.x = best[0]; a.y = best[1]; }
+    }
+    e = enemies(b).sort((x, y) => dist(a.x, a.y, x.x, x.y) - dist(a.x, a.y, y.x, y.y))[0];
+    if (!e || dist(a.x, a.y, e.x, e.y) !== 1) continue;
+    const d = ENEMIES[e.def!];
+    const hit = rng.chance(Math.max(15, Math.min(90, 55 + bond / 4 - d.evasion)));
+    let dmg = 0;
+    if (hit) { dmg = rng.int(2, 4) + Math.floor(bond / 30); e.hp = Math.max(0, e.hp - dmg); e.alert = true; b.stats.petHits = (b.stats.petHits ?? 0) + 1; out.push(`${a.name} ısırdı: ${e.name}, ${dmg} hasar.` + moraleCheck(b, e)); }
+    else out.push(`${a.name} havladı, ${e.name} geri sıçradı.`);
+    b.events.push({ k: "attack", uid: a.uid, target: e.uid, hit, crit: false, dmg });
+  }
+}
+
+/* ---------- ok ---------- */
+export const BOW_RANGE = 5;
+export function hasBow(s: GameState) { return (s.inventory.av_yayi ?? 0) > 0 || s.equipped.weapon === "av_yayi"; }
+export interface ShotPreview { ok: boolean; reason?: string; hit: number; crit: number; dmg: [number, number]; range: number }
+export function previewShot(cfg: Config, s: GameState, b: Battle, target: Unit): ShotPreview {
+  const p = player(b); const d = dist(p.x, p.y, target.x, target.y);
+  const okc = s.attrs.okculuk?.level ?? 0, gor = s.attrs.gorus?.level ?? 10;
+  const base = { hit: 0, crit: 0, dmg: [0, 0] as [number, number], range: d };
+  if (!hasBow(s)) return { ok: false, reason: "Yayın yok", ...base };
+  if (!(s.inventory.ok ?? 0)) return { ok: false, reason: "Okun kalmadı", ...base };
+  if (d > BOW_RANGE) return { ok: false, reason: "Menzil dışı", ...base };
+  if (!visible(cfg, s, b, target)) return { ok: false, reason: "Göremiyorsun", ...base };
+  if (p.acted) return { ok: false, reason: "Bu tur hamle yaptın", ...base };
+  const ed = ENEMIES[target.def!];
+  const hit = Math.max(5, Math.min(92, 38 + okc * 1.3 + (gor - 10) * 0.5 - (d - 1) * 6 - ed.evasion * 0.6 - (b.weather === "yagmur" ? 10 : 0) - b.wind.strength * 4 - (b.night && !b.torch.has ? 15 : 0)));
+  const crit = Math.max(0, Math.min(60, 4 + okc * 0.6));
+  const lo = 4 + Math.floor(okc / 10), hi = 7 + Math.floor(okc / 8);
+  return { ok: true, hit, crit, dmg: [Math.max(1, lo - ed.armor), Math.max(1, hi - ed.armor)], range: d };
+}
+/** quality: yay çekme oyununun sonucu (0–1, kafaya isabet 1.25); verilmezse zar. */
+export function playerShoot(cfg: Config, s: GameState, b: Battle, target: Unit, quality?: number): AttackResult | null {
+  const pv = previewShot(cfg, s, b, target); if (!pv.ok || b.phase !== "player") return null;
+  const p = player(b); const rng = new Rng(b.seed); const tm = attackTimingMods(quality);
+  p.acted = true; p.moveLeft = 0; s.inventory.ok -= 1; if (!s.inventory.ok) delete s.inventory.ok;
+  s.energy = Math.max(0, s.energy - 3); b.stats.shots = (b.stats.shots ?? 0) + 1;
+  const hitP = quality === undefined ? pv.hit : quality <= 0 ? 0 : Math.min(97, pv.hit * 0.4 + 60 * quality + tm.hit);
+  const hit = rng.chance(hitP); const crit = hit && rng.chance(pv.crit + tm.crit);
+  let dmg = 0;
+  if (hit) { dmg = rng.int(pv.dmg[0], pv.dmg[1]); if (crit) { dmg = Math.round(dmg * 1.8); b.stats.crits++; } target.hp = Math.max(0, target.hp - dmg); target.alert = true; }
+  const text = hit ? `${crit ? "Kritik! " : ""}Ok saplandı: ${target.name}, ${dmg} hasar.` : `Ok ıskaladı: ${target.name} sıyrıldı.`;
+  b.events.push({ k: "shoot", from: [p.x, p.y], to: [target.x, target.y], target: target.uid, hit, crit, dmg });
+  const res: AttackResult = { hit, crit, dmg, text: text + (hit ? moraleCheck(b, target) : "") };
+  b.seed = rng.seed; b.log.unshift(res.text); detect(b, true); checkEnd(b);
+  return res;
 }
 
 /** Bu düşman turunda oyuncuya saldırı gelecek mi? (Tur deterministik; kopyada denenir.) */
@@ -616,6 +694,8 @@ export function finishBattle(cfg: Config, s: GameState, b: Battle): BattleOutcom
   if (b.stats.moves) applyGain(cfg, s, "bacak", b.stats.moves * 0.03, gains);
   if (b.stats.pushes) { applyGain(cfg, s, "ust_govde", b.stats.pushes * 0.15, gains); applyGain(cfg, s, "core", b.stats.pushes * 0.15, gains); }
   if (b.stats.ambushes) applyGain(cfg, s, "taktik", b.stats.ambushes * 0.4, gains);
+  if (b.stats.shots) { const g = realUse(cfg, s, "okculuk_idman", b.stats.shots, 0.15); for (const [k, v] of Object.entries(g)) gains[k] = (gains[k] ?? 0) + v; }
+  if (s.pet && b.units.some(u => u.uid === "pet")) s.pet.bond = Math.min(100, s.pet.bond + 2 + (b.stats.petHits ?? 0) * 0.5 + (b.phase === "won" ? 1 : 0));
   // büyü: her başarılı/başarısız deneme ilgili ustalığı, odağı ve kapasiteyi geliştirir
   for (const [attr, n] of Object.entries(b.stats.castMastery)) applyGain(cfg, s, attr, n * 0.5, gains);
   if (b.stats.casts) { applyGain(cfg, s, "odak", b.stats.casts * 0.15, gains); applyGain(cfg, s, "mana", b.stats.casts * 0.15, gains); }

@@ -6,9 +6,9 @@ import {
   type Battle, type BattleOutcome, type Plan, type Scenario, type Stance, type XY,
   createBattle, player, enemies, reachable, movePlayer, playerAttack, observe, enemyTurn, tryFlee, finishBattle,
   previewAttack, knownWeakPoints, dist, visible, sightRange, threatMap, unitById, playerPush, pushChance, pushTarget,
-  playerDefend, canThrowTorch, throwTorch, key, WIND_NAMES, incomingAttack,
+  playerDefend, canThrowTorch, throwTorch, key, WIND_NAMES, incomingAttack, hasBow, previewShot, playerShoot,
 } from "../engine/combat";
-import { slashPrompt, dodgePrompt, runePrompt, pushPrompt } from "./gesture-view";
+import { slashPrompt, dodgePrompt, runePrompt, pushPrompt, bowPrompt } from "./gesture-view";
 import { skillEase } from "../engine/timing";
 import { spellRunes } from "../engine/gesture";
 import { settings } from "./settings";
@@ -81,6 +81,11 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     for (const e of evs) {
       switch (e.k) {
         case "move": sfx("step"); await R.animMove(e.uid, e.path); break;
+        case "shoot": {
+          sfx("whoosh"); await R.animProjectile(e.from, e.to, "ok");
+          if (e.hit) { R.flash(e.target); sfx(e.crit ? "crit" : "hit"); buzz(e.crit ? "medium" : "light"); R.floatAt(e.target, `${e.crit ? "Kritik! " : ""}−${e.dmg}`, "#9E3423"); } else { sfx("miss"); R.floatAt(e.target, "ıska", "#8B8270"); }
+          await R.wait(200); break;
+        }
         case "attack": {
           const onMe = e.target === player(b).uid;
           sfx(!e.hit ? "miss" : e.crit ? "crit" : onMe ? "hurt" : "hit");
@@ -156,7 +161,9 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
           <button class="btn ${stance === "guclu" ? "primary" : ""}" data-b="stance" ${!can ? "disabled" : ""} title="İsabet −15, hasar ×1,5, daha yorucu">Güçlü</button>
           <button class="btn" data-b="push" ${!adj || !can ? "disabled" : ""}>İt %${Math.round(pushChance(cfg, s, b, tgt))}${adj && !pt.blocked ? ` → ${esc(pt.into)}` : ""}</button>
           <button class="btn blue" data-b="observe" ${!can ? "disabled" : ""}>Gözle</button>
+          ${hasBow(s) ? (() => { const sv = previewShot(cfg, s, b, tgt); return `<button class="btn" data-b="shoot" ${sv.ok && can ? "" : "disabled"}>Ok at${sv.ok ? ` %${Math.round(sv.hit)}` : ""} · ${s.inventory.ok ?? 0} ok</button>`; })() : ""}
         </div>
+        ${hasBow(s) && !previewShot(cfg, s, b, tgt).ok && can ? `<p class="muted tiny" style="margin:0">Ok: ${esc(previewShot(cfg, s, b, tgt).reason ?? "")}${previewShot(cfg, s, b, tgt).reason === "Menzil dışı" ? ` (en çok ${5} altıgen)` : ""}</p>` : ""}
         ${!adj ? `<p class="muted tiny" style="margin:0">Vurmak ya da itmek için yanına git.</p>` : ""}`;
     } else {
       body = `<p class="muted tiny" style="margin:0">Mavi taralı altıgenlere dokunarak yürü, kurda dokunarak incele. Kırmızı gölge: kurtların bir sonraki turda saldırabileceği yer.${b.night || b.weather === "sis" ? " Görüşün kısıtlı." : ""}</p>`;
@@ -241,6 +248,17 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
         let q: number | undefined; const p = player(b);
         if (settings().timing) { busy = true; const pt = pushTarget(b, tgt); q = await pushPrompt(stage(), { dir: screenAngle([p.x, p.y], [tgt.x, tgt.y]), ease: skillEase(s, "ust_govde"), into: pt.into && pt.into !== "çayır" ? pt.into : undefined }); busy = false; }
         playerPush(cfg, s, b, tgt, q); after();
+      })(); break;
+      case "shoot": if (tgt) void (async () => {
+        let q: number | undefined;
+        if (settings().timing) {
+          busy = true; const sv = previewShot(cfg, s, b, tgt);
+          // yan rüzgâr: rüzgârın doğu-batı bileşeni
+          const wind = Math.cos(b.wind.dir * Math.PI / 3) * b.wind.strength / 2;
+          q = await bowPrompt(stage(), { range: sv.range, wind, ease: skillEase(s, "okculuk") * 0.6 + skillEase(s, "gorus") * 0.4 });
+          busy = false;
+        }
+        playerShoot(cfg, s, b, tgt, q); after();
       })(); break;
       case "observe": if (tgt) { observe(cfg, s, b, tgt); after(); } break;
       case "defend": playerDefend(b); after(); break;

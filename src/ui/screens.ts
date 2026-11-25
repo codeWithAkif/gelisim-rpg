@@ -97,7 +97,10 @@ export function defterScreen(cfg: Config, s: GameState, page = 0): string {
       <p class="lede">Dağ eteğinde, otuz hanelik bir köy. ${rep <= 0 ? "Burada kimse seni tanımıyor." : rep < 5 ? "Birkaç kişi adını duymuş." : rep < 15 ? "Köyde adın anılmaya başladı." : "Köylüler seni selamlıyor."}</p>
       <p class="hand blue">${esc(s.name)} · tanınırlık ${rep} · güven ${Math.floor(repOf(s, s.region, "guven"))}</p>
     </section>` },
-    { title: "Tanıdıklar", html: `<section class="sec"><h2>Tanıdıklar</h2><div class="people">${people}</div></section>` },
+    { title: "Tanıdıklar", html: `<section class="sec"><h2>Tanıdıklar</h2><div class="people">${people}</div></section>
+      ${s.pet ? `<section class="sec"><h2>Yol arkadaşın</h2><div class="card"><div class="entry-head"><span class="entry-title">${esc(s.pet.name)}</span><span class="entry-meta">bağ ${Math.floor(s.pet.bond)}/100</span></div>
+        <div class="gb"><div class="gf" style="width:${s.pet.bond}%;background:var(--green)"></div></div>
+        <p class="tiny" style="margin:0">Savaşta yanındaki kurda koşar ve ısırır; kurtlar onu da hedef alır. Etrafı ararken burnu, kokuyla bulunan şeylerde çok işe yarar ve günde bir bulgu fazladan getirir. Birlikte savaştıkça ve gezdikçe bağınız güçlenir; güçlendikçe daha isabetli ısırır, daha çok dayanır.</p></div></section>` : ""}` },
     { title: "Koleksiyon", html: collectionSection(s) },
   ];
   if (s.knownElements.length) pages.push({ title: "Annem", html: `<section class="sec"><h2>Annemin sayfaları</h2>${motherPic()}${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` });

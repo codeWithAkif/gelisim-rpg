@@ -55,6 +55,7 @@ export function attackWindow(s: GameState): number {
 /** Saldırıya zamanlama etkisi: isabet ve kritik puanı. q yoksa (komut kapalı) etkisiz. */
 export function attackTimingMods(q?: number): { hit: number; crit: number } {
   if (q === undefined) return { hit: 0, crit: 0 };
+  if (q > 1) return { hit: 14, crit: 45 };   // hassas noktadan geçen kesik / kafaya ok: zor ama yıkıcı
   if (q >= 1) return { hit: 8, crit: 15 };
   if (q >= 0.6) return { hit: 3, crit: Math.round(8 * q) };
   if (q > 0) return { hit: 0, crit: 0 };

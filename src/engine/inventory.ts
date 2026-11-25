@@ -3,7 +3,7 @@
 import type { Config } from "./config";
 import { type GameState, log } from "./state";
 import { applyGain, type GainReport } from "./progression";
-import { GAME_ITEMS, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, CRAFTS, type ItemKind, type Craft } from "../content/world";
+import { GAME_ITEMS, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, CONFIG_PRICES, CRAFTS, type ItemKind, type Craft } from "../content/world";
 
 export interface ItemInfo { id: string; name: string; kind: ItemKind; stack: number; desc: string; capacity?: number; satiety?: number; damage?: number; armor?: number; price?: number }
 export function itemInfo(cfg: Config, id: string): ItemInfo {
@@ -11,7 +11,7 @@ export function itemInfo(cfg: Config, id: string): ItemInfo {
   if (g) return { id, name: g.name, kind: g.slot, stack: g.stack ?? 1, desc: g.desc, capacity: g.capacity, satiety: g.satiety, damage: g.damage, armor: g.armor, price: g.price };
   const c = cfg.item.get(id);
   const kind: ItemKind = c?.slot === "Silah" ? "Silah" : c?.slot === "Zırh" || c?.slot === "Giysi" ? "Zırh" : "Eşya";
-  return { id, name: c?.name ?? id, kind, stack: 1, desc: c?.desc ?? "", damage: CONFIG_WEAPON_DAMAGE[id], armor: CONFIG_ARMOR[id] };
+  return { id, name: c?.name ?? id, kind, stack: 1, desc: c?.desc ?? "", damage: CONFIG_WEAPON_DAMAGE[id], armor: CONFIG_ARMOR[id], price: CONFIG_PRICES[id] };
 }
 export const DEFAULT_BAG = "bez_torba";
 export function bagOf(s: GameState) { return s.equipped.bag ?? DEFAULT_BAG; }

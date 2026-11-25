@@ -46,6 +46,7 @@ export function completeQuest(cfg: Config, s: GameState, id: string): RewardRepo
   s.money += def.rewards.money ?? 0;
   const gains: GainReport = {};
   for (const [a, n] of Object.entries(def.rewards.gains ?? {})) applyGain(cfg, s, a, n, gains);
+  if (def.rewards.pet && !s.pet) s.pet = { id: def.rewards.pet, name: "Karabaş", bond: 5 };
   const relics: Relic[] = [];
   for (const r of def.rewards.relics ?? []) { const g = grantRelic(cfg, s, r, gains); if (g) relics.push(g); }
   const giver = npc(def.giverNpc);

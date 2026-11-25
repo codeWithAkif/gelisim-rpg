@@ -29,7 +29,7 @@ export interface Overlay {
 interface DS { x: number; y: number; face: number; alpha: number; lying: number; offX: number; offY: number; flash: number; walk: number; pose?: "defend" | "swing" | "leap" }
 interface Floater { x: number; y: number; text: string; color: string; size: number; t0: number; dur: number }
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; t0: number; color: string }
-interface Projectile { from: { x: number; y: number }; to: { x: number; y: number }; t0: number; dur: number; kind: "ates" | "mesale" | "buz" | "genel" }
+interface Projectile { from: { x: number; y: number }; to: { x: number; y: number }; t0: number; dur: number; kind: "ates" | "mesale" | "buz" | "genel" | "ok" }
 interface Tween { t0: number; dur: number; step: (t: number) => void; done: () => void }
 
 export class MapRenderer {
@@ -144,11 +144,11 @@ export class MapRenderer {
   splat(x: number, y: number, r: number, color: string) { this.splats.push({ x, y, r, t0: performance.now(), color, seed: Math.random() * 1000 }); if (this.splats.length > 30) this.splats.shift(); }
   async animProjectile(from: XY, to: XY, kind: Projectile["kind"]) {
     const a = this.center(...from), b = this.center(...to);
-    const p: Projectile = { from: { x: a.cx, y: a.cy - this.size * 0.5 }, to: { x: b.cx, y: b.cy - this.size * 0.2 }, t0: performance.now(), dur: 450 * animScale(), kind };
+    const p: Projectile = { from: { x: a.cx, y: a.cy - this.size * 0.5 }, to: { x: b.cx, y: b.cy - this.size * 0.2 }, t0: performance.now(), dur: (kind === "ok" ? 300 : 450) * animScale(), kind };
     if (reducedMotion()) return;
     this.projs.push(p);
     await this.wait(p.dur);
-    this.burst(b.cx, b.cy - this.size * 0.2, kind === "buz" ? "#9FD3E8" : "#D66C28", 18);
+    if (kind !== "ok") this.burst(b.cx, b.cy - this.size * 0.2, kind === "buz" ? "#9FD3E8" : "#D66C28", 18);
   }
   async animPush(uid: string, to: XY, ok: boolean) {
     const d = this.ds.get(uid); if (!d) return;
@@ -291,6 +291,14 @@ export class MapRenderer {
     }
     for (const p of [...this.projs]) {
       const k = (this.now - p.t0) / p.dur; if (k >= 1) { this.projs.splice(this.projs.indexOf(p), 1); continue; }
+      if (p.kind === "ok") {
+        // ok: alçak, hızlı yay; ucu yönüne bakar
+        const arc = (kk: number) => ({ x: p.from.x + (p.to.x - p.from.x) * kk, y: p.from.y + (p.to.y - p.from.y) * kk - Math.sin(kk * Math.PI) * this.size * 0.5 });
+        const a = arc(k), b2 = arc(Math.max(0, k - 0.08)); const L = this.size * 0.7; const ang = Math.atan2(a.y - b2.y, a.x - b2.x);
+        c.strokeStyle = "#5B4630"; c.lineWidth = 2; c.beginPath(); c.moveTo(a.x - Math.cos(ang) * L, a.y - Math.sin(ang) * L); c.lineTo(a.x, a.y); c.stroke();
+        c.fillStyle = "#3A3A40"; c.beginPath(); c.moveTo(a.x + Math.cos(ang) * 5, a.y + Math.sin(ang) * 5); c.lineTo(a.x + Math.cos(ang + 2.5) * 4, a.y + Math.sin(ang + 2.5) * 4); c.lineTo(a.x + Math.cos(ang - 2.5) * 4, a.y + Math.sin(ang - 2.5) * 4); c.fill();
+        continue;
+      }
       const x = p.from.x + (p.to.x - p.from.x) * k, y = p.from.y + (p.to.y - p.from.y) * k - Math.sin(k * Math.PI) * this.size * 1.4;
       for (let i = 0; i < 6; i++) { const kk = Math.max(0, k - i * 0.03); const tx = p.from.x + (p.to.x - p.from.x) * kk, ty = p.from.y + (p.to.y - p.from.y) * kk - Math.sin(kk * Math.PI) * this.size * 1.4; c.beginPath(); c.arc(tx, ty, this.size * (0.16 - i * 0.02), 0, TAU); c.fillStyle = p.kind === "buz" ? `rgba(159,211,232,${0.7 - i * 0.1})` : `rgba(${230 - i * 10},${120 - i * 12},40,${0.75 - i * 0.11})`; c.fill(); }
       c.beginPath(); c.arc(x, y, this.size * 0.2, 0, TAU); c.fillStyle = p.kind === "buz" ? "#E6F4FA" : "#FFD27A"; c.fill();

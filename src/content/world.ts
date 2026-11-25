@@ -25,6 +25,7 @@ export const GAME_ITEMS: Record<string, GameItem> = {
   ip: { id: "ip", name: "Kenevir ipi", slot: "Malzeme", stack: 10, price: 1, desc: "Sağlam bir sicim. Dikiş ve tuzak için." },
   bez_torba: { id: "bez_torba", name: "Bez torba", slot: "Çanta", capacity: 8, desc: "Omza asılan kaba bir torba. 8 göz." },
   deri_canta: { id: "deri_canta", name: "Deri çanta", slot: "Çanta", capacity: 12, desc: "Kendi diktiğin, iki bölmeli deri çanta. 12 göz." },
+  ok: { id: "ok", name: "Ok", slot: "Malzeme", stack: 20, price: 1, desc: "Kaz tüylü, demir uçlu av oku. Atınca çoğu zaman kaybolur." },
   kurt_postu: { id: "kurt_postu", name: "Akyele'nin postu", slot: "Zırh", armor: 2, desc: "Kalın, beyaz yeleli bir post. Soğuğu ve dişleri tutar." },
   // keşifle toplananlar (content/explore.ts)
   kekik: { id: "kekik", name: "Kekik", slot: "Malzeme", stack: 10, desc: "Yaylanın taşlarında biter. Zehra çayına katar." },
@@ -44,7 +45,9 @@ export const CRAFTS: Craft[] = [
   { id: "canta_dik", product: "deri_canta", needs: { deri: 2, ip: 2 }, skill: { el_becerisi: 12 }, minutes: 60, gains: { el_becerisi: 0.8, odak: 0.2 } },
 ];
 /** Köy pazarında satılanlar. */
-export const SHOP = ["ekmek", "peynir", "deri", "ip"];
+export const SHOP = ["ekmek", "peynir", "deri", "ip", "ok", "av_yayi"];
+/** Config eşyalarının köy pazarındaki fiyatı. */
+export const CONFIG_PRICES: Record<string, number> = { av_yayi: 24 };
 
 /** Config'deki ekipmanların silah değerleri (config'de hasar alanı gelene kadar). */
 export const CONFIG_WEAPON_DAMAGE: Record<string, number> = { dede_kilici: 10, av_yayi: 7 };
@@ -92,6 +95,8 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
 };
 
+/** Evcil köpek savaşta düşman tanımı biçimini kullanır (çizim, isabet). */
+ENEMIES.kopek = { ...ENEMIES.kurt, id: "kopek", name: "Karabaş", hp: 14, damage: [2, 4], accuracy: 55, evasion: 22, weakPoints: [], scale: 0.78, tint: "sepia(.9) saturate(1.6) brightness(.62)", desc: "Hasan'ın verdiği çoban köpeği." };
 ENEMIES.akyele = {
   ...ENEMIES.kurt, id: "akyele", name: "Akyele", hp: 40, damage: [4, 8], evasion: 20, accuracy: 66, armor: 1, anatomyOf: "kurt", scale: 1.3, tint: "brightness(1.35) saturate(.4)",
   desc: "Boynunda beyaz bir yele. Kuzeyden inen sürünün başı; açlığı onu cesur, yaşı onu kurnaz yapmış.",
@@ -103,7 +108,7 @@ export const AMBUSH_MAP = "patika";
 export interface QuestDef {
   id: string; title: string; giverNpc: string; importance: "basit" | "onemli" | "hayati";
   text: string; minutes: number; battle?: { enemies: string[]; map: string };
-  rewards: { items?: Record<string, number>; money?: number; note: string; gains?: Record<string, number>; relics?: string[] };
+  rewards: { items?: Record<string, number>; money?: number; note: string; gains?: Record<string, number>; relics?: string[]; pet?: string };
   requires?: string[];
   repeatable?: boolean;
   retiredBy?: string;    // bu iş bitince görev listeden kalkar (ör. sürü dağılınca devriye)
@@ -139,6 +144,12 @@ export const QUESTS: QuestDef[] = [
     text: "\"Bu dağda otuz yıldır çobanım, hiç bu kadar kurt görmedim,\" diyor Hasan. İzler Meşe korusunun kuzeyine çıkıyor. Nereden geldiklerini bul.",
     rewards: { money: 3, gains: { iz_surme: 1.5, koku: 0.8 }, note: "İzleri sürmek sana iz okumayı öğretti. Hasan üç bakır verdi." },
     afterText: "İzler korunun kuzeyinde, eski bir kaya yarığında bitiyor. Yarığın ağzında, yazın ortasında donmuş bir karaca yatıyor; tüyleri kırağı tutmuş. Kurtlar avlarının peşinden aşağı inmiş.",
+  },
+  {
+    id: "kopek", title: "Öksüz yavru", giverNpc: "hasan", importance: "basit", minutes: 20, requires: ["kurt_izi"], at: "yayla", doneText: "Yavruyu al",
+    text: "Kurtlar Hasan'ın çoban köpeğini parçalamış; geriye bir yavru kalmış. \"Bana bakacak gücüm yok,\" diyor Hasan. \"Sen gezersin, o da seninle gezsin.\"",
+    rewards: { pet: "kopek", items: { ekmek: 1 }, note: "Kara kulaklı bir yavru. Adı Karabaş. Hasan bir ekmek de sıkıştırdı." },
+    afterText: "Karabaş ilk gün peşinden ayrılmadı. Burnu senin göremediğin şeyleri buluyor; büyüdükçe kurtlara karşı da yanında duracak.",
   },
   {
     id: "donmus_av", title: "Donmuş karaca", giverNpc: "zehra", importance: "onemli", minutes: 30, requires: ["kurt_izi", "annenin_izi"], at: "zehra_evi", doneText: "Zehra'ya anlat",

@@ -46,7 +46,7 @@ const isNight = (s: GameState) => { const h = hourOf(s); return h >= 20.5 || h <
 function todaySearch(s: GameState) { if (!s.searched || s.searched.day !== s.day) s.searched = { day: s.day, found: {}, tries: {} }; return s.searched; }
 export function searchInfo(s: GameState, place = s.location): { left: number; finds: number } {
   const t = s.searched?.day === s.day ? s.searched : undefined;
-  return { left: Math.max(0, FINDS_PER_DAY - (t?.found[place] ?? 0)), finds: FINDS[place]?.length ?? 0 };
+  return { left: Math.max(0, FINDS_PER_DAY + (s.pet ? 1 : 0) - (t?.found[place] ?? 0)), finds: FINDS[place]?.length ?? 0 };
 }
 export function canSearch(s: GameState): { ok: boolean; reason?: string } {
   if (!FINDS[s.location]) return { ok: false, reason: "Burada aranacak bir şey yok" };
@@ -60,7 +60,9 @@ export function canSearch(s: GameState): { ok: boolean; reason?: string } {
 /** Bulma şansı (%): ilgili duyu ve gözlemle artar. */
 export function findChance(s: GameState, sense: string): number {
   const lv = (s.attrs[sense]?.level ?? 10) * 0.7 + (s.attrs.analiz?.level ?? 10) * 0.3;
-  return Math.max(25, Math.min(85, 40 + (lv - 10) * 1.5));
+  // köpeğin burnu kokuyla bulunanlarda çok, diğerlerinde biraz yardım eder; bağ büyüdükçe artar
+  const pet = s.pet ? (sense === "koku" ? 12 : 6) + s.pet.bond / 8 : 0;
+  return Math.max(25, Math.min(92, 40 + (lv - 10) * 1.5 + pet));
 }
 /** 20 dakika etrafı arar. Bulunanlar çantaya, ilk kez bulunanlar deftere. */
 export function searchHere(cfg: Config, s: GameState): SearchResult {
@@ -85,6 +87,7 @@ export function searchHere(cfg: Config, s: GameState): SearchResult {
   }
   const c = collectible(pick.id)!;
   t.found[s.location] = (t.found[s.location] ?? 0) + 1;
+  if (s.pet) s.pet.bond = Math.min(100, s.pet.bond + 0.5);
   s.collection ??= {};
   const first = !(c.id in s.collection) && !(c.id === "kurt" && collected(s).has("kurt"));
   if (first) s.collection[c.id] = s.day;
