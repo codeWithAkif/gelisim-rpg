@@ -418,8 +418,9 @@ export class MapRenderer {
     const c = this.ctx; const f = d.face;
     const im = (d.pose === "swing" && this.img("poz_kahraman_vurus")) || ((u.defending || d.pose === "defend") && this.img("poz_kahraman_savunma")) || this.img("poz_kahraman_durus");
     if (im) {
-      const h = 44 * k, w = h * im.naturalWidth / im.naturalHeight;
-      c.scale(f, 1); if (d.flash > 0) c.filter = `sepia(1) saturate(4) hue-rotate(-30deg)`;
+      // pozlar aynı ölçekte kesildi: duruş boyu 373 px = 56 birim; görseller sola bakar
+      const s = 56 * k / 373, h = im.naturalHeight * s, w = im.naturalWidth * s;
+      c.scale(-f, 1); if (d.flash > 0) c.filter = `sepia(1) saturate(4) hue-rotate(-30deg)`;
       c.drawImage(im, -w / 2, -h + bob, w, h); c.filter = "none"; d.flash = Math.max(0, d.flash - 0.05); return;
     } const step = Math.sin(d.walk) * 3 * k;
     c.lineCap = "round"; c.lineJoin = "round"; c.strokeStyle = "#2A2722"; c.lineWidth = 1.6 * k;
