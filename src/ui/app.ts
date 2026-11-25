@@ -42,6 +42,14 @@ export function startApp(root: HTMLElement) {
     const fresh = advanceStory(s);
     if (!fresh.length) { after?.(); return; }
     persist(); render();
+    // birden fazla sayfa birden açıldıysa (eski kayıt, art arda olaylar) tek özet pencere
+    if (fresh.length > 1) {
+      const last = fresh[fresh.length - 1];
+      modal(`<p class="hand muted" style="margin:0">Defterin önceki sayfaları</p><h2>${esc(last.title)}</h2>
+        <div>${fresh.slice(0, -1).map(m => `<div class="story-step done"><span class="mk" style="color:var(--green)">✓</span><span class="t">${esc(m.title)}</span></div>`).join("")}</div>
+        <p style="font-size:18px;line-height:1.5">${esc(last.text)}</p>`, [{ label: "Deftere işle", cls: "primary", fn: () => after?.() }]);
+      return;
+    }
     const show = (i: number) => {
       if (i >= fresh.length) { after?.(); return; }
       const m = fresh[i];
