@@ -12,6 +12,8 @@ import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, SHOP, CRAFTS } from "../content/world";
 import { esc, inkBar, portrait, wolfSketch, bodySketch, itemIcon, VITAL_ICONS } from "./sketch";
 import { APP_VERSION } from "../update";
+import { here, place, activityPlace } from "../engine/travel";
+import { NPC_PLACE, SHOP_PLACE } from "../content/map";
 
 export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string }
 
@@ -65,6 +67,7 @@ export function statusBar(cfg: Config, s: GameState): string {
   return `<header class="status">
     <div class="day">Gün ${s.day}<small>${clock(s)}${late ? " · gün bitti" : ""}</small></div>
     <div class="money">${s.money} bakır</div>
+    <button class="where" data-act="show-place" data-id="${esc(s.location)}">⌖ ${esc(here(s).name)}</button>
     <div class="vitals">${g}</div>
     ${al.length ? `<div class="alert-strip ${al[0].level}" role="status"><b>!</b><span>${esc(al[0].text)}${al.length > 1 ? ` <i>(+${al.length - 1})</i>` : ""}</span></div>` : ""}
   </header>`;
@@ -200,7 +203,8 @@ export function calisScreen(cfg: Config, s: GameState, ui: UiState): string {
       <span class="entry-meta">saatte yorgunluk ${Math.round((a.fatigue ?? 0) * perHour)}${t ? ` · ${t.fee ?? 0} bakır/sa` : ""}</span></div>
       ${t ? `<div style="font-size:14px" class="muted">Öğretmen: ${esc(t.name)}</div>` : ""}
       <div class="chips">${chips}</div>
-      ${best ? `<div class="row"><button class="btn small" data-act="session-pick" data-id="${esc(id)}">Başla</button></div>` : `<div class="lock">${esc(any.reason ?? "")}</div>`}</div>`;
+      ${best ? `<div class="row"><button class="btn small" data-act="session-pick" data-id="${esc(id)}">Başla</button></div>` : `<div class="lock">${esc(any.reason ?? "")}</div>`}
+      ${!best && activityPlace(id) && !activityPlace(id)!.includes(s.location) ? `<div class="row"><button class="btn small blue" data-act="show-place" data-id="${esc(activityPlace(id)![0])}">Haritada göster</button></div>` : ""}</div>`;
   };
   const isMagic = (a: { params?: Record<string, unknown> }) => typeof a.params?.element === "string";
   const selfActs = cfg.data.activities.filter(a => a.kind === "aktivite" && !isMagic(a)).map(a => row(a.id)).join("");
@@ -242,10 +246,12 @@ export function islerScreen(cfg: Config, s: GameState): string {
     const g = npc(q.def.giverNpc); const imp = cfg.importance(q.def.importance);
     const giver = cfg.giver(g.giver);
     let action = "";
-    if (q.status === "yeni") action = `<button class="btn small" data-act="accept" data-id="${q.def.id}">Üstlen</button>`;
-    if (q.status === "aktif") action = q.def.battle
+    const giverAt = NPC_PLACE[q.def.giverNpc];
+    const goBtn = (pl: string) => `<button class="btn small blue" data-act="show-place" data-id="${pl}">${esc(place(pl)?.name ?? pl)} · haritada göster</button>`;
+    if (q.status === "yeni") action = s.location === giverAt ? `<button class="btn small" data-act="accept" data-id="${q.def.id}">Üstlen</button>` : `<span class="muted tiny">${esc(g.name)} ${esc(place(giverAt)?.name ?? "")} tarafında.</span>${goBtn(giverAt)}`;
+    if (q.status === "aktif") action = s.location !== q.def.at ? goBtn(q.def.at) : q.def.battle
       ? `<button class="btn small red" data-act="fight" data-id="${q.def.id}" ${left < 30 ? "disabled" : ""}>Meraya çık</button>`
-      : `<button class="btn small blue" data-act="walk" data-id="${q.def.id}" ${left < q.def.minutes ? "disabled" : ""}>Git (${q.def.minutes} dk)</button>`;
+      : `<button class="btn small blue" data-act="walk" data-id="${q.def.id}" ${left < q.def.minutes ? "disabled" : ""}>${esc(q.def.doneText ?? "Yap")} (${q.def.minutes} dk)</button>`;
     const reward = q.status === "bitti"
       ? `<div class="hand green" style="color:var(--green)">Ödül: ${esc(q.def.rewards.note)}</div>`
       : `<div style="font-size:14px" class="muted">${esc(giver?.name ?? "")} · ${esc(imp?.name ?? "")} iş. Ödülü verenin imkânı kadar olur.</div>`;
@@ -266,6 +272,6 @@ export function islerScreen(cfg: Config, s: GameState): string {
       <span class="muted tiny">Kaslar uykuda gelişir, yaralar kapanır. Tok uyumak tam dinlenme demek.</span></div></section>
     <section class="sec"><h1>İşler</h1><p class="lede">Köylünün işi küçük, ödülü de küçük olur. Önemli bir iş, onun için değerli bir şey demektir.</p></section>
     <section class="sec">${list}</section>
-    <section class="sec"><h2>Köy pazarı</h2><div>${shop}</div></section>
+    <section class="sec"><h2>Köy pazarı</h2>${s.location === SHOP_PLACE ? `<div>${shop}</div>` : `<p class="muted" style="margin:0">Pazar köy meydanında.</p><div class="row"><button class="btn small blue" data-act="show-place" data-id="${SHOP_PLACE}">Haritada göster</button></div>`}</section>
   </div>`;
 }

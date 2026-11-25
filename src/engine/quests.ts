@@ -47,7 +47,7 @@ export function completeQuest(cfg: Config, s: GameState, id: string): RewardRepo
   return { items, money: def.rewards.money ?? 0, rep, note: def.rewards.note, dropped };
 }
 
-/** Savaşsız görevi yürüyerek bitirir. */
+/** Savaşsız görevi yerinde bitirir (yolculuk ayrıca haritadan yapılır). */
 export function walkQuest(cfg: Config, s: GameState, id: string): RewardReport | { error: string } {
   const def = QUESTS.find(q => q.id === id)!;
   if (DAY_MINUTES - s.minute < def.minutes) return { error: "Bugün buna vakit yok" };

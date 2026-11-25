@@ -24,6 +24,7 @@ export interface GameState {
   satiety: number;         // tokluk 0–100
   money: number;           // bakır
   region: string;
+  location: string;                            // haritada bulunduğun yer
   attrs: Record<string, AttrState>;
   rep: Record<string, Record<string, number>>; // bölge → boyut → değer
   inventory: Record<string, number>;           // eşya → adet
@@ -52,7 +53,7 @@ export function newGame(cfg: Config, seed = Date.now() % 2147483647): GameState 
   }
   const s: GameState = {
     version: SAVE_VERSION, seed, day: 1, minute: 60, energy: 90, satiety: 70, money: 6,
-    region: "taspinar", attrs, rep: {}, inventory: { ekmek: 1, degnek: 1, bez_torba: 1 },
+    region: "taspinar", location: "yayla", attrs, rep: {}, inventory: { ekmek: 1, degnek: 1, bez_torba: 1 },
     equipped: { weapon: "degnek", bag: "bez_torba" }, familiarity: { degnek: 30 }, quests: {}, metNpcs: [],
     hp: 0, journal: {}, name: "Yolcu", introDone: false, knownElements: [], mana: -1,
     story: { reached: [], flags: {} }, log: [],
@@ -63,6 +64,7 @@ export function newGame(cfg: Config, seed = Date.now() % 2147483647): GameState 
 /** Config'e sonradan eklenen özellikleri eski kayda ekler. */
 export function migrate(cfg: Config, s: GameState): GameState {
   s.journal ??= {};
+  s.location ??= "koy_meydani"; // eski kayıtlar köyde
   if (!s.equipped.bag) { s.equipped.bag = "bez_torba"; s.inventory.bez_torba = (s.inventory.bez_torba ?? 0) + 1; }
   s.name ??= "Yolcu";
   // eski kayıtlar: açılışı zaten geçmiş say

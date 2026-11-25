@@ -6,6 +6,7 @@ import { applyGain, summarize, DEFERRED_CATEGORIES, type GainReport } from "./pr
 import { maxHp } from "./combat";
 import { teacherOf, CRAFTS } from "../content/world";
 import { craftById, craftCheck, completeCraft, removeItem, addItem } from "./inventory";
+import { activityPlace, place } from "./travel";
 
 export interface SessionOption { id: string; label: string; ms: number }
 export const SESSION_OPTIONS: SessionOption[] = [
@@ -30,6 +31,8 @@ export function planSession(cfg: Config, s: GameState, actId: string, ms: number
   let fee = 0;
   const base = { energy, minutes, fee };
   if (s.session) return { ok: false, reason: "Zaten çalışıyorsun", ...base };
+  const where = activityPlace(actId);
+  if (where && !where.includes(s.location)) return { ok: false, reason: `Burada olmaz: ${where.map(w => place(w)?.name ?? w).join(" ya da ")}`, ...base };
   if (minutes > minutesLeft(s)) return { ok: false, reason: "Hava kararmadan bitmez", ...base };
   const el = act.params?.element;
   if (typeof el === "string" && !s.knownElements.includes(el)) return { ok: false, reason: "Defterinde bu sayfa yok", ...base };

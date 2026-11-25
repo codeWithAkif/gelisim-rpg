@@ -124,11 +124,11 @@ h3 { font-size: 22px; }
 
 /* alt sekmeler */
 .tabs {
-  display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1.5px solid var(--ink); background: var(--paper-2);
+  display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1.5px solid var(--ink); background: var(--paper-2);
   padding-bottom: var(--safe-bottom);
 }
 .tabs button { border: 0; background: none; padding: 8px 0 9px; display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer; color: var(--ink-soft); min-height: 56px; }
-.tabs button span { font-family: var(--f-hand); font-size: 19px; font-weight: 700; line-height: 1; }
+.tabs button span { font-family: var(--f-hand); font-size: 17px; font-weight: 700; line-height: 1; }
 .tabs button svg { width: 24px; height: 24px; }
 .tabs button[aria-current="page"] { color: var(--ink); }
 .tabs button[aria-current="page"] span { text-decoration: underline wavy var(--red) 1.5px; text-underline-offset: 4px; }
@@ -264,3 +264,18 @@ h3 { font-size: 22px; }
 .sess-time { font-family: var(--f-hand); font-size: 34px; font-weight: 700; text-align: center; }
 .choice.off { opacity: .55; }
 .choice .tiny { font-size: 12px; }
+
+/* harita */
+.where { grid-column: 1 / -1; justify-self: start; border: 0; background: none; padding: 0; font-family: var(--f-hand); font-size: 18px; color: var(--blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+main.map-mode { padding: 0; overflow: hidden; position: relative; }
+.map-host, .map-wrap { position: absolute; inset: 0; }
+.map-svg { width: 100%; height: 100%; display: block; touch-action: none; background: #B9CDD0; }
+.map-label { font-family: var(--f-hand); font-weight: 700; fill: var(--ink); paint-order: stroke; stroke: #EDE4CB; stroke-width: 3px; stroke-linejoin: round; }
+.map-label.faint { fill: var(--ink-soft); }
+.map-zoom { position: absolute; top: 10px; left: 10px; display: flex; border: 1.5px solid var(--ink); border-radius: 8px; overflow: hidden; background: var(--paper); }
+.map-zoom button { border: 0; background: none; padding: 6px 12px; font-family: var(--f-hand); font-size: 18px; font-weight: 700; cursor: pointer; border-right: 1px solid var(--pencil); }
+.map-zoom button:last-child { border-right: 0; }
+.map-zoom button.on { background: var(--ink); color: var(--paper); }
+.map-card { position: absolute; left: 10px; right: 10px; bottom: 10px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 6px 14px 6px 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; box-shadow: 3px 3px 0 rgba(42,39,34,.25); max-height: 40%; overflow-y: auto; }
+.map-card:empty { display: none; }
+.map-card .person { display: inline-flex; align-items: center; gap: 4px; }

@@ -25,7 +25,7 @@ describe("çanta", () => {
     const s = newGame(cfg, 1); addItem(cfg, s, "annenin_heybesi", 1); equip(cfg, s, "annenin_heybesi");
     addItem(cfg, s, "deri", 120);
     expect(equip(cfg, s, "bez_torba").ok).toBe(false);
-    const t = newGame(cfg, 1); const m = t.money; expect(buy(cfg, t, "ip").ok).toBe(true); expect(t.money).toBe(m - 1);
+    const t = newGame(cfg, 1); expect(buy(cfg, t, "ip").ok).toBe(false); t.location = "koy_meydani"; const m = t.money; expect(buy(cfg, t, "ip").ok).toBe(true); expect(t.money).toBe(m - 1);
   });
 });
 

@@ -10,6 +10,8 @@ import { QUESTS } from "../content/world";
 import { itemInfo, equip, unequip, drop, buy, bagOf } from "../engine/inventory";
 import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
 import { openSessionSheet, openSessionRun } from "./session-view";
+import { mountMap } from "./map-view";
+import { travel, place } from "../engine/travel";
 import { esc, ICONS } from "./sketch";
 import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
@@ -20,14 +22,16 @@ import { applySettings } from "./settings";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 
-type Tab = "defter" | "vucut" | "canta" | "calis" | "isler";
+type Tab = "defter" | "vucut" | "canta" | "harita" | "calis" | "isler";
 // bilgi sayfaları solda, karar sayfaları sağda
-const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["canta", "Çanta"], ["calis", "Çalış"], ["isler", "İşler"]];
+const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["canta", "Çanta"], ["harita", "Harita"], ["calis", "Çalış"], ["isler", "İşler"]];
 
 export function startApp(root: HTMLElement) {
   let s: GameState = load(cfg);
   let tab: Tab = (() => { try { return (localStorage.getItem("gelisim-sekme") as Tab) || "defter"; } catch { return "defter"; } })();
   const ui: UiState = {};
+  let mapState: ReturnType<ReturnType<typeof mountMap>["state"]> | undefined;
+  let mapApi: ReturnType<typeof mountMap> | undefined;
   if (!s.hp) s.hp = maxHp(cfg, s);
 
   root.innerHTML = `<div id="statusSlot"></div><main id="main" tabindex="-1"></main>
@@ -40,6 +44,19 @@ export function startApp(root: HTMLElement) {
   function render(keepScroll = true) {
     const y = main.scrollTop;
     root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
+    if (mapApi) { mapState = mapApi.state(); mapApi = undefined; }
+    main.classList.toggle("map-mode", tab === "harita");
+    if (tab === "harita") {
+      main.innerHTML = `<div class="map-host"></div>`;
+      mapApi = mountMap(main.querySelector<HTMLElement>(".map-host")!, cfg, s, {
+        onTravel: async to => {
+          const r = travel(cfg, s, to);
+          if (r) { toast(`${place(to)!.name}: ${r.minutes} dk yürüdün.`); persist(); }
+          mapState = { view: mapApi!.state().view, sel: to }; render(); storyTick();
+        },
+        onAct: (_k, qid) => { const q = QUESTS.find(x => x.id === qid)!; if (q.battle) doFight(qid); else doWalk(qid); },
+      }, mapState);
+    } else
     main.innerHTML = tab === "defter" ? defterScreen(cfg, s) : tab === "vucut" ? vucutScreen(cfg, s) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : islerScreen(cfg, s);
     root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"));
     if (keepScroll) main.scrollTop = y; else main.scrollTop = 0;
@@ -110,6 +127,11 @@ export function startApp(root: HTMLElement) {
     render(false);
   });
 
+  // üst şeritteki konum düğmesi haritayı açar
+  root.querySelector("#statusSlot")!.addEventListener("click", e => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-act=show-place]"); if (!b) return;
+    tab = "harita"; mapState = { view: { cx: place(s.location)!.x, cy: place(s.location)!.y + 55, w: 230 }, sel: s.location }; render(false);
+  });
   main.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-act]"); if (!b || b.disabled) return;
     const id = b.dataset.id ?? "";
@@ -142,16 +164,28 @@ export function startApp(root: HTMLElement) {
         break;
       }
       case "accept": acceptQuest(s, id); persist(); render(); toast("İşi üstlendin."); break;
-      case "walk": {
+      case "walk": doWalk(id); break;
+      case "fight": doFight(id); break;
+      case "show-place": tab = "harita"; mapState = { view: mapState?.view ?? { cx: place(id)!.x, cy: place(id)!.y + 70, w: 300 }, sel: id }; if (mapState.view.w > 500 || Math.hypot(mapState.view.cx - place(id)!.x, mapState.view.cy - place(id)!.y) > mapState.view.w / 2) mapState.view = { cx: (place(id)!.x + place(s.location)!.x) / 2, cy: (place(id)!.y + place(s.location)!.y) / 2 + 70, w: 300 }; render(false); break;
+      case "equip": {
+        const kind = itemInfo(cfg, id).kind; const r = equip(cfg, s, id);
+        toast(!r.ok ? r.reason ?? "" : kind === "Silah" ? "Yeni silaha alışman zaman alacak." : kind === "Çanta" ? `Artık ${itemInfo(cfg, bagOf(s)).capacity} gözün var.` : "Kuşandın.");
+        ui.sel = undefined; persist(); render(); break;
+      }
+      case "menu": persist(); openTitle(); break;
+    }
+  });
+
+  function doWalk(id: string) {
         const r = walkQuest(cfg, s, id);
-        if ("error" in r) { toast(r.error); break; }
+        if ("error" in r) { toast(r.error); return; }
         persist(); render();
         modal(`<h2>${esc(QUESTS.find(q => q.id === id)!.title)}</h2><p>${esc(r.note)}</p><p class="hand blue">${Object.entries(r.items).map(([k, n]) => `${itemName(cfg, k)}${n > 1 ? " ×" + n : ""}`).join(", ")}${Object.keys(r.items).length ? " · " : ""}tanınırlık +${+r.rep.toFixed(1)}</p>`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
-        break;
-      }
-      case "fight": {
+        return;
+        }
+  function doFight(id: string) {
         const q = QUESTS.find(x => x.id === id)!;
-        if (s.energy < 15) { toast("Bu yorgunlukla kurtların karşısına çıkamazsın."); break; }
+        if (s.energy < 15) { toast("Bu yorgunlukla kurtların karşısına çıkamazsın."); return; }
         openPlan(cfg, s, id, q.title, q.battle!.map, q.battle!.enemies, (sc, plan) => openBattle(cfg, s, sc, plan, id, (o) => {
           let extra = "";
           if (o.result === "won") {
@@ -164,17 +198,7 @@ export function startApp(root: HTMLElement) {
             <p class="lede">${o.result === "lost" ? "Hasan seni yaralı hâlde bulup köye taşıdı. Dinlenmeden tekrar deneme." : o.result === "fled" ? "Kurtlar hâlâ orada. Hazırlanıp tekrar dene." : "Hasan uzaktan izliyordu; koşarak geldi."}</p>
             <h3>Savaşta gelişen</h3>${gainList(cfg, o.gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
         }, persist), () => { persist(); render(); });
-        break;
-      }
-      case "equip": {
-        const kind = itemInfo(cfg, id).kind; const r = equip(cfg, s, id);
-        toast(!r.ok ? r.reason ?? "" : kind === "Silah" ? "Yeni silaha alışman zaman alacak." : kind === "Çanta" ? `Artık ${itemInfo(cfg, bagOf(s)).capacity} gözün var.` : "Kuşandın.");
-        ui.sel = undefined; persist(); render(); break;
-      }
-      case "menu": persist(); openTitle(); break;
-    }
-  });
-
+          }
   function beginIntro() {
     showIntro(name => { s.name = name; s.introDone = true; persist(); render(false); storyTick(); });
   }

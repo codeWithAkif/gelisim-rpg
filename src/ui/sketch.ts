@@ -134,6 +134,7 @@ export function bodySketch(lv: (id: string) => number, pend: (id: string) => num
 }
 
 export const ICONS = {
+  harita: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>`,
   canta: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14l-1 11H6z"/><path d="M9 9V7a3 3 0 0 1 6 0v2M5 13h14"/></svg>`,
   defter: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4.5c3-.8 5.5-.5 8 1.2v14c-2.5-1.7-5-2-8-1.2z"/><path d="M20 4.5c-3-.8-5.5-.5-8 1.2v14c2.5-1.7 5-2 8-1.2z"/></svg>`,
   vucut: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="4.5" r="2.3"/><path d="M6 9.5c4-1.5 8-1.5 12 0M12 8.5v6.5M12 15l-3 6.5M12 15l3 6.5M8 9.8 6.5 14.5M16 9.8l1.5 4.7"/></svg>`,

@@ -85,26 +85,28 @@ export interface QuestDef {
   rewards: { items?: Record<string, number>; money?: number; note: string };
   requires?: string[];
   repeatable?: boolean;
+  at: string;            // işin yapıldığı yer (haber verilecek kişi ya da savaş alanı)
+  doneText?: string;     // yerinde yapılınca düğme metni
 }
 export const QUESTS: QuestDef[] = [
   {
-    id: "mesaj", title: "Muhtara haber", giverNpc: "hasan", importance: "basit", minutes: 40,
-    text: "Hasan sürüyü bırakamıyor. Kurt izlerini muhtara haber vermeni istiyor.",
+    id: "mesaj", title: "Muhtara haber", giverNpc: "hasan", importance: "basit", minutes: 15, at: "koy_meydani", doneText: "Haberi ver",
+    text: "Hasan sürüyü bırakamıyor. Kurt izlerini köydeki muhtara haber vermeni istiyor. Yayladan köy meydanına inmen gerek.",
     rewards: { items: { ekmek: 1, peynir: 1 }, note: "Ekmek ve peynir. Hasan'ın verebileceği bu kadar." },
   },
   {
-    id: "kurt", title: "Sürüye dadanan kurtlar", giverNpc: "hasan", importance: "onemli", minutes: 90, requires: ["mesaj"],
+    id: "kurt", title: "Sürüye dadanan kurtlar", giverNpc: "hasan", importance: "onemli", minutes: 90, requires: ["mesaj"], at: "yayla",
     text: "İki kurt her gece bir kuzu kapıyor. Hasan yalvarıyor: 'Onları uzak tut, elimde ne varsa senin.'",
     battle: { enemies: ["kurt", "kurt"], map: "mera" },
     rewards: { items: { temiz_giysi: 1, el_yapimi_bicak: 1 }, note: "Temiz giysi ve kendi yaptığı bıçak. Bir çoban için büyük fedakârlık." },
   },
   {
-    id: "annenin_izi", title: "Annenin izi", giverNpc: "ayse", importance: "onemli", minutes: 60, requires: ["kurt"],
+    id: "annenin_izi", title: "Annenin izi", giverNpc: "ayse", importance: "onemli", minutes: 30, requires: ["kurt"], at: "zehra_evi", doneText: "Zehra'yla konuş",
     text: "Muhtar Ayşe, on iki yıl önce köye gelen defterli kadının Şifacı Zehra'ya bir şey bıraktığını söylüyor. Zehra köyün en üst evinde, otların arasında yaşıyor.",
     rewards: { items: { annenin_heybesi: 1 }, note: "Zehra'nın sandığından annenin elinden çıkmış bir sayfa ve onun eski heybesi." },
   },
   {
-    id: "devriye", title: "Meraya devriye", giverNpc: "hasan", importance: "basit", minutes: 60, requires: ["kurt"], repeatable: true,
+    id: "devriye", title: "Meraya devriye", giverNpc: "hasan", importance: "basit", minutes: 60, requires: ["kurt"], repeatable: true, at: "yayla",
     text: "Kurtlar tamamen gitmedi. Hasan geceleri meraya bir göz atmanı istiyor; karşılığında ne bulursa paylaşacak.",
     battle: { enemies: ["kurt", "kurt"], map: "mera" },
     rewards: { items: { peynir: 1 }, money: 1, note: "Bir parça peynir ve bir bakır." },

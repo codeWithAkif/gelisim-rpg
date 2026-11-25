@@ -17,7 +17,7 @@ export const INTRO: IntroPage[] = [
   { art: "defter", title: "Annemin defteri", text: "Annem bir Ölçer'di. Ateşin neden yandığını, suyun neden donduğunu ölçer, bu deftere yazardı. Büyü onun için dua değil, hesaptı." },
   { art: "yangin", title: "Kül Yangını", text: "On iki yıl önce başkent Ardıç bir gecede yandı. Kral suçu Ölçerlere yükledi. Defterleri yakıldı, büyü yasaklandı. Annem o gece ortadan kayboldu." },
   { art: "kar", title: "Uzayan kışlar", text: "O günden beri her kış bir öncekinden uzun. Kuzeyde göller yazın bile çözülmüyor. Annemin defterinin son yazılı sayfasında tek bir cümle var: \"Isı kaybolmaz. Bir yere gider.\"" },
-  { art: "yol", title: "Taşpınar yolu", text: "Defterin gerisi boş. Elimde bir çoban değneği, cebimde altı bakır var. Annemin son mektubu Taşpınar'dan gönderilmişti. Buradan başlayacağım." },
+  { art: "yol", title: "Taşpınar yolu", text: "Defterin gerisi boş. Elimde bir çoban değneği, cebimde altı bakır var. Annemin son mektubu Taşpınar'dan gönderilmişti. Dağ yolundan vadiye iniyorum." },
 ];
 
 export interface Milestone {
@@ -37,12 +37,12 @@ export const CHAPTERS: Chapter[] = [
     id: "b1", title: "Bölüm 1: Kıvılcım", place: "Taşpınar",
     milestones: [
       { id: "varis", title: "Taşpınar'a varış", hint: "", reached: s => s.introDone,
-        text: "Köyün girişinde yaşlı bir çoban sürüsünü topluyor. Gözleri yorgun; geceleri uyumadığı belli. Adı Hasan. Bir derdi var." },
-      { id: "ilk_is", title: "İlk iş", hint: "Hasan'ın haberini muhtara götür (İşler).", reached: s => done(s, "mesaj"),
+        text: "Dağ yolu bir yaylaya çıkıyor. Yaşlı bir çoban sürüsünü topluyor; gözleri yorgun, geceleri uyumadığı belli. Adı Hasan. Aşağıda vadide Taşpınar köyü görünüyor." },
+      { id: "ilk_is", title: "İlk iş", hint: "Hasan'dan işi al, sonra Harita'dan köy meydanına in ve muhtara haber ver.", reached: s => done(s, "mesaj"),
         text: "Muhtar Ayşe haberi dinledi, sonra uzun uzun yüzüne baktı. \"Seni bir yerden tanıyor gibiyim,\" dedi. Sonra vazgeçti." },
       { id: "suru", title: "Sürünün bekçisi", hint: "Hasan'ın sürüsüne dadanan kurtları uzaklaştır.", reached: s => done(s, "kurt"),
         text: "Köyde adın anılmaya başladı. Muhtar Ayşe seni çağırttı: \"On iki yıl önce buraya bir kadın geldi. Bir defteri vardı; seninkine benziyordu. Şifacı Zehra'ya bir şey bıraktı.\"" },
-      { id: "iz", title: "Annenin izi", hint: "Muhtar'ın dediği gibi Şifacı Zehra'yı bul.", reached: s => done(s, "annenin_izi"),
+      { id: "iz", title: "Annenin izi", hint: "Muhtardan işi al; Zehra'nın evi yaylaya çıkan patikada.", reached: s => done(s, "annenin_izi"),
         effects: { learnElement: "el_ates" },
         text: "Zehra eski bir sandığı açtı. İçinde annenin elinden çıkmış tek bir yaprak: ATEŞ. \"Isı, maddenin titreşimidir. Titreşimi tek noktada topla; nefesin yakıtındır.\" Defterine yeni bir sayfa eklendi. Artık Ateş çalışabilirsin (Çalış)." },
       { id: "kivilcim", title: "İlk kıvılcım", hint: "Ateş çalışmasıyla Ateş büyüsünü 5'e çıkar.", reached: s => (s.attrs.ates?.level ?? 0) >= 5,
