@@ -8,6 +8,8 @@ import { installErrorScreen, showProblem, checkLayout } from "./fatal";
 import { checkForUpdates, markReady } from "./update";
 
 installErrorScreen();
+// bu paket açıldı: güncelleme eklentisine hemen bildir (gecikirse eklenti önceki pakete döner)
+markReady();
 // yeniden yüklemede eski kaydırma konumu geri gelmesin
 if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
@@ -31,6 +33,9 @@ const updates = () => checkForUpdates({
 });
 
 import("./ui/app")
-  .then(({ startApp }) => { startApp(document.getElementById("app")!); checkLayout(markReady); })
+  .then(({ startApp }) => { startApp(document.getElementById("app")!); checkLayout(() => {}); })
   .catch(e => showProblem("Oyun açılamadı", `${e?.message ?? e}\n${(e?.stack ?? "").split("\n").slice(0, 5).join("\n")}`))
   .finally(updates);
+
+// Ayarlar'daki "Güncellemeleri denetle" düğmesi
+window.addEventListener("gelisim-guncelle", () => { updates(); });

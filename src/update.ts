@@ -2,6 +2,7 @@
 // - Yeni web paketi (dist.zip) varsa indirip uygular; uygulama bir kez yeniden yüklenir.
 // - Yeni yerel sürüm (native) gerekiyorsa kullanıcıya yeni APK'yı önerir.
 // İnternet yoksa sessizce atlar; oyun offline çalışmaya devam eder.
+// Son denetimin sonucu kaydedilir ve Ayarlar'da gösterilir.
 import { Capacitor } from "@capacitor/core";
 
 export const RELEASE_REPO = "codeWithAkif/gelisim-rpg";
@@ -15,7 +16,15 @@ export function newer(a: string, b: string): boolean {
   return false;
 }
 
-/** Oyun gerçekten açıldı: bu paketi sağlam say. Çağrılmazsa eklenti 15 sn sonra önceki pakete döner. */
+const STATUS_KEY = "gelisim-guncelleme";
+export interface UpdateStatus { at: number; text: string; ok: boolean }
+function setStatus(text: string, ok: boolean) { try { localStorage.setItem(STATUS_KEY, JSON.stringify({ at: Date.now(), text, ok })); } catch { /* yok */ } }
+export function lastUpdateStatus(): UpdateStatus | null { try { return JSON.parse(localStorage.getItem(STATUS_KEY) ?? "null"); } catch { return null; } }
+
+/**
+ * Paket sağlam açıldı. Eklenti, yeni paket açıldıktan sonra belirli süre içinde bunu duymazsa
+ * paketi bozuk sayıp önceki pakete döner; bu yüzden uygulama başlar başlamaz çağrılır.
+ */
 export async function markReady() {
   if (!Capacitor.isNativePlatform()) return;
   try { const { CapacitorUpdater } = await import("@capgo/capacitor-updater"); await CapacitorUpdater.notifyAppReady(); } catch { /* yok */ }
@@ -28,16 +37,17 @@ export interface UpdateHooks {
 }
 
 export async function checkForUpdates(h: UpdateHooks): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!Capacitor.isNativePlatform()) { setStatus("Tarayıcıda güncelleme denetlenmez.", true); return; }
   const { CapacitorUpdater } = await import("@capgo/capacitor-updater");
   try {
     const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
     const res = await fetch(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" }, signal: ctrl.signal });
     clearTimeout(t);
-    if (!res.ok) return;
+    if (!res.ok) { setStatus(`GitHub yanıt vermedi (${res.status}).`, false); return; }
     const rel = await res.json() as { tag_name?: string; body?: string; assets?: { name: string; browser_download_url: string }[] };
     const latest = (rel.tag_name ?? "").replace(/^v/, "");
-    if (!latest || !newer(latest, APP_VERSION)) return;
+    if (!latest) { setStatus("Son sürüm okunamadı.", false); return; }
+    if (!newer(latest, APP_VERSION)) { setStatus(`En son sürümdesin (${APP_VERSION}).`, true); return; }
 
     // yerel sürüm farkı: yeni APK gerekiyor mu?
     const remoteNative = parseInt(/native:\s*(\d+)/.exec(rel.body ?? "")?.[1] ?? "0", 10);
@@ -45,16 +55,26 @@ export async function checkForUpdates(h: UpdateHooks): Promise<void> {
     const localNative = parseInt((await App.getInfo()).build, 10) || 0;
     if (remoteNative > localNative) {
       const apk = rel.assets?.find(a => a.name.endsWith(".apk"));
+      setStatus(`${latest} için yeni APK gerekiyor.`, false);
       h.onNativeUpdate(latest, apk?.browser_download_url ?? APK_URL);
       return;
     }
 
     const zip = rel.assets?.find(a => a.name === "dist.zip");
-    if (!zip) return;
+    if (!zip) { setStatus(`${latest} paketi bulunamadı.`, false); return; }
+    // aynı sürüm daha önce indirildiyse: sağlamsa doğrudan kullan, bozuk işaretliyse silip yeniden indir
+    try {
+      const { bundles } = await CapacitorUpdater.list();
+      const old = bundles.find(b => b.version === latest);
+      if (old && old.status === "success") { setStatus(`${latest} uygulanıyor.`, true); await CapacitorUpdater.set({ id: old.id }); return; }
+      if (old) await CapacitorUpdater.delete({ id: old.id });
+    } catch { /* liste alınamadı; yine de indir */ }
     h.onDownloading(latest);
     const bundle = await CapacitorUpdater.download({ url: zip.browser_download_url, version: latest });
+    setStatus(`${latest} indirildi, uygulanıyor.`, true);
     await CapacitorUpdater.set(bundle); // uygulamayı yeni paketle yeniden yükler; kayıt korunur
-  } catch {
+  } catch (e) {
+    setStatus(`Güncelleme başarısız: ${(e as Error)?.message ?? e}`, false);
     h.onDone();
   }
 }

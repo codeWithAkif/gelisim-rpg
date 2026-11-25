@@ -2,7 +2,7 @@
 import { art } from "./intro";
 import { esc } from "./sketch";
 import { settings, saveSettings, type Settings } from "./settings";
-import { APP_VERSION } from "../update";
+import { APP_VERSION, lastUpdateStatus } from "../update";
 
 export interface TitleOpts { hasSave: boolean; summary: string; onContinue: () => void; onNew: () => void }
 
@@ -31,6 +31,8 @@ export function showTitle(o: TitleOpts) {
         <p class="muted tiny" style="margin:0">Yürüme, saldırı, ateş topu ve hasar yazılarının hızı.</p></section>
       <section class="sec"><h3>Yazı boyutu</h3><div class="choices">${chip("text", "normal", "Normal")}${chip("text", "buyuk", "Büyük")}</div></section>
       <p class="muted tiny">Ayarlar kaydından ayrı tutulur; yeni oyuna başlamak ayarları silmez.</p>
+      <section class="sec"><h3>Güncelleme</h3>${(() => { const u = lastUpdateStatus(); return u ? `<p class="${u.ok ? "" : "red"}" style="margin:0">${esc(u.text)}</p><p class="muted tiny" style="margin:0">${new Date(u.at).toLocaleString("tr-TR")}</p>` : `<p class="muted" style="margin:0">Henüz denetlenmedi.</p>`; })()}
+        <div class="row"><button class="btn small" data-x="check">Güncellemeleri denetle</button></div></section>
       <div class="intro-foot"><span class="muted tiny">Sürüm ${esc(APP_VERSION)}</span><button class="btn primary" data-x="back">Geri</button></div></div>`;
     if (view === "sil") el.innerHTML = `<div class="intro-page">
       <h1>Yeni oyun</h1>
@@ -47,6 +49,7 @@ export function showTitle(o: TitleOpts) {
       case "new": view = "sil"; break;
       case "settings": view = "ayarlar"; break;
       case "back": view = "menu"; break;
+      case "check": window.dispatchEvent(new Event("gelisim-guncelle")); setTimeout(render, 2500); break;
     }
     render();
   });
