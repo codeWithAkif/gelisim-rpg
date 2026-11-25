@@ -8,6 +8,7 @@ import { esc, roughPath, portrait } from "./sketch";
 import { animScale } from "./settings";
 import { journeyPoint, journeyProgress, journeyLeftMs } from "../engine/journey";
 import { fmtDur } from "../engine/session";
+import { darkness } from "./daylight";
 
 const W = 1000, H = 1400;
 function hash(x: number, y: number) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -118,6 +119,9 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     const k = view.w / 300; // ölçek: yazı ve simgeler ekranda aynı boyda kalsın
     const fs = 11 * k, icon = 16 * k;
     let out = "";
+    // akşam ve gece haritanın üstüne gölge düşer
+    const dk = darkness(s.minute);
+    if (dk > 0.01) out += `<rect x="-400" y="-400" width="1800" height="2200" fill="#141A30" opacity="${(dk * 0.5).toFixed(2)}" pointer-events="none"/>`;
     for (const r of ROADS) {
       const open = isOpen(place(r.a)!) && isOpen(place(r.b)!);
       out += `<path d="M${r.pts.map(p => p.join(",")).join(" L")}" fill="none" stroke="${open ? "#6B5235" : "#A79C82"}" stroke-width="${r.kind === "yol" ? 2.2 : 1.6}" stroke-dasharray="${r.kind === "yol" ? "6 3" : "3 3"}" vector-effect="non-scaling-stroke" ${open ? "" : 'opacity=".6"'}/>`;

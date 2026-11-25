@@ -20,6 +20,7 @@ import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaSc
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { showIntro } from "./intro";
+import { applyDaylight } from "./daylight";
 import { showTitle } from "./title";
 import { applySettings } from "./settings";
 import { currentChapter } from "../engine/story";
@@ -46,6 +47,7 @@ export function startApp(root: HTMLElement) {
   function toast(t: string) { const el = root.querySelector("#toast")!; el.textContent = t; el.classList.add("on"); clearTimeout((toast as any).t); (toast as any).t = setTimeout(() => el.classList.remove("on"), 2400); }
   function render(keepScroll = true) {
     const y = main.scrollTop;
+    applyDaylight(s.minute);
     root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
     if (mapApi) { mapState = mapApi.state(); mapApi = undefined; }
     main.classList.toggle("map-mode", tab === "harita");
@@ -242,6 +244,7 @@ export function startApp(root: HTMLElement) {
     }
     if (tab === "harita") mapApi?.refresh();
     else root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
+    applyDaylight(s.minute);
   }
   window.setInterval(journeyTick, 1000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) journeyTick(); });

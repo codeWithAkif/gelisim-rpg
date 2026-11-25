@@ -12,6 +12,7 @@ import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, SHOP, CRAFTS } from "../content/world";
 import { esc, inkBar, portrait, wolfSketch, bodySketch, itemIcon, VITAL_ICONS } from "./sketch";
 import { APP_VERSION } from "../update";
+import { phase, PHASE_ICONS } from "./daylight";
 import { here, place, activityPlace } from "../engine/travel";
 import { NPC_PLACE, SHOP_PLACE } from "../content/map";
 
@@ -65,7 +66,7 @@ export function statusBar(cfg: Config, s: GameState): string {
   }).join("");
   const al = alerts(cfg, s);
   return `<header class="status">
-    <div class="day">Gün ${s.day}<small>${clock(s)}${late ? " · gün bitti" : ""}</small></div>
+    <div class="day">Gün ${s.day}<small>${clock(s)}${late ? " · gün bitti" : ""}</small><span class="phase" title="${phase(s.minute).name}">${PHASE_ICONS[phase(s.minute).icon]}<i>${phase(s.minute).name}</i></span></div>
     <div class="money"><span class="coin">${VITAL_ICONS.coin}</span>${s.money} bakır</div>
     <button class="where" data-act="show-place" data-id="${esc(s.journey ? s.journey.to : s.location)}">⌖ ${s.journey ? `Yolda → ${esc(place(s.journey.to)?.name ?? "")}` : esc(here(s).name)}</button>
     <div class="vitals">${g}</div>

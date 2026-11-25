@@ -270,8 +270,8 @@ h3 { font-size: 22px; }
 main.map-mode { padding: 0; overflow: hidden; position: relative; }
 .map-host, .map-wrap { position: absolute; inset: 0; }
 .map-svg { width: 100%; height: 100%; display: block; touch-action: none; background: #B9CDD0; }
-.map-label { font-family: var(--f-hand); font-weight: 700; fill: var(--ink); paint-order: stroke; stroke: #EDE4CB; stroke-width: 3px; stroke-linejoin: round; }
-.map-label.faint { fill: var(--ink-soft); }
+.map-label { font-family: var(--f-hand); font-weight: 700; fill: #2A2722; paint-order: stroke; stroke: #EDE4CB; stroke-width: 3px; stroke-linejoin: round; }
+.map-label.faint { fill: #5B5447; }
 .map-zoom { position: absolute; top: 10px; left: 10px; display: flex; border: 1.5px solid var(--ink); border-radius: 8px; overflow: hidden; background: var(--paper); }
 .map-zoom button { border: 0; background: none; padding: 6px 12px; font-family: var(--f-hand); font-size: 18px; font-weight: 700; cursor: pointer; border-right: 1px solid var(--pencil); }
 .map-zoom button:last-child { border-right: 0; }
@@ -286,3 +286,15 @@ main.map-mode { padding: 0; overflow: hidden; position: relative; }
 .money { display: flex; align-items: center; justify-content: flex-end; }
 .purse { display: flex; align-items: center; gap: 4px; font-size: 16px; }
 .btn.price { display: inline-flex; align-items: center; gap: 2px; }
+
+/* gün ışığı: renk değişkenleri daylight.ts ile saate göre ayarlanır */
+body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .session-screen, .intro { transition: background-color 1.2s ease, color 1.2s ease; }
+.day .phase { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; vertical-align: 3px; }
+.day .phase svg { width: 20px; height: 20px; }
+.day .phase i { font-style: normal; font-family: var(--f-hand); font-size: 16px; font-weight: 500; color: var(--ink-soft); }
+.night .alert-strip.amber { background: rgba(217,165,58,.18); color: #F0C878; }
+.night .alert-strip.red { background: rgba(232,144,126,.16); color: #F2A898; }
+.night .gauge .gl b { color: var(--ink); }
+.night .gauge.low .gl b { color: var(--red); }
+.night .card, .night .choice, .night .eq-slot, .night .cell { background: rgba(255,255,255,.06); }
+.night .map-zoom button.on { background: var(--ink); color: var(--paper); }
