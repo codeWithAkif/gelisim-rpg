@@ -76,7 +76,7 @@ function windVec(dir: number) { const a = dir * Math.PI / 3; return { x: Math.co
 
 /* ---------- senaryo & hazırlık ---------- */
 export interface Scenario { mapId: string; enemies: string[]; weatherNow: Weather; weatherEvening: Weather; wind: { dir: number; strength: number }; seed: number }
-export interface Plan { timing: "simdi" | "aksam"; start: number; scout: boolean; readWind: boolean; traps: XY[]; torch: boolean; paid?: ("scout" | "readWind")[] }
+export interface Plan { timing: "simdi" | "aksam"; start: number; scout: boolean; readWind: boolean; traps: XY[]; torch: boolean; paid?: ("scout" | "readWind")[]; ambushed?: boolean }
 export const DEFAULT_PLAN: Plan = { timing: "simdi", start: 0, scout: false, readWind: false, traps: [], torch: false };
 
 function rollWeather(rng: Rng): Weather { const r = rng.next(); return r < 0.25 ? "yagmur" : r < 0.4 ? "sis" : "acik"; }
@@ -190,7 +190,7 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
   const units: Unit[] = [{ uid: "p", side: "player", name: "Sen", x: st.at[0], y: st.at[1], hp: s.hp, maxHp: hpMax, moveLeft: 0, acted: false, slowed: 0 }];
   enemyIds.forEach((id, i) => {
     const d = ENEMIES[id]; const [x, y] = m.enemies[i % m.enemies.length];
-    units.push({ uid: "e" + i, side: "enemy", def: id, name: `${d.name} ${i + 1}`, x, y, hp: d.hp, maxHp: d.hp, moveLeft: 0, acted: false, slowed: 0, alert: night });
+    units.push({ uid: "e" + i, side: "enemy", def: id, name: `${d.name} ${i + 1}`, x, y, hp: d.hp, maxHp: d.hp, moveLeft: 0, acted: false, slowed: 0, alert: night || !!plan.ambushed });
   });
   const traps: Record<string, number> = {};
   for (const [x, y] of plan.traps.slice(0, 2)) traps[key(x, y)] = 1;
@@ -201,7 +201,8 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
     fire: {}, walls: {}, traps, torch: { has: plan.torch, thrown: false }, flock: m.flock,
   };
   startPlayerTurn(cfg, s, b);
-  b.log.unshift(`${night ? "Gece; kurtlar avda." : "Gündüz; kurtlar inde, seni fark etmediler."} ${weather === "yagmur" ? "Yağmur yağıyor." : weather === "sis" ? "Sis var." : "Hava açık."}`);
+  const opening = plan.ambushed ? "Kurt yolunu kesti; gözünü senden ayırmıyor." : night ? "Gece; kurtlar avda." : "Gündüz; kurtlar inde, seni fark etmediler.";
+  b.log.unshift(`${opening} ${weather === "yagmur" ? "Yağmur yağıyor." : weather === "sis" ? "Sis var." : "Hava açık."}`);
   return b;
 }
 

@@ -20,6 +20,7 @@ export const GAME_ITEMS: Record<string, GameItem> = {
   temiz_giysi: { id: "temiz_giysi", name: "Temiz yün giysi", slot: "Zırh", armor: 1, desc: "Kalın yün. Isıtır, sıyrıkları biraz tutar." },
   ekmek: { id: "ekmek", name: "Ekmek", slot: "Yiyecek", satiety: 35, stack: 5, price: 2, desc: "Taş fırında pişmiş arpa ekmeği." },
   peynir: { id: "peynir", name: "Peynir", slot: "Yiyecek", satiety: 25, stack: 5, price: 3, desc: "Keçi peyniri." },
+  elma: { id: "elma", name: "Yaban elması", slot: "Yiyecek", satiety: 12, stack: 5, desc: "Ekşi, küçük ama tok tutar." },
   deri: { id: "deri", name: "Tabaklanmış deri", slot: "Malzeme", stack: 10, price: 3, desc: "Keçi derisi. Çanta, kemer, kın yapılır." },
   ip: { id: "ip", name: "Kenevir ipi", slot: "Malzeme", stack: 10, price: 1, desc: "Sağlam bir sicim. Dikiş ve tuzak için." },
   bez_torba: { id: "bez_torba", name: "Bez torba", slot: "Çanta", capacity: 8, desc: "Omza asılan kaba bir torba. 8 göz." },
@@ -78,6 +79,9 @@ export const ENEMIES: Record<string, EnemyDef> = {
     ],
   },
 };
+
+/** Yol pususu için küçük harita. */
+export const AMBUSH_MAP = "patika";
 
 export interface QuestDef {
   id: string; title: string; giverNpc: string; importance: "basit" | "onemli" | "hayati";
@@ -141,6 +145,21 @@ export const MAPS: Record<string, BattleMap> = {
     ],
     enemies: [[2, 1], [4, 1]],
     flock: [3, 9],
+  },
+  patika: {
+    name: "Patika",
+    rows: [
+      "*,,..**",
+      ",,..,.*",
+      ".,.~..,",
+      "..^..,.",
+      ".,...^.",
+      "*..,..,",
+      "**..,,*",
+    ],
+    starts: [{ name: "Patika", at: [3, 5], note: "Yolun ortası." }],
+    enemies: [[3, 3], [5, 2]],
+    flock: [3, 6],
   },
 };
 export const MAP_CHARS: Record<string, Terrain> = { ".": "cayir", ",": "uzun_ot", "~": "camur", "^": "kaya", T: "tepe", "=": "su", "*": "agac" };

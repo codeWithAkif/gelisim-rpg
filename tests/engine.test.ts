@@ -41,11 +41,11 @@ describe("gelişim", () => {
     s.rep.taspinar = { taninirlik: 6 };
     expect(canDoActivity(cfg, s, "resim").ok).toBe(true);
   });
-  it("körelme tabanın altına düşmez", () => {
+  it("uyku hiçbir şeyi köreltmez", () => {
     const s = newGame(cfg, 1);
     s.attrs.esneklik = { level: 50, pending: 0, peak: 50, lastUsedDay: 1 };
-    for (let i = 0; i < 2000; i++) sleep(cfg, s);
-    expect(s.attrs.esneklik.level).toBeGreaterThanOrEqual(50 * 0.6 - 1e-9);
+    for (let i = 0; i < 50; i++) sleep(cfg, s);
+    expect(s.attrs.esneklik.level).toBe(50);
   });
 });
 

@@ -50,6 +50,7 @@ export function completeQuest(cfg: Config, s: GameState, id: string): RewardRepo
 /** Savaşsız görevi yerinde bitirir (yolculuk ayrıca haritadan yapılır). */
 export function walkQuest(cfg: Config, s: GameState, id: string): RewardReport | { error: string } {
   const def = QUESTS.find(q => q.id === id)!;
+  if (s.journey) return { error: "Yoldasın" };
   if (DAY_MINUTES - s.minute < def.minutes) return { error: "Bugün buna vakit yok" };
   s.minute += def.minutes; s.energy = Math.max(0, s.energy - 3); s.satiety = Math.max(0, s.satiety - 3);
   return completeQuest(cfg, s, id);

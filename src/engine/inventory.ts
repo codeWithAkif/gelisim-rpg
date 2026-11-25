@@ -79,7 +79,7 @@ export function drop(cfg: Config, s: GameState, id: string): boolean {
 
 export function buy(cfg: Config, s: GameState, id: string): { ok: boolean; reason?: string } {
   const it = itemInfo(cfg, id); const price = it.price ?? 0;
-  if (s.location !== "koy_meydani") return { ok: false, reason: "Pazar köy meydanında" };
+  if (s.journey || s.location !== "koy_meydani") return { ok: false, reason: "Pazar köy meydanında" };
   if (s.money < price) return { ok: false, reason: `${price} bakır gerekir` };
   if (addItem(cfg, s, id, 1)) return { ok: false, reason: "Çantan dolu" };
   s.money -= price; s.minute = Math.min(16 * 60, s.minute + 5);

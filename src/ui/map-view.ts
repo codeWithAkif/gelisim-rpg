@@ -6,6 +6,8 @@ import { NPCS, QUESTS } from "../content/world";
 import { place, planTravel, peopleAt, isOpen } from "../engine/travel";
 import { esc, roughPath, portrait } from "./sketch";
 import { animScale } from "./settings";
+import { journeyPoint, journeyProgress, journeyLeftMs } from "../engine/journey";
+import { fmtDur } from "../engine/session";
 
 const W = 1000, H = 1400;
 function hash(x: number, y: number) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -75,7 +77,7 @@ function placeIcon(p: Place, sz: number, locked: boolean): string {
   return `<g transform="translate(${p.x},${p.y}) scale(${k})">${g}</g>`;
 }
 
-export interface MapHooks { onTravel: (to: string) => Promise<void> | void; onAct: (act: string, id: string) => void }
+export interface MapHooks { onTravel: (to: string) => void; onAct: (act: string, id: string) => void; onTurnBack: () => void }
 type View = { cx: number; cy: number; w: number };
 const LEVELS: Record<string, (s: GameState) => View> = {
   // alttaki bilgi kartı haritanın altını örttüğü için merkezler biraz aşağı kaydırıldı
@@ -84,7 +86,7 @@ const LEVELS: Record<string, (s: GameState) => View> = {
   ulke: () => ({ cx: 500, cy: 820, w: 1000 }),
 };
 
-export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: MapHooks, saved?: { view?: View; sel?: string }): { state: () => { view: View; sel?: string } } {
+export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: MapHooks, saved?: { view?: View; sel?: string }): { state: () => { view: View; sel?: string }; refresh: () => void } {
   host.innerHTML = `<div class="map-wrap"><svg class="map-svg" aria-label="Harita"><g class="terrain">${terrain()}</g><g class="dyn"></g></svg>
     <div class="map-zoom"><button data-z="koy">Köy</button><button data-z="vadi">Vadi</button><button data-z="ulke">Ülke</button></div>
     <div class="map-card" id="mapCard"></div></div>`;
@@ -93,7 +95,15 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
   let view: View = saved?.view ?? LEVELS.koy(s);
   let sel: string | undefined = saved?.sel ?? s.location;
   let walker: { x: number; y: number; trail: [number, number][] } | null = null;
-  let busy = false;
+  const busy = false;
+  /** Yolculuk sürüyorsa figürün yerini ve geçilen izi hesapla. */
+  function syncWalker() {
+    if (!s.journey) { walker = null; return; }
+    const j = s.journey; const now = Date.now(); const [x, y] = journeyPoint(s, now); const f = journeyProgress(s, now);
+    const segs = j.pts.slice(1).map((p, i) => Math.hypot(p[0] - j.pts[i][0], p[1] - j.pts[i][1]));
+    let d = f * segs.reduce((a, b) => a + b, 0); let i = 0; while (i < segs.length - 1 && d > segs[i]) { d -= segs[i]; i++; }
+    walker = { x, y, trail: [...j.pts.slice(0, i + 1), [x, y]] };
+  }
 
   const aspect = () => { const r = svg.getBoundingClientRect(); return r.height / Math.max(1, r.width) || 1.3; };
   function applyView() {
@@ -117,6 +127,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
       const p = planTravel(cfg, s, sel);
       if (p.pts.length) out += `<path d="M${p.pts.map(q => q.join(",")).join(" L")}" fill="none" stroke="${p.ok ? "#9E3423" : "#8B8270"}" stroke-width="3" stroke-dasharray="1 5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
     }
+    if (s.journey) out += `<path d="M${s.journey.pts.map(q => q.join(",")).join(" L")}" fill="none" stroke="#9E3423" stroke-width="3" stroke-dasharray="1 5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
     if (walker && walker.trail.length > 1) out += `<path d="M${walker.trail.map(q => q.join(",")).join(" L")}" fill="none" stroke="#9E3423" stroke-width="3" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
     const regionLabels = view.w > 420;
     for (const p of PLACES) {
@@ -140,6 +151,14 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
   }
 
   function renderCard() {
+    if (s.journey) {
+      const j = s.journey; const now = Date.now(); const f = journeyProgress(s, now);
+      card.innerHTML = `<div class="entry-head"><span class="entry-title">${j.back ? "Geri dönüyorsun" : "Yoldasın"}: ${esc(place(j.to)!.name)}</span><span class="entry-meta">${fmtDur(journeyLeftMs(s, now))} kaldı</span></div>
+        <div class="gb big"><div class="gf" style="width:${(f * 100).toFixed(1)}%;background:var(--green)"></div></div>
+        <p class="muted tiny" style="margin:0">${j.pausedAt !== undefined ? "Yolda bir şey oldu; karar vermeni bekliyor." : `Oyunda ${Math.round(j.minutes)} dk yol. Yolda bir şey çıkarsa sen karar verene kadar beklersin.`}</p>
+        ${j.back ? "" : `<div class="row"><button class="btn small" data-back="1">Geri dön</button></div>`}`;
+      return;
+    }
     if (!sel) { card.innerHTML = ""; return; }
     const p = place(sel)!; const at = sel === s.location;
     const people = peopleAt(sel).map(id => NPCS.find(n => n.id === id)!).filter(Boolean);
@@ -155,33 +174,6 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
       ${people.length ? `<div class="row">${people.map(n => `<span class="person">${portrait(n.name, 30, known(n.id))}<span class="tiny">${known(n.id) ? esc(n.name) : "?"}</span></span>`).join("")}</div>` : ""}
       ${quests.length && at ? `<div class="row">${quests.map(q => `<button class="btn small red" data-qa="${q.id}">${esc(q.battle ? "Meraya çık" : q.doneText ?? "Yap")}: ${esc(q.title)}</button>`).join("")}</div>` : quests.length ? `<p class="hand red" style="margin:0">Burada yapacağın iş var: ${quests.map(q => esc(q.title)).join(", ")}</p>` : ""}
       <div class="row">${at ? `<span class="hand blue">Buradasın.</span>` : `<button class="btn primary" data-go="${sel}" ${plan?.ok && !busy ? "" : "disabled"}>Git</button>${plan && !plan.ok ? `<span class="lock">${esc(plan.reason ?? "")}</span>` : ""}`}</div>`;
-  }
-
-  /** Yürüyüş: işaretçi yol boyunca ilerler, harita onu izler. */
-  async function walk(to: string) {
-    const plan = planTravel(cfg, s, to); if (!plan.ok) return;
-    busy = true; renderCard();
-    const pts = plan.pts; const segs: number[] = []; let total = 0;
-    for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); segs.push(d); total += d; }
-    const dur = Math.max(900, Math.min(4200, plan.minutes * 45)) * animScale();
-    walker = { x: pts[0][0], y: pts[0][1], trail: [pts[0]] };
-    if (view.w > 500) { view = { ...LEVELS.koy(s), w: 300 }; }
-    const lead = view.w * 0.22;
-    await new Promise<void>(res => {
-      const t0 = performance.now();
-      const step = (t: number) => {
-        const f = dur ? Math.min(1, (t - t0) / dur) : 1; let d = f * total; let i = 0;
-        while (i < segs.length - 1 && d > segs[i]) { d -= segs[i]; i++; }
-        const a = pts[i], b = pts[i + 1] ?? pts[i]; const u = segs[i] ? d / segs[i] : 1;
-        walker = { x: a[0] + (b[0] - a[0]) * u, y: a[1] + (b[1] - a[1]) * u, trail: [...pts.slice(0, i + 1), [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]] };
-        view.cx += (walker.x - view.cx) * 0.12; view.cy += (walker.y + lead - view.cy) * 0.12;
-        applyView();
-        if (f < 1) requestAnimationFrame(step); else res();
-      };
-      requestAnimationFrame(step);
-    });
-    walker = null; busy = false;
-    await hooks.onTravel(to);
   }
 
   /* ---------- sürükle, kıstır, tekerlek ---------- */
@@ -212,7 +204,8 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
   host.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b || b.disabled) return;
     if (b.dataset.z) { const target = LEVELS[b.dataset.z](s); zoomTo(target); }
-    if (b.dataset.go) walk(b.dataset.go);
+    if (b.dataset.go) hooks.onTravel(b.dataset.go);
+    if (b.dataset.back) hooks.onTurnBack();
     if (b.dataset.qa) hooks.onAct("quest", b.dataset.qa);
   });
   function zoomTo(t: View) {
@@ -222,6 +215,14 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     requestAnimationFrame(step);
   }
   new ResizeObserver(() => applyView()).observe(svg);
-  applyView(); renderCard();
-  return { state: () => ({ view, sel }) };
+  syncWalker(); applyView(); renderCard();
+  return {
+    state: () => ({ view, sel }),
+    refresh: () => {
+      syncWalker();
+      // yürüyen figür ekrandan çıkmasın
+      if (walker) { const h = view.w * aspect(); if (Math.abs(walker.x - view.cx) > view.w * 0.35 || Math.abs(walker.y - view.cy) > h * 0.3) { view.cx += (walker.x - view.cx) * 0.5; view.cy += (walker.y + view.w * 0.2 - view.cy) * 0.5; } }
+      applyView(); renderCard();
+    },
+  };
 }

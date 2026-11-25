@@ -90,7 +90,7 @@ export function summarize(cfg: Config, r: GainReport, limit = 3): string {
 
 export interface SleepReport { applied: GainReport; decayed: GainReport; recovery: number; energy: number }
 
-/** Günü bitirir: dinlenme kazancı işlenir, körelme uygulanır, enerji yenilenir. */
+/** Günü bitirir: dinlenme kazancı işlenir, enerji yenilenir. Uyku hiçbir özelliği köreltmez. */
 export function sleep(cfg: Config, s: GameState): SleepReport {
   const recovery = s.satiety >= 40 ? 1 : s.satiety >= 15 ? 0.75 : 0.45;
   const applied: GainReport = {}, decayed: GainReport = {};
@@ -100,13 +100,7 @@ export function sleep(cfg: Config, s: GameState): SleepReport {
       st.level += g; st.peak = Math.max(st.peak, st.level); st.pending = 0;
       applied[id] = g;
     }
-    const a = cfg.attr.get(id);
-    const idle = s.day - st.lastUsedDay;
-    if (a && idle >= 2 && (a.decayRate ?? 0) > 0) {
-      const floor = st.peak * (a.decayFloor ?? 60) / 100;
-      const d = Math.min(a.decayRate ?? 0, Math.max(0, st.level - floor));
-      if (d > 0) { st.level -= d; decayed[id] = d; }
-    }
+    // uyku köreltmez: dinlenme yalnız kazancı işler (oyuncu kararı)
   }
   const energy = s.satiety >= 40 ? 100 : s.satiety >= 15 ? 85 : 65;
   s.energy = energy;

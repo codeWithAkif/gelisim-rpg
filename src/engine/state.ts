@@ -1,6 +1,7 @@
 // Kaydedilen oyun durumu. Saf veri: JSON'a yazılıp okunabilir.
 import type { Config } from "./config";
 import type { Session } from "./session";
+import type { Journey } from "./journey";
 
 export const SAVE_VERSION = 1;
 export const DAY_START_HOUR = 6;     // uyanış
@@ -39,7 +40,8 @@ export interface GameState {
   knownElements: string[];                     // annenin defterinden açılmış element sayfaları
   mana: number;
   story: { reached: string[]; flags: Record<string, number> };
-  session?: Session;                           // süren gerçek zamanlı çalışma
+  session?: Session;
+  journey?: Journey;                           // süren yolculuk                           // süren gerçek zamanlı çalışma
   alerts?: Record<string, boolean>;            // gösterilmiş uyarılar (tekrar etmesin)
   prep?: Record<string, { day: number; scout?: boolean; readWind?: boolean }>; // savaş öncesi yapılmış keşifler
   log: LogEntry[];

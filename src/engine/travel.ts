@@ -47,6 +47,7 @@ export function planTravel(cfg: Config, s: GameState, to: string): TravelPlan {
   const minutes = Math.max(5, Math.round(r.length * MIN_PER_UNIT / speed));
   const energy = Math.round(minutes / 60 * 5 * 10) / 10;
   if (s.session) return { ok: false, reason: "Çalışırken yola çıkamazsın", minutes, energy, pts: r.pts };
+  if (s.journey) return { ok: false, reason: "Zaten yoldasın", minutes, energy, pts: r.pts };
   if (minutes > minutesLeft(s)) return { ok: false, reason: "Hava kararmadan varamazsın", minutes, energy, pts: r.pts };
   if (energy > s.energy) return { ok: false, reason: "Yürüyecek gücün yok", minutes, energy, pts: r.pts };
   return { ok: true, minutes, energy, pts: r.pts };
@@ -59,7 +60,7 @@ export function travel(cfg: Config, s: GameState, to: string): { gains: GainRepo
   s.minute = Math.min(DAY_MINUTES, s.minute + p.minutes);
   s.energy = Math.max(0, s.energy - p.energy); s.satiety = Math.max(0, s.satiety - h * 4);
   s.location = to;
-  log(s, `${place(to)!.name}'e vardın (${p.minutes} dk yol).`, "info");
+  log(s, `Vardın: ${place(to)!.name} (${p.minutes} dk yol).`, "info");
   return { gains, minutes: p.minutes };
 }
 

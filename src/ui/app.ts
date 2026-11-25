@@ -11,7 +11,10 @@ import { itemInfo, equip, unequip, drop, buy, bagOf } from "../engine/inventory"
 import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
 import { openSessionSheet, openSessionRun } from "./session-view";
 import { mountMap } from "./map-view";
-import { travel, place } from "../engine/travel";
+import { place } from "../engine/travel";
+import { startJourney, dueEvent, pauseJourney, resumeJourney, resolveEvent, finishJourney, turnBack, canUseChoice } from "../engine/journey";
+import { makeScenario, DEFAULT_PLAN } from "../engine/combat";
+import { AMBUSH_MAP } from "../content/world";
 import { esc, ICONS } from "./sketch";
 import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
@@ -49,11 +52,12 @@ export function startApp(root: HTMLElement) {
     if (tab === "harita") {
       main.innerHTML = `<div class="map-host"></div>`;
       mapApi = mountMap(main.querySelector<HTMLElement>(".map-host")!, cfg, s, {
-        onTravel: async to => {
-          const r = travel(cfg, s, to);
-          if (r) { toast(`${place(to)!.name}: ${r.minutes} dk yürüdün.`); persist(); }
-          mapState = { view: mapApi!.state().view, sel: to }; render(); storyTick();
+        onTravel: to => {
+          const r = startJourney(cfg, s, to, Date.now());
+          if (!r.ok) { toast(r.reason ?? "Yola çıkamadın"); return; }
+          persist(); mapState = { view: mapApi!.state().view, sel: to }; mapApi = undefined; render(); journeyTick();
         },
+        onTurnBack: () => { if (turnBack(s, Date.now())) { toast("Geri dönüyorsun."); persist(); render(); } },
         onAct: (_k, qid) => { const q = QUESTS.find(x => x.id === qid)!; if (q.battle) doFight(qid); else doWalk(qid); },
       }, mapState);
     } else
@@ -154,12 +158,13 @@ export function startApp(root: HTMLElement) {
       case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }
       case "unequip": { const r = unequip(cfg, s, id as "weapon" | "armor"); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "sleep": {
+        if (s.journey) { toast("Yoldayken uyuyamazsın."); break; }
         const hpBefore = s.hp; const rep = sleep(cfg, s);
         const m = maxHp(cfg, s); s.hp = Math.min(m, Math.round(hpBefore + m * 0.6));
         persist(); render(false);
         modal(`<h2>Gün ${s.day - 1} bitti</h2><p class="lede">${rep.recovery < 1 ? "Aç yattın; vücudun tam dinlenemedi." : "Tok ve yorgun uyudun. Vücut gece çalıştı."}</p>
           <h3>Gece işlenen</h3>${gainList(cfg, rep.applied, 8)}
-          ${Object.keys(rep.decayed).length ? `<h3 class="red">Körelen</h3><p class="muted" style="margin:0">${Object.entries(rep.decayed).map(([k, v]) => `${esc(cfg.attr.get(k)?.name ?? k)} −${v.toFixed(2)}`).join(", ")}</p>` : ""}`,
+`,
           [{ label: "Güne başla", cls: "primary", fn: () => storyTick() }]);
         break;
       }
@@ -199,6 +204,48 @@ export function startApp(root: HTMLElement) {
             <h3>Savaşta gelişen</h3>${gainList(cfg, o.gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
         }, persist), () => { persist(); render(); });
           }
+  /* ---------- yolculuk: her saniye ilerleme, sürpriz ve varış ---------- */
+  let eventOpen = false;
+  function journeyTick() {
+    if (!s.journey || eventOpen) return;
+    const now = Date.now();
+    const due = dueEvent(s, now);
+    if (due) {
+      pauseJourney(s, now); persist(); eventOpen = true;
+      if (tab !== "harita") { tab = "harita"; render(false); } else mapApi?.refresh();
+      const opts = due.def.choices.map(c => ({ ...c, ok: canUseChoice(s, c.need) }));
+      const bg = document.createElement("div"); bg.className = "modal-bg";
+      bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">Yolda</p><h2>${esc(due.def.title)}</h2><p style="font-size:17px;line-height:1.5;margin:0">${esc(due.def.text)}</p>
+        <div class="choices">${opts.map(o => `<button class="choice" data-c="${o.id}" ${o.ok ? "" : "disabled"}><b>${esc(o.label)}</b>${o.ok ? "" : `<span class="tiny">${o.need === "ates" ? "Ateş sayfası ve 8 mana gerekir" : ""}</span>`}</button>`).join("")}</div></div>`;
+      document.body.appendChild(bg);
+      bg.addEventListener("click", e => {
+        const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-c]"); if (!b || b.disabled) return;
+        bg.remove();
+        const out = resolveEvent(cfg, s, b.dataset.c!, Date.now()); persist();
+        const cont = () => { eventOpen = false; resumeJourney(s, Date.now()); persist(); render(); journeyTick(); };
+        if (out.battle) {
+          const sc = makeScenario(s, AMBUSH_MAP, ["kurt"], "pusu" + s.day + s.minute);
+          openBattle(cfg, s, sc, { ...DEFAULT_PLAN, ambushed: true }, undefined, o => {
+            persist(); render();
+            modal(`<h2>${o.result === "won" ? "Kurt kaçtı" : o.result === "fled" ? "Sıyrıldın" : "Yaralandın"}</h2><p class="lede">${o.result === "lost" ? "Kanayan kolunla yoluna devam ettin." : "Soluklanıp yoluna devam ettin."}</p>${gainList(cfg, o.gains, 5)}`, [{ label: "Yola devam", cls: "primary", fn: cont }]);
+          }, persist);
+          return;
+        }
+        modal(`<h2>${esc(due.def.title)}</h2><p style="font-size:17px">${esc(out.text)}</p>${Object.keys(out.gains).length ? gainList(cfg, out.gains, 4) : ""}`, [{ label: "Yola devam", cls: "primary", fn: cont }]);
+      });
+      return;
+    }
+    const arrived = finishJourney(cfg, s, now);
+    if (arrived) {
+      persist(); mapApi = undefined; mapState = { view: { cx: place(arrived.to)!.x, cy: place(arrived.to)!.y + 55, w: 230 }, sel: arrived.to };
+      render(); toast(`Vardın: ${place(arrived.to)!.name}.`); storyTick(); return;
+    }
+    if (tab === "harita") mapApi?.refresh();
+    else root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
+  }
+  window.setInterval(journeyTick, 1000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) journeyTick(); });
+
   function beginIntro() {
     showIntro(name => { s.name = name; s.introDone = true; persist(); render(false); storyTick(); });
   }
@@ -210,7 +257,10 @@ export function startApp(root: HTMLElement) {
     showTitle({
       hasSave: started,
       summary: `${s.name} · Gün ${s.day} · ${currentChapter(s).title}`,
-      onContinue: () => { render(false); if (!resumeSession()) storyTick(); },
+      onContinue: () => {
+        if (s.journey) { tab = "harita"; render(false); journeyTick(); return; }
+        render(false); if (!resumeSession()) storyTick();
+      },
       onNew: newGameNow,
     });
   }

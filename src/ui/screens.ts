@@ -67,7 +67,7 @@ export function statusBar(cfg: Config, s: GameState): string {
   return `<header class="status">
     <div class="day">Gün ${s.day}<small>${clock(s)}${late ? " · gün bitti" : ""}</small></div>
     <div class="money">${s.money} bakır</div>
-    <button class="where" data-act="show-place" data-id="${esc(s.location)}">⌖ ${esc(here(s).name)}</button>
+    <button class="where" data-act="show-place" data-id="${esc(s.journey ? s.journey.to : s.location)}">⌖ ${s.journey ? `Yolda → ${esc(place(s.journey.to)?.name ?? "")}` : esc(here(s).name)}</button>
     <div class="vitals">${g}</div>
     ${al.length ? `<div class="alert-strip ${al[0].level}" role="status"><b>!</b><span>${esc(al[0].text)}${al.length > 1 ? ` <i>(+${al.length - 1})</i>` : ""}</span></div>` : ""}
   </header>`;

@@ -31,6 +31,7 @@ export function planSession(cfg: Config, s: GameState, actId: string, ms: number
   let fee = 0;
   const base = { energy, minutes, fee };
   if (s.session) return { ok: false, reason: "Zaten çalışıyorsun", ...base };
+  if (s.journey) return { ok: false, reason: "Yoldasın", ...base };
   const where = activityPlace(actId);
   if (where && !where.includes(s.location)) return { ok: false, reason: `Burada olmaz: ${where.map(w => place(w)?.name ?? w).join(" ya da ")}`, ...base };
   if (minutes > minutesLeft(s)) return { ok: false, reason: "Hava kararmadan bitmez", ...base };
@@ -65,6 +66,7 @@ export function startSession(cfg: Config, s: GameState, actId: string, ms: numbe
 export function startCraft(cfg: Config, s: GameState, craftId: string, now: number): { ok: boolean; reason?: string } {
   const c = craftById(craftId); if (!c) return { ok: false, reason: "Bilinmeyen iş" };
   if (s.session) return { ok: false, reason: "Zaten bir işle uğraşıyorsun" };
+  if (s.journey) return { ok: false, reason: "Yoldasın" };
   if (c.minutes > minutesLeft(s)) return { ok: false, reason: "Hava kararmadan bitmez" };
   const chk = craftCheck(cfg, s, c); if (!chk.ok) return chk;
   for (const [id, n] of Object.entries(c.needs)) removeItem(s, id, n); // malzemeler ayrılır

@@ -8,7 +8,7 @@ import {
   previewAttack, knownWeakPoints, dist, visible, sightRange, threatMap, unitById, playerPush, pushChance, pushTarget,
   playerDefend, canThrowTorch, throwTorch, key, WIND_NAMES,
 } from "../engine/combat";
-import { TERRAIN, ENEMIES } from "../content/world";
+import { TERRAIN, ENEMIES, MAPS } from "../content/world";
 import { esc, wolfSketch } from "./sketch";
 import { spellOptions, previewSpell, castSpell, hexRange, areaHexes } from "../engine/magic";
 import { MapRenderer } from "./battle-render";
@@ -27,7 +27,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
 
   const el = document.createElement("div");
   el.className = "battle"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Savaş");
-  el.innerHTML = `<div class="battle-top"><h2>Mera</h2><span class="hand" id="bInfo"></span></div>
+  el.innerHTML = `<div class="battle-top"><h2>${esc(MAPS[sc.mapId]?.name ?? "Savaş")}</h2><span class="hand" id="bInfo"></span></div>
     <div class="battle-canvas"><canvas aria-label="Savaş haritası"></canvas><button class="map-help" id="bHelp" aria-label="Harita işaretleri">?</button></div>
     <div class="battle-panel" id="bPanel"></div>`;
   document.body.appendChild(el);
