@@ -391,6 +391,79 @@ function kesme(S: number, c: Ink, ease: number): Game {
   };
 }
 
+/* ---------- ot ayıklama: Zehra'nın istediği otları tanı, benzerlerini at ---------- */
+interface Herb { name: string; leaf: "yuvarlak" | "uzun" | "disli" | "parcali" | "minik"; color: string; flower?: string; berry?: string; square?: boolean; hairy?: boolean; poison?: boolean }
+const HERBS: Herb[] = [
+  { name: "Nane", leaf: "disli", color: "#5E9A55", square: true },
+  { name: "Isırgan", leaf: "disli", color: "#3F6A34", hairy: true },
+  { name: "Adaçayı", leaf: "uzun", color: "#9AAA98", flower: "#8A6AB0" },
+  { name: "Kekik", leaf: "minik", color: "#7A8A4A", flower: "#C89AC0" },
+  { name: "Maydanoz", leaf: "parcali", color: "#5E9A45" },
+  { name: "Baldıran", leaf: "parcali", color: "#4F7A3A", flower: "#F4F1E8", poison: true },
+  { name: "Ebegümeci", leaf: "yuvarlak", color: "#6A9A50", flower: "#C870A8" },
+  { name: "İt üzümü", leaf: "uzun", color: "#4A6A3A", berry: "#2A2430", poison: true },
+];
+function drawHerb(g: CanvasRenderingContext2D, h: Herb, x: number, y: number, s: number, c: Ink) {
+  g.save(); g.translate(x, y); g.strokeStyle = c.ink; g.lineWidth = 1.4; g.lineCap = "round";
+  g.beginPath(); g.moveTo(0, s * 0.5); g.lineTo(0, -s * 0.45); g.stroke();
+  if (h.square) { g.strokeRect(-1.5, -s * 0.45, 3, s * 0.95); }
+  const leaf = (lx: number, ly: number, a: number) => {
+    g.save(); g.translate(lx, ly); g.rotate(a); g.fillStyle = h.color; g.beginPath();
+    const L = s * (h.leaf === "minik" ? 0.14 : h.leaf === "uzun" ? 0.36 : 0.3), W = L * (h.leaf === "uzun" ? 0.28 : h.leaf === "yuvarlak" ? 0.7 : 0.36);
+    if (h.leaf === "parcali") { for (let i = 0; i < 3; i++) { g.moveTo(0, 0); g.ellipse(L * 0.35 * (i + 1) / 1.5, (i - 1) * W * 0.6, L * 0.22, W * 0.35, 0, 0, TAU); } }
+    else if (h.leaf === "disli") { g.moveTo(0, 0); for (let i = 0; i <= 8; i++) { const u = i / 8; g.lineTo(L * u, -W * Math.sin(u * Math.PI) * (i % 2 ? 1.15 : 0.85)); } for (let i = 8; i >= 0; i--) { const u = i / 8; g.lineTo(L * u, W * Math.sin(u * Math.PI) * (i % 2 ? 1.15 : 0.85)); } }
+    else g.ellipse(L / 2, 0, L / 2, W, 0, 0, TAU);
+    g.fill(); g.stroke();
+    if (h.hairy) { g.lineWidth = 0.8; for (let i = 1; i < 5; i++) { g.beginPath(); g.moveTo(L * i / 5, -W * 0.5); g.lineTo(L * i / 5 + 2, -W * 0.9); g.stroke(); } g.lineWidth = 1.4; }
+    g.restore();
+  };
+  const n = h.leaf === "minik" ? 6 : 3;
+  for (let i = 0; i < n; i++) { const ly = s * 0.32 - i * s * 0.72 / n; const a = h.leaf === "uzun" ? 0.5 : 0.7; leaf(0, ly, -a); leaf(0, ly - s * 0.08, a - Math.PI); }
+  if (h.flower) { if (h.poison) { for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(0, -s * 0.45); g.lineTo(i * s * 0.07, -s * 0.6); g.stroke(); g.fillStyle = h.flower; g.beginPath(); g.arc(i * s * 0.07, -s * 0.62, 3, 0, TAU); g.fill(); g.stroke(); } }
+    else { g.fillStyle = h.flower; for (let i = 0; i < 5; i++) { g.beginPath(); g.arc(Math.cos(i * 1.26) * 4, -s * 0.5 + Math.sin(i * 1.26) * 4, 3, 0, TAU); g.fill(); } } }
+  if (h.berry) { g.fillStyle = h.berry; for (const [bx, by] of [[-6, -s * 0.48], [5, -s * 0.5], [0, -s * 0.56]]) { g.beginPath(); g.arc(bx, by, 4, 0, TAU); g.fill(); } }
+  g.restore();
+}
+function ayikla(S: number, c: Ink, ease: number): Game {
+  // iki hedef ot; geri kalanlar benzer görünüşlü (zehirliler dahil)
+  const pool = HERBS.map((_, i) => i).sort(() => rnd() - 0.5);
+  const targets = pool.filter(i => !HERBS[i].poison).slice(0, 2);
+  const N = 16; const seq: number[] = []; for (let i = 0; i < N; i++) seq.push(rnd() < 0.45 ? targets[i % 2] : pool[Math.floor(rnd() * pool.length)]);
+  let idx = 0; let shownAt = 0; let sw: P[] = []; let fly: { k: number; dir: number; t: number } | null = null;
+  let right = 0, wrong = 0, poisonIn = 0; const pops: Pop[] = []; const TIME = 2600 * ease;
+  const decide = (dir: number, now: number) => {
+    if (idx >= N || fly) return; const k = seq[idx]; const want = targets.includes(k); const ok = (dir > 0) === want;
+    if (ok) { right++; sfx(dir > 0 ? "good" : "page"); } else { wrong++; sfx("bad"); buzz("light"); if (dir > 0 && HERBS[k].poison) { poisonIn++; buzz("heavy"); } }
+    pops.push({ text: ok ? (dir > 0 ? "Sepete" : "Doğru, at") : (dir > 0 && HERBS[k].poison ? `Zehirli! (${HERBS[k].name})` : `Yanlış: ${HERBS[k].name}`), x: S / 2, y: S * 0.3, t: now, color: ok ? c.green : c.red });
+    fly = { k, dir, t: now }; idx++;
+  };
+  return {
+    hint: "Zehra üstteki iki otu istiyor. Ortaya gelen ot onlardan biriyse sağa (sepete), değilse sola kaydır. Benzerlerine dikkat: bazıları zehirli.",
+    frame(now, g) {
+      if (!shownAt) shownAt = now;
+      // istenenler
+      g.fillStyle = c.paper; g.fillRect(8, 8, S - 16, S * 0.24); g.strokeStyle = c.ink; g.lineWidth = 1.5; g.strokeRect(8, 8, S - 16, S * 0.24);
+      g.fillStyle = c.soft; g.font = "16px Caveat, cursive"; g.textAlign = "left"; g.fillText("Zehra'nın listesi", 16, 26);
+      targets.forEach((k, i) => { const x = S * (0.22 + i * 0.48); drawHerb(g, HERBS[k], x, S * 0.17, S * 0.15, c); g.fillStyle = c.ink; g.font = "700 18px Caveat, cursive"; g.textAlign = "center"; g.fillText(HERBS[k].name, x + S * 0.16, S * 0.2); });
+      // sepet ve yığın
+      g.font = "700 20px Caveat, cursive"; g.fillStyle = c.green; g.textAlign = "right"; g.fillText("sepet →", S - 14, S * 0.92);
+      g.fillStyle = c.red; g.textAlign = "left"; g.fillText("← at", 14, S * 0.92);
+      if (fly) { const k = (now - fly.t) / 350; if (k >= 1) { fly = null; shownAt = now; } else { g.globalAlpha = 1 - k; drawHerb(g, HERBS[fly.k], S / 2 + fly.dir * k * S * 0.5, S * 0.6 + k * 30, S * 0.32, c); g.globalAlpha = 1; } }
+      if (!fly && idx < N) {
+        const left = 1 - (now - shownAt) / TIME;
+        drawHerb(g, HERBS[seq[idx]], S / 2, S * 0.6, S * 0.32, c);
+        g.fillStyle = c.paper2; g.fillRect(S * 0.2, S * 0.83, S * 0.6, 6); g.fillStyle = left > 0.3 ? c.blue : c.red; g.fillRect(S * 0.2, S * 0.83, S * 0.6 * Math.max(0, left), 6);
+        if (left <= 0) { wrong++; idx++; shownAt = now; pops.push({ text: "Geç kaldın", x: S / 2, y: S * 0.3, t: now, color: c.red }); sfx("bad"); }
+      }
+      drawPops(g, pops, now); counter(g, c, S, `${Math.min(idx + 1, N)} / ${N}`);
+      return idx >= N && !fly && pops.length === 0;
+    },
+    down(x, y, now) { sw = [{ x, y, t: now }]; }, move(x, y, now) { sw.push({ x, y, t: now }); },
+    up(now) { const v = swipeOf(sw); if (v.len < 40) return; if (dirScore(v, 0, 50) > 0) decide(1, now); else if (dirScore(v, 180, 50) > 0) decide(-1, now); },
+    score: () => clamp01(right / N * 1.05 - poisonIn * 0.1),
+  };
+}
+
 /* ---------- yay: geri çek, rüzgârı hesapla, bırak ---------- */
 function yay(S: number, c: Ink, ease: number): Game {
   const N = 5; const res: number[] = []; let pull: P | null = null; let cur: P | null = null; let wind = 0; const newWind = () => { wind = (rnd() - 0.5) * 2; }; newWind();
@@ -648,7 +721,7 @@ function sequence(S: number, c: Ink, ease: number, strings: boolean): Game {
 }
 
 const MAKERS: Record<MiniKind, (S: number, c: Ink, ease: number, o: MiniOpts) => Game> = {
-  kosu, yuzme, odun, tirmanma, dans, ocak, mum, isaret, savustur, kesme, yay, cizgi,
+  kosu, yuzme, odun, tirmanma, dans, ocak, mum, isaret, savustur, kesme, ayikla, yay, cizgi,
   hafiza: (S, c, e) => sequence(S, c, e, false), ezgi: (S, c, e) => sequence(S, c, e, true),
 };
 
