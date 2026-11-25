@@ -8,30 +8,34 @@ export interface Place {
   icon: "dag" | "ev" | "meydan" | "ocak" | "dere" | "koru" | "sehir" | "kale";
 }
 export const PLACES: Place[] = [
-  { id: "yayla", name: "Hasan'ın yaylası", x: 505, y: 735, region: "taspinar", icon: "dag", desc: "Köyün üstünde, rüzgârlı bir yayla. Hasan'ın sürüsü burada otluyor; kurtlar kuzeydeki ağaçlıktan iniyor." },
-  { id: "zehra_evi", name: "Zehra'nın evi", x: 470, y: 800, region: "taspinar", icon: "ev", desc: "Yamaçta, otların arasında tek başına bir ev. Kapıda kuruyan şifalı bitkiler asılı." },
-  { id: "koy_meydani", name: "Taşpınar meydanı", x: 540, y: 858, region: "taspinar", icon: "meydan", desc: "Çeşmenin başı. Muhtar Ayşe'nin evi, fırın ve küçük pazar burada." },
-  { id: "demirhane", name: "Kemal'in demirhanesi", x: 576, y: 850, region: "taspinar", icon: "ocak", desc: "Ocağın isi duvarlara sinmiş. Örsün sesi meydana kadar gelir." },
-  { id: "nuri_evi", name: "Nuri'nin evi", x: 500, y: 886, region: "taspinar", icon: "ev", desc: "Derenin yanında, pencereleri büyük bir ev. İçeriden yağlı boya kokusu gelir." },
-  { id: "dere", name: "Dere kenarı", x: 452, y: 906, region: "taspinar", icon: "dere", desc: "Soğuk, berrak bir dere. Yüzmek için derin bir göl yeri var." },
-  { id: "koru", name: "Meşe korusu", x: 612, y: 798, region: "taspinar", icon: "koru", desc: "Sık meşeler, devrik kütükler. Odun kesmek ve avlanmak için." },
-  { id: "karacam", name: "Karaçam", x: 820, y: 640, region: "uzak", icon: "sehir", chapter: "Bölüm 2", desc: "Tüccarların şehri. Annenin mektubu seni buraya yönlendiriyor." },
-  { id: "ayazkale", name: "Ayazkale", x: 430, y: 240, region: "uzak", icon: "kale", chapter: "Bölüm 3", desc: "Kuzeyde, yazın bile buzla çevrili lordun kalesi." },
-  { id: "ardic", name: "Ardıç", x: 190, y: 1180, region: "uzak", icon: "sehir", chapter: "Bölüm 4", desc: "Başkent. On iki yıl önce bir gecede yanan şehir." },
+  { id: "yayla", name: "Hasan'ın yaylası", x: 440, y: 563, region: "taspinar", icon: "dag", desc: "Köyün üstünde, rüzgârlı bir yayla. Hasan'ın sürüsü burada otluyor; kurtlar kuzeydeki ağaçlıktan iniyor." },
+  { id: "zehra_evi", name: "Zehra'nın evi", x: 434, y: 621, region: "taspinar", icon: "ev", desc: "Yamaçta, otların arasında tek başına bir ev. Kapıda kuruyan şifalı bitkiler asılı." },
+  { id: "koy_meydani", name: "Taşpınar meydanı", x: 516, y: 709, region: "taspinar", icon: "meydan", desc: "Çeşmenin başı. Muhtar Ayşe'nin evi, fırın ve küçük pazar burada." },
+  { id: "demirhane", name: "Kemal'in demirhanesi", x: 564, y: 693, region: "taspinar", icon: "ocak", desc: "Ocağın isi duvarlara sinmiş. Örsün sesi meydana kadar gelir." },
+  { id: "nuri_evi", name: "Nuri'nin evi", x: 463, y: 727, region: "taspinar", icon: "ev", desc: "Derenin yanında, pencereleri büyük bir ev. İçeriden yağlı boya kokusu gelir." },
+  { id: "dere", name: "Dere kenarı", x: 463, y: 772, region: "taspinar", icon: "dere", desc: "Soğuk, berrak bir dere. Yüzmek için derin bir göl yeri var." },
+  { id: "koru", name: "Meşe korusu", x: 543, y: 597, region: "taspinar", icon: "koru", desc: "Sık meşeler, devrik kütükler. Odun kesmek ve avlanmak için." },
+  { id: "karacam", name: "Karaçam", x: 796, y: 864, region: "uzak", icon: "sehir", chapter: "Bölüm 2", desc: "Tüccarların şehri. Annenin mektubu seni buraya yönlendiriyor." },
+  { id: "ayazkale", name: "Ayazkale", x: 606, y: 314, region: "uzak", icon: "kale", chapter: "Bölüm 3", desc: "Kuzeyde, yazın bile buzla çevrili lordun kalesi." },
+  { id: "ardic", name: "Ardıç", x: 370, y: 1099, region: "uzak", icon: "sehir", chapter: "Bölüm 4", desc: "Başkent. On iki yıl önce bir gecede yanan şehir." },
 ];
 
 export interface Road { a: string; b: string; pts: [number, number][]; kind?: "patika" | "yol" }
+// Yerler harita görsellerine göre konumlandı (harita_ulke 1400 boy, harita_vadi 384..604 × 497..827 kutusunda).
+const P = (id: string): [number, number] => { const p = PLACES.find(q => q.id === id)!; return [p.x, p.y]; };
+/** Kısa köy patikası: iki yer arası hafif kıvrımlı. */
+const via = (a: string, b: string): [number, number][] => { const [ax, ay] = P(a), [bx, by] = P(b); return [[ax, ay], [(ax + bx) / 2 + (by - ay) * 0.12, (ay + by) / 2 - (bx - ax) * 0.12], [bx, by]]; };
 export const ROADS: Road[] = [
-  { a: "yayla", b: "zehra_evi", kind: "patika", pts: [[505, 735], [492, 758], [480, 780], [470, 800]] },
-  { a: "zehra_evi", b: "koy_meydani", kind: "patika", pts: [[470, 800], [492, 822], [516, 842], [540, 858]] },
-  { a: "yayla", b: "koru", kind: "patika", pts: [[505, 735], [540, 752], [580, 774], [612, 798]] },
-  { a: "koru", b: "demirhane", kind: "patika", pts: [[612, 798], [600, 824], [576, 850]] },
-  { a: "koy_meydani", b: "demirhane", kind: "yol", pts: [[540, 858], [558, 856], [576, 850]] },
-  { a: "koy_meydani", b: "nuri_evi", kind: "yol", pts: [[540, 858], [520, 872], [500, 886]] },
-  { a: "nuri_evi", b: "dere", kind: "patika", pts: [[500, 886], [476, 898], [452, 906]] },
-  { a: "demirhane", b: "karacam", kind: "yol", pts: [[576, 850], [640, 805], [700, 740], [760, 690], [820, 640]] },
-  { a: "yayla", b: "ayazkale", kind: "patika", pts: [[505, 735], [495, 640], [470, 520], [450, 380], [430, 240]] },
-  { a: "dere", b: "ardic", kind: "yol", pts: [[452, 906], [400, 980], [320, 1060], [250, 1130], [190, 1180]] },
+  { a: "yayla", b: "zehra_evi", kind: "patika", pts: via("yayla", "zehra_evi") },
+  { a: "zehra_evi", b: "koy_meydani", kind: "patika", pts: via("zehra_evi", "koy_meydani") },
+  { a: "yayla", b: "koru", kind: "patika", pts: via("yayla", "koru") },
+  { a: "koru", b: "demirhane", kind: "patika", pts: via("koru", "demirhane") },
+  { a: "koy_meydani", b: "demirhane", kind: "yol", pts: via("koy_meydani", "demirhane") },
+  { a: "koy_meydani", b: "nuri_evi", kind: "yol", pts: via("koy_meydani", "nuri_evi") },
+  { a: "nuri_evi", b: "dere", kind: "patika", pts: via("nuri_evi", "dere") },
+  { a: "demirhane", b: "karacam", kind: "yol", pts: [P("demirhane"), [662, 718], [729, 808], P("karacam")] },
+  { a: "yayla", b: "ayazkale", kind: "patika", pts: [P("yayla"), [505, 505], [538, 393], P("ayazkale")] },
+  { a: "dere", b: "ardic", kind: "yol", pts: [P("dere"), [538, 875], [404, 987], P("ardic")] },
 ];
 
 /** Kimin nerede olduğu. */

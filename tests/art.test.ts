@@ -9,7 +9,7 @@ const DIR = "src/assets/art";
 test("her görsel bilinen bir kişi, yer ya da eşyaya ait ve küçük boyutlu", () => {
   const items = new Set([...Object.keys(GAME_ITEMS), ...Object.keys(CONFIG_WEAPON_DAMAGE), ...Object.keys(CONFIG_ARMOR)]);
   for (const f of readdirSync(DIR)) {
-    expect(f, f).toMatch(/^(portre|yer|esya|hikaye|dusman|poz)_[a-z0-9_]+\.webp$/);
+    expect(f, f).toMatch(/^(portre|yer|esya|hikaye|dusman|poz|harita)_[a-z0-9_]+\.webp$/);
     const [, kind, id] = f.match(/^([a-z]+)_(.+)\.webp$/)!;
     if (kind === "portre") expect(id === "anne" || NPCS.some(n => n.id === id), f).toBe(true);
     if (kind === "yer") expect(PLACES.some(p => p.id === id), f).toBe(true);

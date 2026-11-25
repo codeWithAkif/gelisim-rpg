@@ -5,7 +5,7 @@ import { PLACES, ROADS, type Place } from "../content/map";
 import { NPCS, QUESTS } from "../content/world";
 import { place, planTravel, peopleAt, isOpen } from "../engine/travel";
 import { esc, roughPath } from "./sketch";
-import { personPic, placePic } from "./art";
+import { personPic, placePic, artUrl } from "./art";
 import { animScale } from "./settings";
 import { journeyPoint, journeyProgress, journeyLeftMs } from "../engine/journey";
 import { fmtDur } from "../engine/session";
@@ -36,8 +36,22 @@ function forest(cx: number, cy: number, rx: number, ry: number, n: number, seed:
   for (const [x, y] of t) out += `<line x1="${x}" y1="${y}" x2="${x}" y2="${y + 5}" stroke="#5B4630" stroke-width="1" vector-effect="non-scaling-stroke"/><circle cx="${x}" cy="${y - 2}" r="${5 + hash(x, y) * 3}" fill="${hash(y, x) > 0.5 ? "#7C9A5E" : "#6A8A50"}" stroke="#3E5230" stroke-width=".8" vector-effect="non-scaling-stroke"/>`;
   return out;
 }
+/** Vadi görselinin dünya üzerindeki kutusu (content/map.ts'teki yerler buna göre). */
+const VALLEY = { x: 384, y: 497, w: 220, h: 330 };
+const VILLAGE: [number, number] = [494, 662];
+/** Çizilmiş harita görselleri: ülke tüm dünyayı, vadi yakınlaşınca belirir. */
+function paintedTerrain(): string | null {
+  const ulke = artUrl("harita_ulke"), vadi = artUrl("harita_vadi");
+  if (!ulke) return null;
+  const vw = 933; // 2:3 görsel 1400 boyda
+  return `<rect x="-400" y="-400" width="${W + 800}" height="${H + 800}" fill="#E9DFC6"/>
+    <image href="${ulke}" x="${(W - vw) / 2}" y="0" width="${vw}" height="${H}" preserveAspectRatio="none"/>
+    ${vadi ? `<defs><radialGradient id="vadiFade"><stop offset="0.72" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><mask id="vadiMask"><rect x="${VALLEY.x}" y="${VALLEY.y}" width="${VALLEY.w}" height="${VALLEY.h}" fill="url(#vadiFade)"/></mask></defs>
+    <image class="valley-art" href="${vadi}" x="${VALLEY.x}" y="${VALLEY.y}" width="${VALLEY.w}" height="${VALLEY.h}" preserveAspectRatio="none" mask="url(#vadiMask)"/>` : ""}`;
+}
 function terrain(): string {
   if (terrainCache) return terrainCache;
+  const painted = paintedTerrain(); if (painted) return (terrainCache = painted);
   const land = roughPath([[120, 40], [600, 20], [930, 80], [980, 400], [940, 800], [960, 1150], [820, 1370], [420, 1380], [150, 1330], [60, 1150], [110, 900], [40, 600], [90, 300]], 18, 4, true);
   const river = `M430,300 C470,420 410,520 470,640 C510,720 430,780 452,906 C470,1000 330,1040 260,1120 C200,1180 120,1230 70,1260`;
   let fields = "";
@@ -85,8 +99,8 @@ type View = { cx: number; cy: number; w: number };
 const LEVELS: Record<string, (s: GameState) => View> = {
   // alttaki bilgi kartı haritanın altını örttüğü için merkezler biraz aşağı kaydırıldı
   koy: s => ({ cx: place(s.location)!.x, cy: place(s.location)!.y + 55, w: 230 }),
-  vadi: () => ({ cx: 535, cy: 875, w: 340 }),
-  ulke: () => ({ cx: 500, cy: 820, w: 1000 }),
+  vadi: () => ({ cx: VALLEY.x + VALLEY.w / 2, cy: VALLEY.y + VALLEY.h / 2 + 40, w: 300 }),
+  ulke: () => ({ cx: 500, cy: 760, w: 1000 }),
 };
 
 export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: MapHooks, saved?: { view?: View; sel?: string }): { state: () => { view: View; sel?: string }; refresh: () => void } {
@@ -114,6 +128,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     const h = view.w * aspect();
     view.cx = Math.max(0, Math.min(W, view.cx)); view.cy = Math.max(0, Math.min(H, view.cy));
     svg.setAttribute("viewBox", `${view.cx - view.w / 2} ${view.cy - h / 2} ${view.w} ${h}`);
+    const va = svg.querySelector<SVGImageElement>(".valley-art"); if (va) va.style.opacity = String(Math.max(0, Math.min(1, (700 - view.w) / 300)));
     drawDyn();
     host.querySelectorAll<HTMLButtonElement>("[data-z]").forEach(b => b.classList.toggle("on", Math.abs(LEVELS[b.dataset.z!](s).w - view.w) < 30));
   }
@@ -155,8 +170,8 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
       if (!locked || regionLabels) out += `<text x="${p.x}" y="${p.y + icon * 0.95}" font-size="${fs * (locked ? 1.3 : 1)}" text-anchor="middle" class="map-label">${esc(locked ? p.name + " ?" : p.name)}</text>`;
     }
     if (view.w > 700) {
-      out += `<circle cx="535" cy="830" r="${10 * k}" fill="#F3ECDA" stroke="#2A2722" stroke-width="1.4" vector-effect="non-scaling-stroke"/><text x="535" y="${830 + 24 * k}" font-size="${fs * 1.3}" text-anchor="middle" class="map-label">Taşpınar vadisi</text>`;
-      out += `<text x="500" y="${120}" font-size="${fs * 1.6}" text-anchor="middle" class="map-label faint">Kuzey Dağları</text><text x="110" y="1300" font-size="${fs * 1.4}" text-anchor="middle" class="map-label faint">Tuz Denizi</text>`;
+      out += `<circle cx="${VILLAGE[0]}" cy="${VILLAGE[1]}" r="${10 * k}" fill="#F3ECDA" stroke="#2A2722" stroke-width="1.4" vector-effect="non-scaling-stroke"/><text x="${VILLAGE[0]}" y="${VILLAGE[1] + 24 * k}" font-size="${fs * 1.3}" text-anchor="middle" class="map-label">Taşpınar vadisi</text>`;
+      out += `<text x="314" y="202" font-size="${fs * 1.6}" text-anchor="middle" class="map-label faint">Kuzey Dağları</text><text x="146" y="1234" font-size="${fs * 1.4}" text-anchor="middle" class="map-label faint">Tuz Denizi</text>`;
     }
     // oyuncu
     const me = walker ?? { x: place(s.location)!.x, y: place(s.location)!.y };
@@ -212,7 +227,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     const w = toWorld(e.clientX, e.clientY); const k = view.w / 300;
     let best: Place | undefined, bd = Infinity;
     for (const p of PLACES) { if ((isOpen(p) && view.w > 700) || !isSeen(s, p.id)) continue; const d = Math.hypot(p.x - w.x, p.y - w.y); if (d < bd) { bd = d; best = p; } }
-    if (view.w > 700 && Math.hypot(535 - w.x, 830 - w.y) < 30 * k) { view = LEVELS.vadi(s); applyView(); return; }
+    if (view.w > 700 && Math.hypot(VILLAGE[0] - w.x, VILLAGE[1] - w.y) < 30 * k) { view = LEVELS.vadi(s); applyView(); return; }
     if (best && bd < 26 * k) { sel = best.id; renderCard(); drawDyn(); }
   };
   svg.addEventListener("pointerup", up); svg.addEventListener("pointercancel", up);
