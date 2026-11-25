@@ -312,3 +312,23 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 .art-thumb img { object-position: 50% 55%; }
 .art-mother { width: 150px; height: 150px; margin: 0 auto; overflow: hidden; border-radius: 50%; -webkit-mask-image: radial-gradient(circle, #000 55%, transparent 72%); mask-image: radial-gradient(circle, #000 55%, transparent 72%); }
 .art-mother img { width: 100%; height: 100%; object-fit: cover; opacity: .85; filter: sepia(.25) brightness(calc(1 - var(--dark, 0) * .3)); }
+
+/* ---------- Savaşta zamanlama komutu ---------- */
+.qt { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.12); touch-action: none; }
+.qt-box { position: relative; display: flex; flex-direction: column; align-items: center; background: var(--paper); border: 2px solid var(--ink); border-radius: 14px 22px 14px 22px; padding: 6px 14px 10px; box-shadow: 3px 3px 0 rgba(42,39,34,.25); }
+.battle-canvas .qt canvas { position: static; inset: auto; width: 200px; height: 200px; }
+.qt-label { font-size: 26px; font-weight: 700; margin-top: -8px; }
+.qt.dodge .qt-label { color: var(--red); }
+.qt-result { position: absolute; top: 34%; left: 0; right: 0; text-align: center; background: var(--paper); border-radius: 8px; font-size: 30px; font-weight: 700; animation: pop .25s ease-out; }
+.qt-result:empty { display: none; }
+.qt-result[data-q="1"] { color: var(--green); } .qt-result[data-q="g"] { color: var(--blue); } .qt-result[data-q="0"] { color: var(--red); }
+
+/* ---------- Mini oyun (odak turu) ---------- */
+.minigame { position: fixed; inset: 0; z-index: 70; background: var(--paper); display: flex; justify-content: center; overflow-y: auto; touch-action: none; }
+.mini-inner { width: 100%; max-width: 520px; padding: calc(var(--safe-top) + 24px) 16px calc(var(--safe-bottom) + 24px); display: flex; flex-direction: column; gap: 14px; align-items: center; }
+.mini-inner h1 { font-size: 34px; text-align: center; }
+.mini-hint { margin: 0; text-align: center; color: var(--ink-soft); max-width: 36ch; }
+.mini-canvas { border: 1.5px solid var(--ink); border-radius: 8px 14px 8px 14px; background: var(--paper-2); touch-action: none; }
+.mini-count { font-size: 64px; font-weight: 700; min-height: 1.1em; line-height: 1; color: var(--red); }
+.mini-score { font-family: var(--f-hand); font-size: 72px; font-weight: 700; line-height: 1; color: var(--green); }
+.focus-card { border-color: var(--green); }

@@ -8,6 +8,7 @@ import { type GameState, hourOf, log, DAY_MINUTES } from "./state";
 import { derived, effectiveAttr, maxMana, type Context } from "./derived";
 import { Rng } from "./rng";
 import { applyGain, realUse, summarize, type GainReport } from "./progression";
+import { attackTimingMods, dodgeMod } from "./timing";
 import { ENEMIES, GAME_ITEMS, MAPS, MAP_CHARS, TERRAIN, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, type Terrain, type WeakPoint } from "../content/world";
 
 export type Weather = "acik" | "yagmur" | "sis";
@@ -36,6 +37,8 @@ export type BattleEvent =
 
 export interface Battle {
   w: number; h: number; tiles: Terrain[][];
+  /** Düşman turundan önce oynanan kaçınma komutunun sonucu (0–1); tur sonunda silinir. */
+  dodgeQ?: number;
   weather: Weather; night: boolean;
   wind: { dir: number; strength: number };   // dir: rüzgârın estiği yön (0 = doğu, saat yönünde 60°)
   units: Unit[]; turn: number;
@@ -347,10 +350,13 @@ export function detect(b: Battle, force: boolean) {
 
 /* ---------- eylemler ---------- */
 export interface AttackResult { hit: boolean; crit: boolean; dmg: number; text: string }
-export function playerAttack(cfg: Config, s: GameState, b: Battle, target: Unit, aim?: string, stance: Stance = "normal"): AttackResult | null {
+/** timing: zamanlama komutunun sonucu (0–1); verilmezse komut oynanmamış sayılır. */
+export function playerAttack(cfg: Config, s: GameState, b: Battle, target: Unit, aim?: string, stance: Stance = "normal", timing?: number): AttackResult | null {
   const p = player(b);
   if (b.phase !== "player" || p.acted || dist(p.x, p.y, target.x, target.y) !== 1) return null;
   const rng = new Rng(b.seed); const pv = previewAttack(cfg, s, b, target, aim, stance); const d = ENEMIES[target.def!];
+  const tm = attackTimingMods(timing);
+  pv.hit = Math.max(5, Math.min(97, pv.hit + tm.hit)); pv.crit = Math.max(0, Math.min(90, pv.crit + tm.crit));
   b.stats.attacks++; p.acted = true; p.moveLeft = 0;
   s.energy = Math.max(0, s.energy - (stance === "guclu" ? 8 : 4));
   const w = s.equipped.weapon; if (w) s.familiarity[w] = Math.min(100, (s.familiarity[w] ?? 0) + 0.8);
@@ -567,7 +573,7 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
     if (e.alert && dist(e.x, e.y, p.x, p.y) === 1) {
       const ctx = ctxAt(cfg, s, b, p, d.species);
       const dodge = derived(cfg, s, "kacinma", ctx).value;
-      const hitChance = Math.max(10, Math.min(90, d.accuracy - dodge + (s.energy < 20 ? 10 : 0) - (blind ? 30 : 0) - (p.defending ? 22 : 0)));
+      const hitChance = Math.max(5, Math.min(90, d.accuracy - dodge + (s.energy < 20 ? 10 : 0) - (blind ? 30 : 0) - (p.defending ? 22 : 0) - dodgeMod(b.dodgeQ)));
       const hit = rng.chance(hitChance);
       let dmg = 0;
       if (hit) {
@@ -579,10 +585,18 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
       if (p.hp <= 0) break;
     }
   }
-  b.seed = rng.seed; out.forEach(t => b.log.unshift(t));
+  b.seed = rng.seed; out.forEach(t => b.log.unshift(t)); b.dodgeQ = undefined;
   b.turn++; checkEnd(b);
   if (b.phase === "enemy") startPlayerTurn(cfg, s, b);
   return out;
+}
+
+/** Bu düşman turunda oyuncuya saldırı gelecek mi? (Tur deterministik; kopyada denenir.) */
+export function willBeAttacked(cfg: Config, s: GameState, b: Battle): boolean {
+  const bc = structuredClone(b), sc = structuredClone(s); bc.events = [];
+  const pid = player(bc).uid;
+  enemyTurn(cfg, sc, bc);
+  return bc.events.some(e => e.k === "attack" && e.target === pid);
 }
 
 export interface BattleOutcome { result: Battle["phase"]; gains: GainReport; minutes: number; text: string }

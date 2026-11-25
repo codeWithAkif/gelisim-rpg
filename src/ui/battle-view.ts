@@ -6,8 +6,12 @@ import {
   type Battle, type BattleOutcome, type Plan, type Scenario, type Stance, type XY,
   createBattle, player, enemies, reachable, movePlayer, playerAttack, observe, enemyTurn, tryFlee, finishBattle,
   previewAttack, knownWeakPoints, dist, visible, sightRange, threatMap, unitById, playerPush, pushChance, pushTarget,
-  playerDefend, canThrowTorch, throwTorch, key, WIND_NAMES,
+  playerDefend, canThrowTorch, throwTorch, key, WIND_NAMES, willBeAttacked,
 } from "../engine/combat";
+import { attackWindow, dodgeWindow } from "../engine/timing";
+import { quickTiming } from "./timing-view";
+import { settings } from "./settings";
+import { sfx, buzz } from "./feel";
 import { TERRAIN, ENEMIES, MAPS } from "../content/world";
 import { esc, wolfSketch } from "./sketch";
 import { spellOptions, previewSpell, castSpell, hexRange, areaHexes } from "../engine/magic";
@@ -72,13 +76,18 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     const pPos = () => { const p = player(b); const c = R.center(p.x, p.y); return { x: c.cx, y: c.cy }; };
     for (const e of evs) {
       switch (e.k) {
-        case "move": await R.animMove(e.uid, e.path); break;
-        case "attack": await R.animAttack(e.uid, e.target, e); break;
+        case "move": sfx("step"); await R.animMove(e.uid, e.path); break;
+        case "attack": {
+          const onMe = e.target === player(b).uid;
+          sfx(!e.hit ? "miss" : e.crit ? "crit" : onMe ? "hurt" : "hit");
+          if (e.hit) buzz(onMe ? "heavy" : e.crit ? "medium" : "light");
+          await R.animAttack(e.uid, e.target, e); break;
+        }
         case "cast": {
           const sp = cfg.spell.get(e.spell)!;
           if (e.fizzle) { R.floatAt("p", "büyü dağıldı", "#8B8270"); await R.wait(400); break; }
           const cold = sp.sources.some(x => x.id.includes("ayaz") || x.id.includes("buz"));
-          await R.animProjectile(e.from, e.to, cold ? "buz" : "ates");
+          sfx("whoosh"); await R.animProjectile(e.from, e.to, cold ? "buz" : "ates"); sfx("fire"); buzz("medium");
           for (const [x, y] of areaHexes(b, sp, e.to[0], e.to[1])) R.showFire(key(x, y));
           for (const h of e.hits) { R.flash(h.uid); R.floatAt(h.uid, `−${h.dmg}`, "#9E3423"); }
           await R.wait(250); break;
@@ -170,6 +179,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     mode = { k: "normal" }; stance = "normal";
     busy = true; renderPanel();
     await R.wait(200);
+    if (settings().timing && willBeAttacked(cfg, s, b)) b.dodgeQ = await quickTiming(el.querySelector<HTMLElement>(".battle-canvas")!, "dodge", dodgeWindow(s));
     enemyTurn(cfg, s, b); busy = false;
     await play();
     if (!b.units.some(u => u.uid === selected && u.hp > 0 && !u.fled)) selected = enemies(b)[0]?.uid ?? null;
@@ -179,6 +189,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
   }
   function finish() {
     busy = true; renderPanel();
+    sfx(b.phase === "won" ? "win" : b.phase === "lost" ? "lose" : "page"); if (b.phase === "lost") buzz("long");
     setTimeout(() => {
       const o = finishBattle(cfg, s, b);
       R.stop(); window.removeEventListener("resize", onResize); ro.disconnect(); el.remove();
@@ -211,7 +222,11 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     }
     const tgt = selected ? unitById(b, selected) : undefined;
     switch (t.dataset.b) {
-      case "attack": if (tgt) { playerAttack(cfg, s, b, tgt, aim, stance); stance = "normal"; after(); } break;
+      case "attack": if (tgt) void (async () => {
+        let q: number | undefined;
+        if (settings().timing) { busy = true; q = await quickTiming(el.querySelector<HTMLElement>(".battle-canvas")!, "attack", attackWindow(s)); busy = false; }
+        playerAttack(cfg, s, b, tgt, aim, stance, q); stance = "normal"; after();
+      })(); break;
       case "stance": stance = stance === "guclu" ? "normal" : "guclu"; renderPanel(); break;
       case "push": if (tgt) { playerPush(cfg, s, b, tgt); after(); } break;
       case "observe": if (tgt) { observe(cfg, s, b, tgt); after(); } break;

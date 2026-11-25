@@ -67,6 +67,7 @@ export function checkLayout(onOk: () => void) {
   setTimeout(tick, 2500);
   // elle tanı: ekrana 2 saniye basılı tut
   let timer = 0;
-  window.addEventListener("pointerdown", () => { clearTimeout(timer); timer = window.setTimeout(() => { shown = false; showProblem("Tanı bilgisi", layoutReport().text); }, 2000); });
+  // oyun alanlarında (mini oyun, savaş haritası) basılı tutmak oyunun parçası; tanı açılmasın
+  window.addEventListener("pointerdown", e => { clearTimeout(timer); if ((e.target as Element | null)?.closest?.("canvas, .minigame, .qt")) return; timer = window.setTimeout(() => { shown = false; showProblem("Tanı bilgisi", layoutReport().text); }, 2000); });
   for (const ev of ["pointerup", "pointercancel", "pointermove"]) window.addEventListener(ev, () => clearTimeout(timer));
 }

@@ -1,7 +1,8 @@
 // Oyuncu ayarları (kayıttan ayrı tutulur; yeni oyun başlatmak ayarları silmez).
-export interface Settings { anim: "yavas" | "normal" | "hizli" | "kapali"; text: "normal" | "buyuk"; notify: boolean }
+export interface Settings { anim: "yavas" | "normal" | "hizli" | "kapali"; text: "normal" | "buyuk"; notify: boolean; sound: boolean; ambient: boolean; haptic: boolean; timing: boolean }
+export type BoolSetting = "notify" | "sound" | "ambient" | "haptic" | "timing";
 const KEY = "gelisim-ayarlar";
-const DEF: Settings = { anim: "normal", text: "normal", notify: true };
+const DEF: Settings = { anim: "normal", text: "normal", notify: true, sound: true, ambient: true, haptic: true, timing: true };
 let cache: Settings | null = null;
 
 export function settings(): Settings {
@@ -9,7 +10,7 @@ export function settings(): Settings {
   try { cache = { ...DEF, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }; } catch { cache = { ...DEF }; }
   return cache!;
 }
-export function saveSettings(s: Settings) { cache = s; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* yok */ } applySettings(); }
+export function saveSettings(s: Settings) { cache = s; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* yok */ } applySettings(); window.dispatchEvent(new Event("gelisim-ayar")); }
 export function applySettings() {
   document.documentElement.classList.toggle("big-text", settings().text === "buyuk");
 }

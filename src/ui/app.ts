@@ -24,6 +24,8 @@ import { applyDaylight } from "./daylight";
 import { notifyAt, clearNotify } from "../notify";
 import { showTitle } from "./title";
 import { applySettings } from "./settings";
+import { sfx, buzz, ambience, unlockAudio } from "./feel";
+import { darkness } from "./daylight";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 
@@ -45,10 +47,14 @@ export function startApp(root: HTMLElement) {
   const main = root.querySelector<HTMLElement>("#main")!;
 
   function persist() { save(s); }
+  let titleOpen = true;
+  function syncAmbience() { ambience(!titleOpen && !document.querySelector(".battle, .minigame"), darkness(s.minute) > 0.7); }
+  window.addEventListener("gelisim-ayar", syncAmbience);
+  document.addEventListener("visibilitychange", syncAmbience);
   function toast(t: string) { const el = root.querySelector("#toast")!; el.textContent = t; el.classList.add("on"); clearTimeout((toast as any).t); (toast as any).t = setTimeout(() => el.classList.remove("on"), 2400); }
   function render(keepScroll = true) {
     const y = main.scrollTop;
-    applyDaylight(s.minute);
+    applyDaylight(s.minute); syncAmbience();
     root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
     if (mapApi) { mapState = mapApi.state(); mapApi = undefined; }
     main.classList.toggle("map-mode", tab === "harita");
@@ -98,13 +104,15 @@ export function startApp(root: HTMLElement) {
     ui.lastResult = { title: r.label, gains: r.gains, at: Date.now(), note: r.wounded ? "Yaralıydın; bedensel kazanç düştü." : undefined };
     persist(); render();
     modal(`<p class="hand muted" style="margin:0">${r.early ? "Yarıda bıraktın" : "Çalışma bitti"} · ${fmtDur(r.minutes * 60_000)}</p><h2>${esc(r.label)}</h2>${gainList(cfg, r.gains, 8)}
+      ${r.boost && r.boost > 1.01 ? `<p class="hand" style="margin:0;color:var(--green)">Odak turu: verim ×${r.boost.toFixed(1)}</p>` : ""}
       ${r.wounded ? `<p class="red" style="margin:0">Yaralıydın; bedensel kazanç düştü.</p>` : ""}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
+    sfx(r.early ? "page" : "win"); buzz("medium");
   }
   function resumeSession() {
     if (!s.session) return false;
     const r = finishSession(cfg, s, Date.now());
     if (r) { sessionDone(r); return true; }
-    openSessionRun(cfg, s, sessionDone, persist);
+    openSessionRun(cfg, s, sessionDone, persist, scheduleNotify);
     return true;
   }
   /** Yeni kilometre taşlarını sırayla "Yeni sayfa" olarak gösterir. */
@@ -122,7 +130,7 @@ export function startApp(root: HTMLElement) {
     }
     const show = (i: number) => {
       if (i >= fresh.length) { after?.(); return; }
-      const m = fresh[i];
+      const m = fresh[i]; sfx("page");
       modal(`<p class="hand muted" style="margin:0">Yeni sayfa</p><h2>${esc(m.title)}</h2><p style="font-size:18px;line-height:1.5">${esc(m.text)}</p>`,
         [{ label: "Deftere işle", cls: "primary", fn: () => show(i + 1) }]);
     };
@@ -139,7 +147,7 @@ export function startApp(root: HTMLElement) {
   root.querySelector("nav")!.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-tab]"); if (!b) return;
     tab = b.dataset.tab as Tab; try { localStorage.setItem("gelisim-sekme", tab); } catch { /* yok */ }
-    render(false);
+    sfx("page"); render(false);
   });
 
   // üst şeritteki konum düğmesi haritayı açar
@@ -155,17 +163,17 @@ export function startApp(root: HTMLElement) {
         openSessionSheet(cfg, s, id, ms => {
           const p = startSession(cfg, s, id, ms, Date.now());
           if (!p.ok) { toast(p.reason ?? "Başlayamadın"); return; }
-          persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist);
+          persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist, scheduleNotify);
         });
         break;
       case "craft": {
         const r = startCraft(cfg, s, id, Date.now());
         if (!r.ok) { toast(r.reason ?? "Başlayamadın"); break; }
-        persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist); break;
+        persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist, scheduleNotify); break;
       }
       case "pick": ui.sel = ui.sel === id ? undefined : id; render(); break;
       case "eat": { const it = itemInfo(cfg, id); if (eat(s, id, it.satiety ?? 20)) { toast(`${it.name} yedin. Tokluk +${it.satiety}.`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); } break; }
-      case "buy": { const r = buy(cfg, s, id); toast(r.ok ? `${itemInfo(cfg, id).name} aldın.` : r.reason ?? ""); persist(); render(); break; }
+      case "buy": { const r = buy(cfg, s, id); sfx(r.ok ? "coin" : "bad"); toast(r.ok ? `${itemInfo(cfg, id).name} aldın.` : r.reason ?? ""); persist(); render(); break; }
       case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }
       case "unequip": { const r = unequip(cfg, s, id as "weapon" | "armor"); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "sleep": {
@@ -179,7 +187,7 @@ export function startApp(root: HTMLElement) {
           [{ label: "Güne başla", cls: "primary", fn: () => storyTick() }]);
         break;
       }
-      case "accept": acceptQuest(s, id); persist(); render(); toast("İşi üstlendin."); break;
+      case "accept": acceptQuest(s, id); sfx("page"); persist(); render(); toast("İşi üstlendin."); break;
       case "walk": doWalk(id); break;
       case "fight": doFight(id); break;
       case "show-place": tab = "harita"; mapState = { view: mapState?.view ?? { cx: place(id)!.x, cy: place(id)!.y + 70, w: 300 }, sel: id }; if (mapState.view.w > 500 || Math.hypot(mapState.view.cx - place(id)!.x, mapState.view.cy - place(id)!.y) > mapState.view.w / 2) mapState.view = { cx: (place(id)!.x + place(s.location)!.x) / 2, cy: (place(id)!.y + place(s.location)!.y) / 2 + 70, w: 300 }; render(false); break;
@@ -222,7 +230,7 @@ export function startApp(root: HTMLElement) {
     const now = Date.now();
     const due = dueEvent(s, now);
     if (due) {
-      pauseJourney(s, now); persist(); eventOpen = true;
+      pauseJourney(s, now); persist(); eventOpen = true; sfx("page"); buzz("light");
       if (tab !== "harita") { tab = "harita"; render(false); } else mapApi?.refresh();
       const opts = due.def.choices.map(c => ({ ...c, ok: canUseChoice(s, c.need) }));
       const bg = document.createElement("div"); bg.className = "modal-bg";
@@ -249,11 +257,12 @@ export function startApp(root: HTMLElement) {
     const arrived = finishJourney(cfg, s, now);
     if (arrived) {
       persist(); mapApi = undefined; mapState = { view: { cx: place(arrived.to)!.x, cy: place(arrived.to)!.y + 55, w: 230 }, sel: arrived.to };
-      render(); toast(`Vardın: ${place(arrived.to)!.name}.`); storyTick(); return;
+      render(); toast(`Vardın: ${place(arrived.to)!.name}.`); sfx("good"); storyTick(); return;
     }
     if (tab === "harita") mapApi?.refresh();
     else root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
     applyDaylight(s.minute);
+    if (s.journey.pausedAt === undefined && !document.hidden) { sfx("step"); setTimeout(() => sfx("step"), 480); }
   }
   window.setInterval(journeyTick, 1000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) journeyTick(); });
@@ -265,19 +274,20 @@ export function startApp(root: HTMLElement) {
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
   function newGameNow() { reset(); s = newGame(cfg); s.hp = maxHp(cfg, s); persist(); tab = "defter"; ui.lastResult = undefined; render(false); beginIntro(); }
   function openTitle() {
-    const started = s.introDone;
+    const started = s.introDone; titleOpen = true; syncAmbience();
     showTitle({
       hasSave: started,
       summary: `${s.name} · Gün ${s.day} · ${currentChapter(s).title}`,
       onContinue: () => {
+        titleOpen = false;
         if (s.journey) { tab = "harita"; render(false); journeyTick(); return; }
         render(false); if (!resumeSession()) storyTick();
       },
-      onNew: newGameNow,
+      onNew: () => { titleOpen = false; newGameNow(); },
     });
   }
 
-  applySettings();
+  applySettings(); unlockAudio();
   render(false);
   persist();
   openTitle();

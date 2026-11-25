@@ -1,7 +1,8 @@
 // Açılış menüsü: devam et, yeni oyun (sıfırlama), ayarlar.
 import { art } from "./intro";
 import { esc } from "./sketch";
-import { settings, saveSettings, type Settings } from "./settings";
+import { settings, saveSettings, type Settings, type BoolSetting } from "./settings";
+import { sfx } from "./feel";
 import { APP_VERSION, lastUpdateStatus } from "../update";
 
 export interface TitleOpts { hasSave: boolean; summary: string; onContinue: () => void; onNew: () => void }
@@ -13,6 +14,8 @@ export function showTitle(o: TitleOpts) {
   let view: "menu" | "ayarlar" | "sil" = "menu";
   const chip = (group: keyof Settings, val: string, label: string) =>
     `<button class="choice ${settings()[group] === val ? "on" : ""}" data-set="${group}" data-val="${val}"><b>${label}</b></button>`;
+  const toggle = (k: BoolSetting, title: string, desc: string) =>
+    `<section class="sec"><h3>${title}</h3><div class="choices"><button class="choice ${settings()[k] ? "on" : ""}" data-bool="${k}" data-val="1"><b>Açık</b></button><button class="choice ${settings()[k] ? "" : "on"}" data-bool="${k}" data-val="0"><b>Kapalı</b></button></div><p class="muted tiny" style="margin:0">${desc}</p></section>`;
   const render = () => {
     if (view === "menu") el.innerHTML = `<div class="intro-page title-page">
       <div class="intro-art">${art("defter")}</div>
@@ -29,7 +32,11 @@ export function showTitle(o: TitleOpts) {
       <section class="sec"><h3>Savaş canlandırmaları</h3><div class="choices">
         ${chip("anim", "yavas", "Yavaş")}${chip("anim", "normal", "Normal")}${chip("anim", "hizli", "Hızlı")}${chip("anim", "kapali", "Kapalı")}</div>
         <p class="muted tiny" style="margin:0">Yürüme, saldırı, ateş topu ve hasar yazılarının hızı.</p></section>
-      <section class="sec"><h3>Bildirimler</h3><div class="choices"><button class="choice ${settings().notify ? "on" : ""}" data-notify="1"><b>Açık</b><span class="tiny">Çalışma bitince telefona haber ver</span></button><button class="choice ${settings().notify ? "" : "on"}" data-notify="0"><b>Kapalı</b></button></div></section>
+      ${toggle("timing", "Savaşta zamanlama", "Vuruşta ve kaçışta doğru anı yakalama komutları. Kapalıysa savaş eskisi gibi zar ile.")}
+      ${toggle("sound", "Ses efektleri", "Vuruş, adım, kâğıt hışırtısı.")}
+      ${toggle("ambient", "Ortam sesi", "Gündüz kuşlar ve rüzgâr, gece cırcırböcekleri.")}
+      ${toggle("haptic", "Titreşim", "Vuruşta, kritikte ve yaralanınca.")}
+      ${toggle("notify", "Bildirimler", "Çalışma bitince telefona haber ver.")}
       <section class="sec"><h3>Yazı boyutu</h3><div class="choices">${chip("text", "normal", "Normal")}${chip("text", "buyuk", "Büyük")}</div></section>
       <p class="muted tiny">Ayarlar kaydından ayrı tutulur; yeni oyuna başlamak ayarları silmez.</p>
       <section class="sec"><h3>Güncelleme</h3>${(() => { const u = lastUpdateStatus(); return u ? `<p class="${u.ok ? "" : "red"}" style="margin:0">${esc(u.text)}</p><p class="muted tiny" style="margin:0">${new Date(u.at).toLocaleString("tr-TR")}</p>` : `<p class="muted" style="margin:0">Henüz denetlenmedi.</p>`; })()}
@@ -44,7 +51,7 @@ export function showTitle(o: TitleOpts) {
   el.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b) return;
     if (b.dataset.set) { saveSettings({ ...settings(), [b.dataset.set]: b.dataset.val } as Settings); render(); return; }
-    if (b.dataset.notify) { saveSettings({ ...settings(), notify: b.dataset.notify === "1" }); render(); return; }
+    if (b.dataset.bool) { saveSettings({ ...settings(), [b.dataset.bool]: b.dataset.val === "1" }); sfx("tap"); render(); return; }
     switch (b.dataset.x) {
       case "continue": el.remove(); o.onContinue(); return;
       case "start": case "wipe": el.remove(); o.onNew(); return;

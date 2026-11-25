@@ -8,6 +8,7 @@ import { maxHp } from "./combat";
 import { teacherOf, CRAFTS } from "../content/world";
 import { craftById, craftCheck, completeCraft, removeItem, addItem } from "./inventory";
 import { activityPlace, place } from "./travel";
+import { sessionBoost, sessionRounds } from "./timing";
 
 /** Zaman sıkıştırması: oyun süresi / gerçek süre. */
 export const TIME_SCALE = 60;
@@ -21,7 +22,16 @@ export const SESSION_OPTIONS: SessionOption[] = [
   { id: "5h", label: "5 saat", ms: 18_000_000 },
 ];
 /** durMs gerçek bekleme süresi, gameMs oyundaki karşılığı. */
-export interface Session { kind: "act" | "craft"; id: string; startMs: number; durMs: number; gameMs?: number; label: string; fee?: number }
+export interface Session { kind: "act" | "craft"; id: string; startMs: number; durMs: number; gameMs?: number; label: string; fee?: number; scores?: number[] }
+/** Oturumun mini oyun verimi (×1 ile ×2 arası). */
+export function boostOf(ss: Session): number { return ss.kind === "act" ? sessionBoost(ss.scores, ss.gameMs ?? ss.durMs) : 1; }
+/** Oynanabilecek kalan odak turu. */
+export function roundsLeft(ss: Session): number { return Math.max(0, sessionRounds(ss.gameMs ?? ss.durMs) - (ss.scores?.length ?? 0)); }
+/** Mini oyun sonucunu oturuma yazar (0–1). */
+export function recordPlay(s: GameState, score: number): boolean {
+  const ss = s.session; if (!ss || ss.kind !== "act" || roundsLeft(ss) <= 0) return false;
+  (ss.scores ??= []).push(Math.max(0, Math.min(1, score))); return true;
+}
 const gameOf = (ss: Session, realMs: number) => realMs * ((ss.gameMs ?? ss.durMs) / ss.durMs);
 
 const LOW_ENERGY = 25;
@@ -86,13 +96,13 @@ export function sessionProgress(s: GameState, now: number): number {
 }
 
 /** Bir saatlik kazancı parça parça uygular: yoruldukça verim düşer. */
-function applyHours(cfg: Config, s: GameState, actId: string, hours: number, report: GainReport) {
+function applyHours(cfg: Config, s: GameState, actId: string, hours: number, report: GainReport, boost = 1) {
   const act = cfg.act.get(actId)!; const perHour = 60 / (act.duration ?? 60);
   const hurt = wounded(cfg, s);
   let left = hours;
   while (left > 1e-9) {
     const h = Math.min(0.25, left); left -= h;
-    const eff = (s.energy < LOW_ENERGY ? 0.6 : 1) * (s.satiety < 15 ? 0.7 : 1);
+    const eff = (s.energy < LOW_ENERGY ? 0.6 : 1) * (s.satiety < 15 ? 0.7 : 1) * boost;
     for (const g of act.gains) {
       const physical = DEFERRED_CATEGORIES.has(cfg.attr.get(g.attribute)?.cat ?? "");
       applyGain(cfg, s, g.attribute, g.w * eff * perHour * h * (physical && hurt ? 0.6 : 1), report);
@@ -104,7 +114,7 @@ function applyHours(cfg: Config, s: GameState, actId: string, hours: number, rep
   }
 }
 
-export interface SessionResult { label: string; gains: GainReport; minutes: number; early: boolean; kind: "act" | "craft"; product?: string; dropped?: number; wounded: boolean }
+export interface SessionResult { label: string; gains: GainReport; minutes: number; early: boolean; kind: "act" | "craft"; product?: string; dropped?: number; wounded: boolean; boost?: number }
 /** Oturumu bitirir (süre dolduysa tamamı, yarıda bırakıldıysa geçen kısmı). */
 export function finishSession(cfg: Config, s: GameState, now: number, early = false): SessionResult | null {
   const ss = s.session; if (!ss) return null;
@@ -116,9 +126,10 @@ export function finishSession(cfg: Config, s: GameState, now: number, early = fa
   const hurt = wounded(cfg, s);
   const gameDone = gameOf(ss, done);
   if (ss.kind === "act") {
-    applyHours(cfg, s, ss.id, gameDone / 3_600_000, report);
-    log(s, `${ss.label} (${fmtDur(gameDone)}${complete ? "" : ", yarıda"}): ${summarize(cfg, report)}`, "gain");
-    return { label: ss.label, gains: report, minutes: gameDone / 60_000, early: !complete, kind: "act", wounded: hurt };
+    const boost = boostOf(ss);
+    applyHours(cfg, s, ss.id, gameDone / 3_600_000, report, boost);
+    log(s, `${ss.label} (${fmtDur(gameDone)}${complete ? "" : ", yarıda"}${boost > 1.01 ? `, odak ×${boost.toFixed(1)}` : ""}): ${summarize(cfg, report)}`, "gain");
+    return { label: ss.label, gains: report, minutes: gameDone / 60_000, early: !complete, kind: "act", wounded: hurt, boost };
   }
   const c = craftById(ss.id)!;
   if (!complete) {

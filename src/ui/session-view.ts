@@ -1,7 +1,10 @@
 // Çalışma oturumu: süre seçimi ve süren oturumun ekranı (kum saati, kalan süre, şimdiye kadarki kazanç).
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
-import { finishSession, sessionProgress, fmtDur, type SessionResult } from "../engine/session";
+import { finishSession, sessionProgress, fmtDur, boostOf, roundsLeft, recordPlay, type SessionResult } from "../engine/session";
+import { miniFor, miniEase, MINI_NAMES } from "../engine/timing";
+import { playMini } from "./minigame";
+import { sfx } from "./feel";
 import { itemInfo } from "../engine/inventory";
 import { CRAFTS } from "../content/world";
 import { sessionSheet, gainList } from "./screens";
@@ -31,15 +34,17 @@ function hourglass(p: number): string {
 }
 
 /** Süren oturumun ekranı. Kapanınca onDone sonucu verir. */
-export function openSessionRun(cfg: Config, s: GameState, onDone: (r: SessionResult) => void, persist: () => void) {
+export function openSessionRun(cfg: Config, s: GameState, onDone: (r: SessionResult) => void, persist: () => void, onShift?: () => void) {
   const ss = s.session; if (!ss) return;
   const title = ss.kind === "craft" ? `${itemInfo(cfg, CRAFTS.find(c => c.id === ss.id)!.product).name} yapıyorsun` : ss.label;
   const el = document.createElement("div");
   el.className = "session-screen"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Çalışma");
   document.body.appendChild(el);
-  let confirm = false;
+  let confirm = false; let timer = 0; let playing = false;
+  const mini = ss.kind === "act" ? miniFor(ss.id) : undefined;
   const close = (r: SessionResult | null) => { clearInterval(timer); document.removeEventListener("visibilitychange", vis); el.remove(); persist(); if (r) onDone(r); };
   const draw = () => {
+    if (playing) return;
     if (!s.session) return close(null);
     const now = Date.now(); const p = sessionProgress(s, now);
     if (p >= 1) { const r = finishSession(cfg, s, now); return close(r); }
@@ -51,6 +56,10 @@ export function openSessionRun(cfg: Config, s: GameState, onDone: (r: SessionRes
       <div class="hg">${hourglass(p)}</div>
       <div class="sess-time">${fmtDur(left)}<span class="muted tiny"> kaldı · oyunda ${fmtDur(ss.gameMs ?? ss.durMs)}</span></div>
       <div class="gb big"><div class="gf" style="width:${(p * 100).toFixed(2)}%;background:var(--green)"></div></div>
+      ${mini ? (() => { const n = roundsLeft(s.session!); const b = boostOf(s.session!);
+        return `<div class="card focus-card"><div class="entry-head"><span class="entry-title">Odak turu · ${MINI_NAMES[mini]}</span><span class="entry-meta">verim ×${b.toFixed(1)}</span></div>
+        <p class="tiny" style="margin:0">${n > 0 ? `Beklemek yerine çalışmaya katıl: iyi oynarsan bu çalışmadan ${n > 1 ? "her turda" : ""} daha çok kazanırsın (en çok ×2). Oynarken süre durur.` : "Bu çalışmanın odak turlarını oynadın."}</p>
+        ${n > 0 ? `<div class="row"><button class="btn primary" data-x="mini">Oyna${n > 1 ? ` (${n} tur kaldı)` : ""}</button></div>` : ""}</div>`; })() : ""}
       ${soFar ? `<h3>Şimdiye kadar</h3>${soFar}` : ""}
       <p class="muted tiny">Çalışırken başka bir şey yapamazsın. Uygulamayı kapatabilirsin; süre işlemeye devam eder.</p>
       <div class="row" style="justify-content:center">${confirm
@@ -62,9 +71,20 @@ export function openSessionRun(cfg: Config, s: GameState, onDone: (r: SessionRes
     if (x === "ask") { confirm = true; draw(); }
     if (x === "no") { confirm = false; draw(); }
     if (x === "stop") close(finishSession(cfg, s, Date.now(), true));
+    if (x === "mini" && mini && s.session) {
+      sfx("tap"); clearInterval(timer); playing = true; const paused = Date.now();
+      void playMini(mini, miniEase(s, mini), esc(ss.label), sc => {
+        const c = structuredClone(s.session!); (c.scores ??= []).push(sc);
+        return `Bu çalışmanın verimi <b>×${boostOf(c).toFixed(1)}</b> oldu.`;
+      }).then(sc => {
+        playing = false;
+        if (s.session) { s.session.startMs += Date.now() - paused; if (sc >= 0) recordPlay(s, sc); persist(); onShift?.(); }
+        timer = window.setInterval(draw, 1000); draw();
+      });
+    }
   });
   const vis = () => { if (!document.hidden) draw(); };
   document.addEventListener("visibilitychange", vis);
-  const timer = window.setInterval(draw, 1000);
+  timer = window.setInterval(draw, 1000);
   draw();
 }
