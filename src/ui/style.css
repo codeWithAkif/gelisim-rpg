@@ -363,3 +363,4 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
   -webkit-mask-image: radial-gradient(ellipse 75% 75% at 50% 50%, #000 70%, transparent 100%); mask-image: radial-gradient(ellipse 75% 75% at 50% 50%, #000 70%, transparent 100%);
   filter: brightness(calc(1 - var(--dark, 0) * .3)); }
 .story-art.small { max-height: 30vh; }
+.backup-code { width: 100%; min-height: 120px; font: 12px/1.35 ui-monospace, monospace; word-break: break-all; background: var(--paper-2); color: var(--ink); border: 1.5px solid var(--ink); border-radius: 6px; padding: 8px; -webkit-user-select: text; user-select: text; }

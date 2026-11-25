@@ -39,6 +39,7 @@ export interface UpdateHooks {
 export async function checkForUpdates(h: UpdateHooks): Promise<void> {
   if (!Capacitor.isNativePlatform()) { setStatus("Tarayıcıda güncelleme denetlenmez.", true); return; }
   const { CapacitorUpdater } = await import("@capgo/capacitor-updater");
+  let step = "GitHub'a bağlanma";
   try {
     const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
     const res = await fetch(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" }, signal: ctrl.signal });
@@ -60,6 +61,7 @@ export async function checkForUpdates(h: UpdateHooks): Promise<void> {
       return;
     }
 
+    step = "paket bulma";
     const zip = rel.assets?.find(a => a.name === "dist.zip");
     if (!zip) { setStatus(`${latest} paketi bulunamadı.`, false); return; }
     // aynı sürüm daha önce indirildiyse: sağlamsa doğrudan kullan, bozuk işaretliyse silip yeniden indir
@@ -70,11 +72,15 @@ export async function checkForUpdates(h: UpdateHooks): Promise<void> {
       if (old) await CapacitorUpdater.delete({ id: old.id });
     } catch { /* liste alınamadı; yine de indir */ }
     h.onDownloading(latest);
-    const bundle = await CapacitorUpdater.download({ url: zip.browser_download_url, version: latest });
+    step = "indirme";
+    let bundle;
+    try { bundle = await CapacitorUpdater.download({ url: zip.browser_download_url, version: latest }); }
+    catch { bundle = await CapacitorUpdater.download({ url: zip.browser_download_url, version: latest }); } // bir kez daha dene
+    step = "uygulama";
     setStatus(`${latest} indirildi, uygulanıyor.`, true);
     await CapacitorUpdater.set(bundle); // uygulamayı yeni paketle yeniden yükler; kayıt korunur
   } catch (e) {
-    setStatus(`Güncelleme başarısız: ${(e as Error)?.message ?? e}`, false);
+    setStatus(`${step} adımında olmadı: ${(e as Error)?.message ?? e} (yüklü: ${APP_VERSION})`, false);
     h.onDone();
   }
 }
