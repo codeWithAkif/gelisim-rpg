@@ -2,6 +2,7 @@
 import type { Config } from "./config";
 import { type GameState, addRep, log, repOf, DAY_MINUTES } from "./state";
 import { NPCS, QUESTS, GAME_ITEMS, type QuestDef } from "../content/world";
+import { addItem } from "./inventory";
 
 export function npc(id: string) { return NPCS.find(n => n.id === id)!; }
 
@@ -24,7 +25,7 @@ export function acceptQuest(s: GameState, id: string) {
   log(s, `${npc(def.giverNpc).name}: "${def.title}" işini üstlendin.`, "quest");
 }
 
-export interface RewardReport { items: Record<string, number>; money: number; rep: number; note: string }
+export interface RewardReport { items: Record<string, number>; money: number; rep: number; note: string; dropped: Record<string, number> }
 export function completeQuest(cfg: Config, s: GameState, id: string): RewardReport {
   const def = QUESTS.find(q => q.id === id)!;
   const count = (s.quests[id]?.count ?? 0) + 1;
@@ -36,13 +37,14 @@ export function completeQuest(cfg: Config, s: GameState, id: string): RewardRepo
   addRep(s, s.region, "guven", rep * 0.6);
   if (def.importance !== "basit") addRep(s, s.region, "onur", rep * 0.5);
   const items = def.rewards.items ?? {};
-  for (const [k, v] of Object.entries(items)) s.inventory[k] = (s.inventory[k] ?? 0) + v;
+  const dropped: Record<string, number> = {};
+  for (const [k, v] of Object.entries(items)) { const d = addItem(cfg, s, k, v); if (d) dropped[k] = d; }
   s.money += def.rewards.money ?? 0;
   const giver = npc(def.giverNpc);
   for (const n of [def.giverNpc, "ayse"]) if (!s.metNpcs.includes(n)) s.metNpcs.push(n);
   if (id === "annenin_izi" && !s.metNpcs.includes("zehra")) s.metNpcs.push("zehra");
   log(s, `${giver.name} teşekkür etti. ${def.rewards.note} Taşpınar'da tanınırlığın ${Math.floor(repOf(s, s.region, "taninirlik"))}.`, "quest");
-  return { items, money: def.rewards.money ?? 0, rep, note: def.rewards.note };
+  return { items, money: def.rewards.money ?? 0, rep, note: def.rewards.note, dropped };
 }
 
 /** Savaşsız görevi yürüyerek bitirir. */

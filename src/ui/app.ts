@@ -1,14 +1,17 @@
 // Uygulama kabuğu: üst şerit, ekranlar, alt sekmeler, eylemler, kayıt.
 import { config as cfg } from "../engine/config";
 import type { GameState } from "../engine/state";
-import { doActivity, sleep, eat } from "../engine/progression";
+import { sleep, eat } from "../engine/progression";
 import { acceptQuest, walkQuest, completeQuest, itemName } from "../engine/quests";
 import { maxHp } from "../engine/combat";
 import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
-import { GAME_ITEMS, QUESTS } from "../content/world";
+import { QUESTS } from "../content/world";
+import { itemInfo, equip, unequip, drop, buy, bagOf } from "../engine/inventory";
+import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
+import { openSessionSheet, openSessionRun } from "./session-view";
 import { esc, ICONS } from "./sketch";
-import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, gainList, type UiState } from "./screens";
+import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { showIntro } from "./intro";
@@ -17,8 +20,9 @@ import { applySettings } from "./settings";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 
-type Tab = "defter" | "vucut" | "calis" | "isler";
-const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["calis", "Çalış"], ["isler", "İşler"]];
+type Tab = "defter" | "vucut" | "canta" | "calis" | "isler";
+// bilgi sayfaları solda, karar sayfaları sağda
+const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["canta", "Çanta"], ["calis", "Çalış"], ["isler", "İşler"]];
 
 export function startApp(root: HTMLElement) {
   let s: GameState = load(cfg);
@@ -36,9 +40,40 @@ export function startApp(root: HTMLElement) {
   function render(keepScroll = true) {
     const y = main.scrollTop;
     root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
-    main.innerHTML = tab === "defter" ? defterScreen(cfg, s) : tab === "vucut" ? vucutScreen(cfg, s) : tab === "calis" ? calisScreen(cfg, s, ui) : islerScreen(cfg, s);
+    main.innerHTML = tab === "defter" ? defterScreen(cfg, s) : tab === "vucut" ? vucutScreen(cfg, s) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : islerScreen(cfg, s);
     root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"));
     if (keepScroll) main.scrollTop = y; else main.scrollTop = 0;
+    vitalAlerts();
+  }
+  /** Bir değer eşiğin altına ilk düştüğünde uyarı; düzelince yeniden kurulur. */
+  function vitalAlerts() {
+    s.alerts ??= {};
+    const now = new Set(alerts(cfg, s).map(a => a.id));
+    // yeni düşen uyarılardan en ciddisi gösterilir
+    const fresh = alerts(cfg, s).filter(a => !s.alerts![a.id] && a.id !== "day");
+    fresh.forEach(a => { s.alerts![a.id] = true; });
+    if (fresh.length) toast(fresh[0].text);
+    for (const k of Object.keys(s.alerts)) if (!now.has(k)) delete s.alerts[k];
+  }
+  function sessionDone(r: SessionResult) {
+    if (r.kind === "craft") {
+      if (r.early) { toast("Yarıda bıraktın; malzemeler çantanda."); persist(); render(); return; }
+      const p = itemInfo(cfg, r.product!);
+      persist(); render();
+      modal(`<p class="hand muted" style="margin:0">El işi bitti</p><h2>${esc(p.name)}</h2>${r.dropped ? `<p class="red">Çantanda yer yoktu; yere bıraktın.</p>` : `<p>Çantana koydun. Kuşanmak için Çanta'ya git.</p>`}${gainList(cfg, r.gains)}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
+      return;
+    }
+    ui.lastResult = { title: r.label, gains: r.gains, at: Date.now(), note: r.wounded ? "Yaralıydın; bedensel kazanç düştü." : undefined };
+    persist(); render();
+    modal(`<p class="hand muted" style="margin:0">${r.early ? "Yarıda bıraktın" : "Çalışma bitti"} · ${fmtDur(r.minutes * 60_000)}</p><h2>${esc(r.label)}</h2>${gainList(cfg, r.gains, 8)}
+      ${r.wounded ? `<p class="red" style="margin:0">Yaralıydın; bedensel kazanç düştü.</p>` : ""}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
+  }
+  function resumeSession() {
+    if (!s.session) return false;
+    const r = finishSession(cfg, s, Date.now());
+    if (r) { sessionDone(r); return true; }
+    openSessionRun(cfg, s, sessionDone, persist);
+    return true;
   }
   /** Yeni kilometre taşlarını sırayla "Yeni sayfa" olarak gösterir. */
   function storyTick(after?: () => void) {
@@ -79,15 +114,23 @@ export function startApp(root: HTMLElement) {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-act]"); if (!b || b.disabled) return;
     const id = b.dataset.id ?? "";
     switch (b.dataset.act) {
-      case "do": {
-        const r = doActivity(cfg, s, id);
-        if ("error" in r) { toast(r.error); break; }
-        const a = cfg.act.get(id)!;
-        ui.lastResult = { title: a.name, gains: r.gains, at: Date.now(), note: r.tired ? "Yorgundun; verim düştü." : r.fee ? `${r.fee} bakır ders ücreti ödedin.` : undefined };
-        persist(); render(); main.scrollTo({ top: 0, behavior: "smooth" }); storyTick(); break;
+      case "session-pick":
+        openSessionSheet(cfg, s, id, ms => {
+          const p = startSession(cfg, s, id, ms, Date.now());
+          if (!p.ok) { toast(p.reason ?? "Başlayamadın"); return; }
+          persist(); render(); openSessionRun(cfg, s, sessionDone, persist);
+        });
+        break;
+      case "craft": {
+        const r = startCraft(cfg, s, id, Date.now());
+        if (!r.ok) { toast(r.reason ?? "Başlayamadın"); break; }
+        persist(); render(); openSessionRun(cfg, s, sessionDone, persist); break;
       }
-      case "eat": { const it = GAME_ITEMS[id]; if (it && eat(s, id, it.satiety ?? 20)) { toast(`${it.name} yedin.`); persist(); render(); } break; }
-      case "buy-bread": { if (s.money >= 2) { s.money -= 2; s.inventory.ekmek = (s.inventory.ekmek ?? 0) + 1; s.minute = Math.min(16 * 60, s.minute + 10); toast("Bir somun ekmek aldın."); persist(); render(); } break; }
+      case "pick": ui.sel = ui.sel === id ? undefined : id; render(); break;
+      case "eat": { const it = itemInfo(cfg, id); if (eat(s, id, it.satiety ?? 20)) { toast(`${it.name} yedin. Tokluk +${it.satiety}.`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); } break; }
+      case "buy": { const r = buy(cfg, s, id); toast(r.ok ? `${itemInfo(cfg, id).name} aldın.` : r.reason ?? ""); persist(); render(); break; }
+      case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }
+      case "unequip": { const r = unequip(cfg, s, id as "weapon" | "armor"); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "sleep": {
         const hpBefore = s.hp; const rep = sleep(cfg, s);
         const m = maxHp(cfg, s); s.hp = Math.min(m, Math.round(hpBefore + m * 0.6));
@@ -113,6 +156,7 @@ export function startApp(root: HTMLElement) {
           let extra = "";
           if (o.result === "won") {
             const r = completeQuest(cfg, s, id);
+            if (Object.keys(r.dropped).length) toast("Çantan doluydu; bazı ödülleri taşıyamadın.");
             extra = `<h3>Ödül</h3><p>${esc(r.note)}</p><p class="hand blue">${Object.entries(r.items).map(([k, n]) => `${itemName(cfg, k)}${n > 1 ? " ×" + n : ""}`).join(", ")}${r.money ? ` · ${r.money} bakır` : ""} · tanınırlık +${+r.rep.toFixed(1)}</p>`;
           }
           persist(); render();
@@ -123,9 +167,9 @@ export function startApp(root: HTMLElement) {
         break;
       }
       case "equip": {
-        const slot = GAME_ITEMS[id]?.slot ?? cfg.item.get(id)?.slot;
-        if (slot === "Silah") s.equipped.weapon = id; else if (slot === "Zırh") s.equipped.armor = id;
-        s.familiarity[id] ??= 0; toast(slot === "Silah" ? "Yeni silaha alışman zaman alacak." : "Kuşandın."); persist(); render(); break;
+        const kind = itemInfo(cfg, id).kind; const r = equip(cfg, s, id);
+        toast(!r.ok ? r.reason ?? "" : kind === "Silah" ? "Yeni silaha alışman zaman alacak." : kind === "Çanta" ? `Artık ${itemInfo(cfg, bagOf(s)).capacity} gözün var.` : "Kuşandın.");
+        ui.sel = undefined; persist(); render(); break;
       }
       case "menu": persist(); openTitle(); break;
     }
@@ -142,7 +186,7 @@ export function startApp(root: HTMLElement) {
     showTitle({
       hasSave: started,
       summary: `${s.name} · Gün ${s.day} · ${currentChapter(s).title}`,
-      onContinue: () => { render(false); storyTick(); },
+      onContinue: () => { render(false); if (!resumeSession()) storyTick(); },
       onNew: newGameNow,
     });
   }

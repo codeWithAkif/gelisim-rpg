@@ -1,5 +1,6 @@
 // Kaydedilen oyun durumu. Saf veri: JSON'a yazılıp okunabilir.
 import type { Config } from "./config";
+import type { Session } from "./session";
 
 export const SAVE_VERSION = 1;
 export const DAY_START_HOUR = 6;     // uyanış
@@ -26,7 +27,7 @@ export interface GameState {
   attrs: Record<string, AttrState>;
   rep: Record<string, Record<string, number>>; // bölge → boyut → değer
   inventory: Record<string, number>;           // eşya → adet
-  equipped: { weapon?: string; armor?: string };
+  equipped: { weapon?: string; armor?: string; bag?: string };
   familiarity: Record<string, number>;         // silah → alışkınlık (0–100)
   quests: Record<string, QuestState>;
   metNpcs: string[];
@@ -37,6 +38,8 @@ export interface GameState {
   knownElements: string[];                     // annenin defterinden açılmış element sayfaları
   mana: number;
   story: { reached: string[]; flags: Record<string, number> };
+  session?: Session;                           // süren gerçek zamanlı çalışma
+  alerts?: Record<string, boolean>;            // gösterilmiş uyarılar (tekrar etmesin)
   prep?: Record<string, { day: number; scout?: boolean; readWind?: boolean }>; // savaş öncesi yapılmış keşifler
   log: LogEntry[];
 }
@@ -49,8 +52,8 @@ export function newGame(cfg: Config, seed = Date.now() % 2147483647): GameState 
   }
   const s: GameState = {
     version: SAVE_VERSION, seed, day: 1, minute: 60, energy: 90, satiety: 70, money: 6,
-    region: "taspinar", attrs, rep: {}, inventory: { ekmek: 1, degnek: 1 },
-    equipped: { weapon: "degnek" }, familiarity: { degnek: 30 }, quests: {}, metNpcs: [],
+    region: "taspinar", attrs, rep: {}, inventory: { ekmek: 1, degnek: 1, bez_torba: 1 },
+    equipped: { weapon: "degnek", bag: "bez_torba" }, familiarity: { degnek: 30 }, quests: {}, metNpcs: [],
     hp: 0, journal: {}, name: "Yolcu", introDone: false, knownElements: [], mana: -1,
     story: { reached: [], flags: {} }, log: [],
   };
@@ -60,6 +63,7 @@ export function newGame(cfg: Config, seed = Date.now() % 2147483647): GameState 
 /** Config'e sonradan eklenen özellikleri eski kayda ekler. */
 export function migrate(cfg: Config, s: GameState): GameState {
   s.journal ??= {};
+  if (!s.equipped.bag) { s.equipped.bag = "bez_torba"; s.inventory.bez_torba = (s.inventory.bez_torba ?? 0) + 1; }
   s.name ??= "Yolcu";
   // eski kayıtlar: açılışı zaten geçmiş say
   s.introDone ??= true;

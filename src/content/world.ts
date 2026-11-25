@@ -1,12 +1,16 @@
 // Oyun tarafı içerik: config editöründe henüz ekranı olmayan veriler.
 // İleride editöre "Dünya" sekmesi eklenince buradan taşınacak.
 
+export type ItemKind = "Silah" | "Zırh" | "Yiyecek" | "Malzeme" | "Çanta" | "Eşya";
 export interface GameItem {
-  id: string; name: string; slot: "Silah" | "Zırh" | "Yiyecek" | "Eşya";
+  id: string; name: string; slot: ItemKind;
   damage?: number;        // silah: taban hasar
   armor?: number;         // zırh: hasar azaltma
   satiety?: number;       // yiyecek: tokluk
   critBonus?: number;
+  capacity?: number;      // çanta: göz sayısı
+  stack?: number;         // bir gözde kaç tane
+  price?: number;         // köy pazarında bakır
   desc: string;
 }
 /** Config'deki ekipmanlara ek olarak oyun tarafında tanımlı eşyalar. */
@@ -14,9 +18,23 @@ export const GAME_ITEMS: Record<string, GameItem> = {
   degnek: { id: "degnek", name: "Çoban değneği", slot: "Silah", damage: 4, desc: "Kuru meşe. Hafif, kırılmaz ama keskin değil." },
   el_yapimi_bicak: { id: "el_yapimi_bicak", name: "El yapımı bıçak", slot: "Silah", damage: 6, critBonus: 3, desc: "Hasan'ın verdiği, sapı sicimle sarılı bıçak. Kısa ama keskin." },
   temiz_giysi: { id: "temiz_giysi", name: "Temiz yün giysi", slot: "Zırh", armor: 1, desc: "Kalın yün. Isıtır, sıyrıkları biraz tutar." },
-  ekmek: { id: "ekmek", name: "Ekmek", slot: "Yiyecek", satiety: 35, desc: "Taş fırında pişmiş arpa ekmeği." },
-  peynir: { id: "peynir", name: "Peynir", slot: "Yiyecek", satiety: 25, desc: "Keçi peyniri." },
+  ekmek: { id: "ekmek", name: "Ekmek", slot: "Yiyecek", satiety: 35, stack: 5, price: 2, desc: "Taş fırında pişmiş arpa ekmeği." },
+  peynir: { id: "peynir", name: "Peynir", slot: "Yiyecek", satiety: 25, stack: 5, price: 3, desc: "Keçi peyniri." },
+  deri: { id: "deri", name: "Tabaklanmış deri", slot: "Malzeme", stack: 10, price: 3, desc: "Keçi derisi. Çanta, kemer, kın yapılır." },
+  ip: { id: "ip", name: "Kenevir ipi", slot: "Malzeme", stack: 10, price: 1, desc: "Sağlam bir sicim. Dikiş ve tuzak için." },
+  bez_torba: { id: "bez_torba", name: "Bez torba", slot: "Çanta", capacity: 8, desc: "Omza asılan kaba bir torba. 8 göz." },
+  deri_canta: { id: "deri_canta", name: "Deri çanta", slot: "Çanta", capacity: 12, desc: "Kendi diktiğin, iki bölmeli deri çanta. 12 göz." },
+  annenin_heybesi: { id: "annenin_heybesi", name: "Annenin heybesi", slot: "Çanta", capacity: 16, desc: "Eski ama sağlam; iç cebine Ölçer işareti dikilmiş. 16 göz." },
 };
+
+export interface Craft { id: string; product: string; needs: Record<string, number>; skill: Record<string, number>; minutes: number; gains: Record<string, number> }
+/** El işleri: malzeme + beceri + zaman. */
+export const CRAFTS: Craft[] = [
+  { id: "canta_dik", product: "deri_canta", needs: { deri: 2, ip: 2 }, skill: { el_becerisi: 12 }, minutes: 60, gains: { el_becerisi: 0.8, odak: 0.2 } },
+];
+/** Köy pazarında satılanlar. */
+export const SHOP = ["ekmek", "peynir", "deri", "ip"];
+
 /** Config'deki ekipmanların silah değerleri (config'de hasar alanı gelene kadar). */
 export const CONFIG_WEAPON_DAMAGE: Record<string, number> = { dede_kilici: 10, av_yayi: 7 };
 export const CONFIG_ARMOR: Record<string, number> = { deri_zirh: 3, zincir_zirh: 7 };
@@ -83,7 +101,7 @@ export const QUESTS: QuestDef[] = [
   {
     id: "annenin_izi", title: "Annenin izi", giverNpc: "ayse", importance: "onemli", minutes: 60, requires: ["kurt"],
     text: "Muhtar Ayşe, on iki yıl önce köye gelen defterli kadının Şifacı Zehra'ya bir şey bıraktığını söylüyor. Zehra köyün en üst evinde, otların arasında yaşıyor.",
-    rewards: { note: "Zehra'nın sandığından annenin elinden çıkmış bir sayfa." },
+    rewards: { items: { annenin_heybesi: 1 }, note: "Zehra'nın sandığından annenin elinden çıkmış bir sayfa ve onun eski heybesi." },
   },
   {
     id: "devriye", title: "Meraya devriye", giverNpc: "hasan", importance: "basit", minutes: 60, requires: ["kurt"], repeatable: true,

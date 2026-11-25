@@ -134,8 +134,43 @@ export function bodySketch(lv: (id: string) => number, pend: (id: string) => num
 }
 
 export const ICONS = {
+  canta: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14l-1 11H6z"/><path d="M9 9V7a3 3 0 0 1 6 0v2M5 13h14"/></svg>`,
   defter: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4.5c3-.8 5.5-.5 8 1.2v14c-2.5-1.7-5-2-8-1.2z"/><path d="M20 4.5c-3-.8-5.5-.5-8 1.2v14c2.5-1.7 5-2 8-1.2z"/></svg>`,
   vucut: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="4.5" r="2.3"/><path d="M6 9.5c4-1.5 8-1.5 12 0M12 8.5v6.5M12 15l-3 6.5M12 15l3 6.5M8 9.8 6.5 14.5M16 9.8l1.5 4.7"/></svg>`,
   calis: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="14.5" cy="4.5" r="2"/><path d="M8 9.5l4-2 3 3-2 4 3 3v3M13 14.5l-4 1-2 4M15 10.5l3.5 1.5"/></svg>`,
   isler: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 3.5h11v15.5c0 1.2-1 2-2 2H5"/><path d="M6 3.5c-1.4 0-2 1-2 2s.6 2 2 2M8.5 8h6M8.5 11.5h6M8.5 15h4"/></svg>`,
+};
+
+/** Eşya resimleri: suluboya dolgu + titrek mürekkep hat. */
+export function itemIcon(id: string, size = 44): string {
+  const P = (pts: [number, number][], fill: string, seed: number, close = true, extra = "") =>
+    `<path d="${roughPath(pts, 0.9, seed, close)}" fill="${fill}" ${extra}/>`;
+  const L = (pts: [number, number][], seed: number, extra = "") => `<path d="${roughPath(pts, 0.6, seed)}" fill="none" ${extra}/>`;
+  let g = "";
+  switch (id) {
+    case "ekmek": g = P([[6, 30], [10, 18], [24, 13], [38, 18], [42, 30], [34, 36], [14, 36]], "#C98F4A", 1) + L([[16, 20], [20, 28]], 2) + L([[23, 18], [27, 27]], 3) + L([[30, 19], [34, 27]], 4); break;
+    case "peynir": g = P([[6, 34], [40, 34], [40, 22], [6, 30]], "#E8C870", 5) + P([[6, 30], [40, 22], [30, 14]], "#F2DA8C", 6) + `<circle cx="18" cy="30" r="2.2" fill="#C9A24A"/><circle cx="30" cy="29" r="1.6" fill="#C9A24A"/>`; break;
+    case "degnek": g = L([[10, 40], [38, 8]], 7, 'stroke="#6B5235" stroke-width="4"') + L([[22, 26], [26, 25]], 8, 'stroke="#4A3A22" stroke-width="2"'); break;
+    case "el_yapimi_bicak": g = P([[24, 24], [40, 8], [42, 10], [27, 27]], "#C9CDD1", 9) + P([[10, 38], [24, 24], [27, 27], [13, 41]], "#7B5A3A", 10) + L([[15, 32], [19, 36]], 11) + L([[18, 29], [22, 33]], 12); break;
+    case "temiz_giysi": g = P([[14, 8], [20, 10], [24, 12], [28, 10], [34, 8], [42, 16], [36, 22], [34, 20], [34, 40], [14, 40], [14, 20], [12, 22], [6, 16]], "#8FA6C4", 13) + L([[24, 12], [24, 20]], 14); break;
+    case "deri": g = P([[8, 14], [16, 8], [26, 10], [36, 8], [42, 16], [38, 26], [42, 36], [30, 40], [20, 36], [8, 40], [10, 28]], "#A0703F", 15) + L([[16, 18], [30, 20]], 16, 'stroke-dasharray="2 3"'); break;
+    case "ip": g = `<ellipse cx="24" cy="26" rx="15" ry="11" fill="#D8C08A"/>` + [0, 1, 2, 3].map(i => `<ellipse cx="24" cy="26" rx="${15 - i * 3.5}" ry="${11 - i * 2.5}" fill="none"/>`).join("") + L([[36, 32], [42, 40]], 17); break;
+    case "bez_torba": g = P([[12, 18], [36, 18], [40, 36], [24, 42], [8, 36]], "#D9C9A0", 18) + P([[18, 18], [22, 10], [26, 10], [30, 18]], "#CDBB93", 19) + L([[16, 18], [32, 18]], 20, 'stroke="#8B6A3A" stroke-width="2"'); break;
+    case "deri_canta": g = P([[8, 16], [40, 16], [40, 40], [8, 40]], "#8A5A30", 21) + P([[8, 16], [40, 16], [38, 28], [10, 28]], "#A0703F", 22) + `<rect x="21" y="25" width="6" height="5" fill="#D9B54A"/>` + L([[14, 16], [20, 6], [28, 6], [34, 16]], 23, 'stroke="#5B3A1E" stroke-width="2"'); break;
+    case "annenin_heybesi": g = P([[4, 14], [22, 14], [22, 40], [4, 38]], "#6E5070", 24) + P([[26, 14], [44, 14], [44, 38], [26, 40]], "#6E5070", 25) + P([[4, 14], [44, 14], [44, 20], [4, 20]], "#83647F", 26) + P([[13, 26], [16, 23], [19, 26], [16, 30]], "#9E3423", 27); break;
+    case "dede_kilici": g = P([[22, 30], [40, 6], [43, 8], [26, 33]], "#D5D9DD", 28) + L([[16, 26], [30, 38]], 29, 'stroke="#8A6A2A" stroke-width="3"') + L([[8, 42], [22, 30]], 30, 'stroke="#5B3A1E" stroke-width="4"'); break;
+    case "av_yayi": g = `<path d="M14,6 Q38,24 14,42" fill="none" stroke="#7B5A3A" stroke-width="3.5"/>` + L([[14, 6], [14, 42]], 31, 'stroke="#C9B98A"'); break;
+    case "deri_zirh": g = P([[12, 8], [20, 12], [28, 12], [36, 8], [38, 40], [10, 40]], "#8A5A30", 32) + L([[24, 12], [24, 40]], 33) + L([[14, 24], [34, 24]], 34, 'stroke-dasharray="2 2"'); break;
+    case "zincir_zirh": g = P([[12, 8], [20, 12], [28, 12], [36, 8], [38, 40], [10, 40]], "#A9ADB1", 35) + [0, 1, 2, 3, 4].map(r => [0, 1, 2, 3].map(c => `<circle cx="${15 + c * 6 + (r % 2) * 3}" cy="${18 + r * 5}" r="2" fill="none" stroke-width=".8"/>`).join("")).join(""); break;
+    default: g = P([[10, 10], [38, 10], [38, 38], [10, 38]], "#E1D5B8", 36) + `<text x="24" y="30" text-anchor="middle" font-family="var(--f-hand)" font-size="18" fill="var(--ink)">?</text>`;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><g stroke="var(--ink)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${g}</g></svg>`;
+}
+
+/** Gösterge simgeleri. */
+export const VITAL_ICONS = {
+  hp: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="#C2483A" stroke="var(--ink)" stroke-width="1.3"/></svg>`,
+  energy: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 5 13h6l-1 9 8-12h-6z" fill="#E0B043" stroke="var(--ink)" stroke-width="1.3" stroke-linejoin="round"/></svg>`,
+  food: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14c1-5 5-8 8-8s7 3 8 8c-1 3-4 4-8 4s-7-1-8-4z" fill="#C98F4A" stroke="var(--ink)" stroke-width="1.3"/><path d="M9 9l1 4M13 8l1 5M17 10l0 4" stroke="var(--ink)" stroke-width="1" fill="none"/></svg>`,
+  mana: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 5 6 8 6 12a6 6 0 0 1-12 0c0-4 3-7 6-12z" fill="#5A7FB8" stroke="var(--ink)" stroke-width="1.3"/></svg>`,
 };
