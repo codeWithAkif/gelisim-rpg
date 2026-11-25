@@ -21,7 +21,7 @@ export function markSeen(s: GameState, placeId: string) {
 /** Haritada görünüyor mu: görülmüş, ya da bir işin/tanıdığın orada olduğunu biliyorsun. */
 export function isSeen(s: GameState, placeId: string): boolean {
   if (!s.seen) return true; // eski kayıt: hepsi açık
-  if (PLACES.find(p => p.id === placeId)?.region === "uzak") return true; // uzak şehirler hep görünür (kilitli)
+  if (PLACES.find(p => p.id === placeId)?.hub) return true; // şehir merkezleri hep görünür (kilitliyse soru işaretiyle)
   if (s.seen.includes(placeId)) return true;
   if (QUESTS.some(q => q.at === placeId && s.quests[q.id]?.status === "aktif")) return true;
   if (QUESTS.some(q => NPC_PLACE[q.giverNpc] === placeId && s.quests[q.id]?.status === "aktif")) return true;

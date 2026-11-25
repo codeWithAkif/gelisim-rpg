@@ -12,12 +12,19 @@ const len = (pts: [number, number][]) => pts.slice(1).reduce((a, p, i) => a + Ma
 /** Harita birimi → dakika (yayladan meydana yaklaşık bir saat). */
 const MIN_PER_UNIT = 0.36;
 
-export function isOpen(p: Place) { return p.region !== "uzak"; }
+/** Yer açık mı: bölüm kilidi olan yerler hikâyede o sayfaya ulaşınca açılır. */
+export function isOpen(p: Place, s?: GameState) { return !p.unlock || !!s?.story.reached.includes(p.unlock); }
+/** Bir yere varmak: konum, bölge, görülen yerler ve "buraya gittim" kaydı. */
+export function arrive(s: GameState, to: string) {
+  const p = place(to); s.location = to; markSeen(s, to);
+  if (p) s.region = p.region;
+  s.story.flags["v_" + to] ??= s.day;
+}
 
 /** En kısa yol: yer sırası ve çizilecek noktalar. */
-export function route(from: string, to: string): { places: string[]; pts: [number, number][]; length: number } | null {
+export function route(from: string, to: string, s?: GameState): { places: string[]; pts: [number, number][]; length: number } | null {
   const dist = new Map<string, number>([[from, 0]]); const prev = new Map<string, { via: string; road: (typeof ROADS)[number]; rev: boolean }>();
-  const open = new Set(PLACES.filter(isOpen).map(p => p.id)); open.add(from); open.add(to);
+  const open = new Set(PLACES.filter(p => isOpen(p, s)).map(p => p.id)); open.add(from); open.add(to);
   const q = [from]; const done = new Set<string>();
   while (q.length) {
     q.sort((a, b) => dist.get(a)! - dist.get(b)!); const cur = q.shift()!; if (done.has(cur)) continue; done.add(cur);
@@ -41,10 +48,10 @@ export interface TravelPlan { ok: boolean; reason?: string; minutes: number; ene
 export function planTravel(cfg: Config, s: GameState, to: string): TravelPlan {
   const p = place(to);
   if (!p) return { ok: false, reason: "Böyle bir yer yok", minutes: 0, energy: 0, pts: [] };
-  if (!isOpen(p)) return { ok: false, reason: `${p.chapter ?? "İleride"} açılacak`, minutes: 0, energy: 0, pts: [] };
+  if (!isOpen(p, s)) return { ok: false, reason: `${p.chapter ?? "İleride"} açılacak`, minutes: 0, energy: 0, pts: [] };
   if (to === s.location) return { ok: false, reason: "Zaten buradasın", minutes: 0, energy: 0, pts: [] };
   if (!isSeen(s, to)) return { ok: false, reason: "Henüz bilmediğin bir yer", minutes: 0, energy: 0, pts: [] };
-  const r = route(s.location, to); if (!r) return { ok: false, reason: "Oraya yol yok", minutes: 0, energy: 0, pts: [] };
+  const r = route(s.location, to, s); if (!r) return { ok: false, reason: "Oraya yol yok", minutes: 0, energy: 0, pts: [] };
   const speed = 1 + ((s.attrs.bacak?.level ?? 10) - 10) / 80 + ((s.attrs.kardiyo?.level ?? 10) - 10) / 160;
   const minutes = Math.max(5, Math.round(r.length * MIN_PER_UNIT / speed));
   const energy = Math.round(minutes / 60 * 5 * 10) / 10;
@@ -61,7 +68,7 @@ export function travel(cfg: Config, s: GameState, to: string): { gains: GainRepo
   applyGain(cfg, s, "bacak", 0.15 * h, gains); applyGain(cfg, s, "kardiyo", 0.1 * h, gains); applyGain(cfg, s, "mekansal", 0.05 * h, gains);
   s.minute = Math.min(DAY_MINUTES, s.minute + p.minutes);
   s.energy = Math.max(0, s.energy - p.energy); s.satiety = Math.max(0, s.satiety - h * 4);
-  s.location = to; markSeen(s, to);
+  arrive(s, to);
   log(s, `Vardın: ${place(to)!.name} (${p.minutes} dk yol).`, "info");
   return { gains, minutes: p.minutes };
 }

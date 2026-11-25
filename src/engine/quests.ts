@@ -3,6 +3,7 @@ import type { Config } from "./config";
 import { type GameState, addRep, log, repOf, DAY_MINUTES } from "./state";
 import { NPCS, QUESTS, GAME_ITEMS, type QuestDef } from "../content/world";
 import { addItem } from "./inventory";
+import { REGION_NAMES } from "../content/map";
 import { applyGain, type GainReport } from "./progression";
 import { grantRelic } from "./relics";
 import type { Relic } from "../content/relics";
@@ -11,7 +12,7 @@ export function npc(id: string) { return NPCS.find(n => n.id === id)!; }
 
 export type QuestView = { def: QuestDef; status: "yeni" | "aktif" | "bitti" | "kilitli"; reason?: string };
 export function questList(s: GameState): QuestView[] {
-  return QUESTS.map(def => {
+  return QUESTS.filter(def => !def.after || s.story.reached.includes(def.after) || s.quests[def.id]).map(def => {
     const st = s.quests[def.id]?.status;
     if (def.retiredBy && s.quests[def.retiredBy]?.status === "bitti") return { def, status: "bitti" as const };
     if (st === "bitti" && !def.repeatable) return { def, status: "bitti" };
@@ -52,7 +53,7 @@ export function completeQuest(cfg: Config, s: GameState, id: string): RewardRepo
   const giver = npc(def.giverNpc);
   for (const n of [def.giverNpc, "ayse"]) if (!s.metNpcs.includes(n)) s.metNpcs.push(n);
   if (id === "annenin_izi" && !s.metNpcs.includes("zehra")) s.metNpcs.push("zehra");
-  log(s, `${giver.name} teşekkür etti. ${def.rewards.note} Taşpınar'da tanınırlığın ${Math.floor(repOf(s, s.region, "taninirlik"))}.`, "quest");
+  log(s, `${giver.name} teşekkür etti. ${def.rewards.note} ${REGION_NAMES[s.region as keyof typeof REGION_NAMES] ?? "Burada"} tanınırlığın ${Math.floor(repOf(s, s.region, "taninirlik"))}.`, "quest");
   if (def.afterText && count === 1) log(s, def.afterText, "quest");
   return { items, money: def.rewards.money ?? 0, rep, note: def.rewards.note, dropped, gains, relics, after: count === 1 ? def.afterText : undefined };
 }

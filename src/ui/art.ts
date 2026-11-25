@@ -11,7 +11,7 @@ export const artUrl = (key: string): string | undefined => ART[key];
 
 /** Kişi resmi: görsel varsa ve tanışıldıysa çizim, yoksa eskiz. */
 export function personPic(n: { id: string; name: string }, size = 46, known = true): string {
-  const url = ART["portre_" + n.id];
+  const url = ART["portre_" + (n.id === "leyla" ? "anne" : n.id)];
   if (!url || !known) return portrait(n.name, size, known);
   // küçük boyutta yüz seçilsin diye resim yüze yakınlaştırılır
   return `<span class="art-portrait" style="width:${size}px;height:${size}px"><img src="${url}" alt="${esc(n.name)}" loading="lazy"></span>`;

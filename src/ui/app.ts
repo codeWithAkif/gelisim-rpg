@@ -6,14 +6,14 @@ import { acceptQuest, walkQuest, completeQuest, itemName, type RewardReport } fr
 import { maxHp } from "../engine/combat";
 import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
-import { QUESTS, CRAFTS } from "../content/world";
+import { QUESTS, CRAFTS, ENEMIES } from "../content/world";
 import { itemInfo, equip, unequip, drop, buy, bagOf } from "../engine/inventory";
 import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
 import { openSessionSheet, openSessionRun } from "./session-view";
 import { mountMap } from "./map-view";
 import { place } from "../engine/travel";
 import { startJourney, dueEvent, pauseJourney, resumeJourney, resolveEvent, finishJourney, turnBack, canUseChoice } from "../engine/journey";
-import { makeScenario, DEFAULT_PLAN } from "../engine/combat";
+import { makeScenario, DEFAULT_PLAN, foeWords, cap } from "../engine/combat";
 import { AMBUSH_MAP } from "../content/world";
 import { esc, ICONS } from "./sketch";
 import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
@@ -273,9 +273,10 @@ export function startApp(root: HTMLElement) {
             extra = `<h3>Ödül</h3>${rewardHtml(r)}`; if (r.relics.length) sfx("perfect");
           }
           persist(); render();
-          const boss = id === "akyele";
-          modal(`<h2>${o.result === "won" ? (boss ? "Akyele düştü" : "Kurtlar uzaklaştı") : o.result === "fled" ? "Geri çekildin" : "Yenildin"}</h2>
-            <p class="lede">${o.result === "lost" ? (boss ? "Sürü seni inden kovaladı; köylüler seni yarı baygın buldu. Hazırlanmadan dönme." : "Hasan seni yaralı hâlde bulup köye taşıdı. Dinlenmeden tekrar deneme.") : o.result === "fled" ? (boss ? "İnden sağ çıktın. Akyele seni artık tanıyor." : "Kurtlar hâlâ orada. Hazırlanıp tekrar dene.") : boss ? "Kalan kurtlar uluyarak kuzeye kaçtı." : "Hasan uzaktan izliyordu; koşarak geldi."}</p>
+          const boss = id === "akyele"; const home = q.giverNpc === "hasan";
+          const W = foeWords(q.battle!.enemies); const big = q.battle!.enemies.find(e => ENEMIES[e]?.scale);
+          modal(`<h2>${o.result === "won" ? (big ? `${esc(ENEMIES[big].name)} düştü` : `${esc(cap(W.pl))} dağıldı`) : o.result === "fled" ? "Geri çekildin" : "Yenildin"}</h2>
+            <p class="lede">${o.result === "lost" ? (boss ? "Sürü seni inden kovaladı; köylüler seni yarı baygın buldu. Hazırlanmadan dönme." : home ? "Hasan seni yaralı hâlde bulup köye taşıdı. Dinlenmeden tekrar deneme." : "Yaralı hâlde sürünerek kurtuldun. Dinlenmeden, hazırlanmadan tekrar deneme.") : o.result === "fled" ? (big ? `Sağ çıktın. ${esc(ENEMIES[big].name)} seni artık tanıyor.` : `${esc(cap(W.pl))} hâlâ orada. Hazırlanıp tekrar dene.`) : boss ? "Kalan kurtlar uluyarak kuzeye kaçtı." : home ? "Hasan uzaktan izliyordu; koşarak geldi." : "Nefesin yerine geldi; geride sessizlik kaldı."}</p>
             <h3>Savaşta gelişen</h3>${gainList(cfg, o.gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
         }, persist), () => { persist(); render(); });
           }

@@ -14,7 +14,7 @@ import { spellRunes } from "../engine/gesture";
 import { settings } from "./settings";
 import { sfx, buzz } from "./feel";
 import { TERRAIN, ENEMIES, MAPS } from "../content/world";
-import { esc, wolfSketch } from "./sketch";
+import { esc, wolfSketch, humanSketch } from "./sketch";
 import { spellOptions, previewSpell, castSpell, hexRange, areaHexes } from "../engine/magic";
 import { MapRenderer } from "./battle-render";
 
@@ -151,7 +151,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
       const adj = dist(p.x, p.y, tgt.x, tgt.y) === 1;
       const parts = pv.critParts.sort((a, c) => c.amount - a.amount).slice(0, 4).map(x => `${x.name} ${x.amount >= 0 ? "+" : ""}${x.amount.toFixed(1)}`).join(" · ");
       const pt = pushTarget(b, tgt);
-      body = `<div class="foe">${wolfSketch({ detail: s.attrs.analiz?.level ?? 0, marks: known.map(w => ({ name: w.name, at: w.at })), width: 112, labels: false, seed: tgt.uid.length * 13 })}
+      body = `<div class="foe">${d.species === "insan" ? humanSketch({ marks: known.map(w => ({ name: w.name, at: w.at })), width: 112, labels: false }) : wolfSketch({ detail: s.attrs.analiz?.level ?? 0, marks: known.map(w => ({ name: w.name, at: w.at })), width: 112, labels: false, seed: tgt.uid.length * 13 })}
         <div><div class="entry-head"><span class="entry-title" style="font-size:22px">${esc(tgt.name)}</span><span class="hpbar">${tgt.alert ? "" : "habersiz · "}can ${tgt.hp}/${tgt.maxHp}</span></div>
         <div class="odds"><span>İsabet <b>%${Math.round(pv.hit)}</b></span><span>Kritik <b>%${Math.round(pv.crit)}</b></span><span>Hasar <b>${pv.dmg[0]}–${pv.dmg[1]}</b></span></div>
         <div class="muted tiny">Kritik: ${esc(parts)}</div></div></div>
@@ -166,7 +166,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
         ${hasBow(s) && !previewShot(cfg, s, b, tgt).ok && can ? `<p class="muted tiny" style="margin:0">Ok: ${esc(previewShot(cfg, s, b, tgt).reason ?? "")}${previewShot(cfg, s, b, tgt).reason === "Menzil dışı" ? ` (en çok ${5} altıgen)` : ""}</p>` : ""}
         ${!adj ? `<p class="muted tiny" style="margin:0">Vurmak ya da itmek için yanına git.</p>` : ""}`;
     } else {
-      body = `<p class="muted tiny" style="margin:0">Mavi taralı altıgenlere dokunarak yürü, kurda dokunarak incele. Kırmızı gölge: kurtların bir sonraki turda saldırabileceği yer.${b.night || b.weather === "sis" ? " Görüşün kısıtlı." : ""}</p>`;
+      body = `<p class="muted tiny" style="margin:0">Mavi taralı altıgenlere dokunarak yürü, düşmana dokunarak incele. Kırmızı gölge: düşmanın bir sonraki turda saldırabileceği yer.${b.night || b.weather === "sis" ? " Görüşün kısıtlı." : ""}</p>`;
     }
     const spells = spellOptions(cfg, s);
     const tools = mode.k === "normal" ? `<div class="actions">
@@ -191,7 +191,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     busy = true; renderPanel();
     await R.wait(200);
     const inc = settings().timing ? incomingAttack(cfg, s, b) : null;
-    if (inc) b.dodgeQ = await dodgePrompt(stage(), { from: screenAngle(inc.to, inc.from), ease: skillEase(s, "refleks") * 0.7 + skillEase(s, "esneklik") * 0.3 });
+    if (inc) b.dodgeQ = await dodgePrompt(stage(), { foe: inc.def, from: screenAngle(inc.to, inc.from), ease: skillEase(s, "refleks") * 0.7 + skillEase(s, "esneklik") * 0.3 });
     enemyTurn(cfg, s, b); busy = false;
     await play();
     if (!b.units.some(u => u.uid === selected && u.hp > 0 && !u.fled)) selected = enemies(b)[0]?.uid ?? null;
@@ -238,7 +238,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
         let q: number | undefined;
         if (settings().timing) {
           busy = true; const wp = aim ? ENEMIES[tgt.def!].weakPoints.find(w => w.id === aim) : undefined;
-          q = await slashPrompt(stage(), { aimName: wp?.name, aimAt: wp?.at, aimArtAt: wp?.artAt, detail: s.attrs.analiz?.level ?? 10, ease: skillEase(s, "refleks") * 0.5 + skillEase(s, "kilic") * 0.5 });
+          q = await slashPrompt(stage(), { foe: tgt.def!, aimName: wp?.name, aimAt: wp?.at, aimArtAt: wp?.artAt, detail: s.attrs.analiz?.level ?? 10, ease: skillEase(s, "refleks") * 0.5 + skillEase(s, "kilic") * 0.5 });
           busy = false;
         }
         playerAttack(cfg, s, b, tgt, aim, stance, q); stance = "normal"; after();
@@ -255,7 +255,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
           busy = true; const sv = previewShot(cfg, s, b, tgt);
           // yan rüzgâr: rüzgârın doğu-batı bileşeni
           const wind = Math.cos(b.wind.dir * Math.PI / 3) * b.wind.strength / 2;
-          q = await bowPrompt(stage(), { range: sv.range, wind, ease: skillEase(s, "okculuk") * 0.6 + skillEase(s, "gorus") * 0.4 });
+          q = await bowPrompt(stage(), { foe: tgt.def!, range: sv.range, wind, ease: skillEase(s, "okculuk") * 0.6 + skillEase(s, "gorus") * 0.4 });
           busy = false;
         }
         playerShoot(cfg, s, b, tgt, q); after();
@@ -282,10 +282,10 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     const h = document.createElement("div"); h.className = "modal-bg";
     h.innerHTML = `<div class="modal"><h2>Haritayı okumak</h2>
       <p><b class="blue">Mavi tarama</b>: bu tur yürüyebileceğin yerler.</p>
-      <p><b class="red">Kırmızı gölge</b>: kurtların bir sonraki turda saldırabileceği yerler. Ne kadar koyu, o kadar çok kurt.</p>
-      <p><b>z</b>: kurt seni henüz fark etmedi. Fark edilmeden yanına varırsan pusu kurarsın: isabet +15, kritik +25. Uzun ot ve ağaç seni saklar, rüzgâr kokunu taşır, yağmur kokunu bastırır.</p>
-      <p><b>İt</b>: kurdu bir altıgen geri iter. Arkası ateşse yanar, dereyse sersemler, çamursa saplanır.</p>
-      <p><b>Savun</b>: turu harcarsın ama kurtların isabeti düşer.</p>
+      <p><b class="red">Kırmızı gölge</b>: düşmanların bir sonraki turda saldırabileceği yerler. Ne kadar koyu, o kadar çok düşman.</p>
+      <p><b>z</b>: düşman seni henüz fark etmedi. Fark edilmeden yanına varırsan pusu kurarsın: isabet +15, kritik +25. Uzun ot ve ağaç seni saklar, rüzgâr kokunu taşır, yağmur kokunu bastırır.</p>
+      <p><b>İt</b>: düşmanı bir altıgen geri iter. Arkası ateşse yanar, dereyse sersemler, çamursa saplanır.</p>
+      <p><b>Savun</b>: turu harcarsın ama düşmanın isabeti düşer.</p>
       <div class="row"><button class="btn primary">Tamam</button></div></div>`;
     document.body.appendChild(h); h.querySelector("button")!.addEventListener("click", () => h.remove());
   });

@@ -26,6 +26,7 @@ export interface Milestone {
   reached: (s: GameState) => boolean;
   text: string;                      // ulaşınca açılan sayfa
   effects?: { learnElement?: string; items?: Record<string, number>; flag?: string };
+  side?: boolean;                    // yan hikâye: bölümün bitmesini beklemez
 }
 export interface Chapter { id: string; title: string; place: string; milestones: Milestone[]; soon?: boolean }
 
@@ -50,15 +51,58 @@ export const CHAPTERS: Chapter[] = [
       { id: "ates_kurt", title: "Ateş ve kurt", hint: "Bir savaşı büyü kullanarak kazan (İşler → Meraya devriye).", reached: s => (s.story.flags.buyuluZafer ?? 0) > 0,
         effects: { flag: "zaferGun" },
         text: "Kurtlar ateşi görünce dağıldı. Hasan uzaktan bakıp bir dua mırıldandı. Köyde biri yasak bir şey gördüğünü fısıldıyor." },
-      { id: "suru_basi", title: "Sürünün başı", hint: "Kurtların neden çoğaldığını bul: Hasan'ın 'Kurtlar nereden geliyor?' işi.", reached: s => done(s, "akyele"),
+      { id: "suru_basi", side: true, title: "Sürünün başı", hint: "Kurtların neden çoğaldığını bul: Hasan'ın 'Kurtlar nereden geliyor?' işi.", reached: s => done(s, "akyele"),
         text: "Akyele düştü, sürü dağıldı. Ama donmuş karacayı unutamıyorsun: kuzeyde bir şey ısıyı çekiyor, ve annenin defterindeki kor taşı şimdi senin cebinde." },
       { id: "mektup", title: "Annenin mektubu", hint: "Bir gece dinlen; Zehra seni bekliyor.", reached: s => has(s, "ates_kurt") && s.day > (s.story.flags.zaferGun ?? 1e9),
         text: "Zehra annenin bıraktığı mühürlü mektubu sana verdi: \"Isıyı çeken biri var. Kuzeyde değil, aramızda. Karaçam'daki tüccar Selim'e git; kimin için çalıştığını o bilir.\" Bölüm 1 burada bitiyor." },
     ],
   },
-  { id: "b2", title: "Bölüm 2: Karaçam", place: "Tüccar şehri", soon: true, milestones: [] },
-  { id: "b3", title: "Bölüm 3: Ayazkale", place: "Lordun kalesi", soon: true, milestones: [] },
-  { id: "b4", title: "Bölüm 4: Ardıç", place: "Başkent", soon: true, milestones: [] },
+  {
+    id: "b2", title: "Bölüm 2: Karaçam", place: "Tüccar şehri",
+    milestones: [
+      { id: "k_varis", title: "Karaçam", hint: "Annenin mektubu seni Karaçam'a çağırıyor. Harita'dan demirhanenin doğusundaki yola çık.", reached: s => !!s.story.flags.v_karacam,
+        text: "Surlu şehrin kapısından girerken nefesin buğulandı; yazın ortasında herkes kürk giymiş. Çarşıda kehribar renginde taşlar satılıyor; yanlarından geçince elin ısınıyor. Han kapısında bir kadın sazını akort ediyor: Hancı Yaren." },
+      { id: "k_muhur", title: "Kar tanesi mührü", hint: "Hancı Yaren'den Selim'i sor (İşler).", reached: s => done(s, "selim_dukkan"),
+        text: "Kor taşları ısıyı tutuyor, ama bir yerden alıyor. Her birinin altında Ayazkale'nin kar tanesi mührü var. Selim annenin adını duyunca sustu; bir şey biliyor." },
+      { id: "k_selim", title: "Selim'in sözü", hint: "Selim'in kervanını haydutlara karşı koru.", reached: s => done(s, "kervan"),
+        text: "Haydutlar dolu arabaları seçiyordu, çünkü biri onlara söylüyordu. Selim artık sana güveniyor: annen on iki yıl önce buradaydı, taşların ısıyı yerden çaldığını ilk o anladı." },
+      { id: "k_derya", title: "Su", hint: "Eski sarnıca in; suyun sesini takip et.", reached: s => done(s, "sarnic"),
+        effects: { learnElement: "el_su" },
+        text: "Usta Derya, annenin defterine SU sayfasını ekledi: \"Su ısıyı emer, taşır ve geri verir.\" Artık Su çalışabilirsin; ateşle birleşince buhar olur." },
+      { id: "k_defter", title: "Annem yaşıyor", hint: "Derya'nın işi: Isı Loncası'nın deposundan kayıt defterini al.", reached: s => done(s, "lonca_defteri"),
+        text: "\"Ölçer L. — Soğuk Ocak'ta çalıştırılıyor.\" On iki yıl boyunca öldüğünü sandığın annen kuzeyde, Ayazkale'de tutsak. Kar geçidinin yolu açıldı (yayladan kuzeye). Bölüm 2 burada bitiyor." },
+    ],
+  },
+  {
+    id: "b3", title: "Bölüm 3: Ayazkale", place: "Kayhan Bey'in kalesi",
+    milestones: [
+      { id: "a_gecit", title: "Kar geçidi", hint: "Derya'nın işi: yayladan kuzeye, Kar geçidine çık ve kar kurtlarını aş.", reached: s => done(s, "gecit"),
+        text: "Geçidin tepesinden Ayazkale göründü: buza gömülü surlar, ortasında mavi bir soğuk sızdıran kule. Donmuş kervanların arabaları kor taşıyla dolu." },
+      { id: "a_iceride", title: "Kalenin içinde", hint: "Kale mutfağında Aşçı Gülizar'ın güvenini kazan.", reached: s => done(s, "mutfak"),
+        text: "Bir aşçı yamağına kimse bakmaz. Gülizar sana kulenin gizli kapısını gösterecek; kardeşini geçitte Kayhan'ın soğuğu öldürmüş." },
+      { id: "a_anne", title: "Annem", hint: "Kuleye çık; annenin yanındaki muhafızları geç.", reached: s => done(s, "kule"),
+        effects: { learnElement: "el_ayaz" },
+        text: "On iki yıl sonra annenin elini tuttun. Soğuktu. \"Ayaz bir madde değil,\" dedi, \"ısının yokluğu.\" Defterine AYAZ sayfası eklendi. Ama asıl kötü haber sonra geldi: Kayhan sadece taşıyıcı." },
+      { id: "a_ocak", title: "Soğuk Ocak", hint: "Annenin işi: Kayhan Bey'i ocağın başında durdur.", reached: s => done(s, "soguk_ocak"),
+        effects: { learnElement: "el_toprak" },
+        text: "Soğuk Ocak sustu; Ayazkale'nin buzları ilk kez damladı. Annen kalıp kalenin insanlarına bakacak; sana TOPRAK sayfasını verdi: \"Toprak sabırlıdır, ısıyı derinde saklar.\" Kayhan'ın son sözleri seni güneye, başkente çağırıyor. Bölüm 3 burada bitiyor." },
+    ],
+  },
+  {
+    id: "b4", title: "Bölüm 4: Ardıç", place: "Başkent",
+    milestones: [
+      { id: "d_varis", title: "Ardıç", hint: "Dere kenarından güneye, başkent Ardıç'a git.", reached: s => !!s.story.flags.v_ardic,
+        text: "On iki yıl önce yanan şehrin üstüne yenisi kurulmuş, ama sokaklar hâlâ is kokuyor. Her köşede Vezir Sungur'un muhafızları. Kral yıllardır görülmemiş." },
+      { id: "d_kul", title: "O gece", hint: "Kül mahallesinde Kül Ana'yı bul.", reached: s => done(s, "kul_ana"),
+        effects: { learnElement: "el_simsek" },
+        text: "Kül Yangını gökten gelmedi; sarayın altından, Sungur'un ilk ocağından çıktı. Ölçerler yangını söndürmeye koştu ve kundakçı diye asıldı. Kül Ana sana annenin son sayfasını verdi: ŞİMŞEK." },
+      { id: "d_saray", title: "Dehlizin ağzı", hint: "Kül Ana'nın işi: saray avlusundaki muhafızları geç.", reached: s => done(s, "saray_yolu"),
+        text: "Avlunun dibinde dehlizin kapısı. Duvarlarda kırağı var, ama hava sıcak: bütün ülkenin ısısı buraya akıyor." },
+      { id: "d_bahar", title: "Bahar", hint: "Büyük Ocak'ı kır.", reached: s => done(s, "buyuk_ocak"),
+        effects: { learnElement: "el_hava" },
+        text: "Ocak kırıldığında ısı patlamadı; dağıldı. Ardıç'a ılık bir yağmur yağdı, Ayazkale'nin buzları çözüldü, Taşpınar'da kayısılar çiçek açtı. Annenin defterinin son boş sayfasına sen yazdın: \"Isı kaybolmaz. Bir yere gider. Ve geri döner.\" SON. (Defterin açık kalıyor: dolaşmaya, öğrenmeye devam edebilirsin.)" },
+    ],
+  },
 ];
 
 /** Element sayfaları: annenin defterinden açılan notlar. */

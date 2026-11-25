@@ -23,9 +23,9 @@ export function advanceStory(s: GameState): Milestone[] {
 }
 
 export function currentChapter(s: GameState): Chapter {
-  return CHAPTERS.find(c => !c.soon && c.milestones.some(m => !s.story.reached.includes(m.id))) ?? CHAPTERS.find(c => c.soon) ?? CHAPTERS[0];
+  return CHAPTERS.find(c => !c.soon && c.milestones.some(m => !m.side && !s.story.reached.includes(m.id))) ?? CHAPTERS[CHAPTERS.length - 1];
 }
 export function nextMilestone(s: GameState): Milestone | undefined {
-  for (const c of CHAPTERS) for (const m of c.milestones) if (!s.story.reached.includes(m.id)) return m;
+  for (const c of CHAPTERS) for (const m of c.milestones) if (!m.side && !s.story.reached.includes(m.id)) return m;
   return undefined;
 }

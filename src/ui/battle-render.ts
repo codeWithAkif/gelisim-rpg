@@ -11,7 +11,7 @@ const reducedMotion = () => animScale() === 0;
 function hash(x: number, y: number) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 const ease = (t: number) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
-const SIDE: Record<Terrain, string> = { cayir: "#9C9A68", uzun_ot: "#7F8C52", camur: "#6F5A3C", kaya: "#8B8576", tepe: "#8C7744", su: "#4E7F8F", agac: "#5E7545" };
+const SIDE: Record<Terrain, string> = { cayir: "#9C9A68", uzun_ot: "#7F8C52", camur: "#6F5A3C", kaya: "#8B8576", tepe: "#8C7744", su: "#4E7F8F", agac: "#5E7545", kar: "#B9C3CC" };
 
 export interface MapView {
   w: number; h: number; tiles: Terrain[][];
@@ -115,12 +115,13 @@ export class MapRenderer {
   async animAttack(uid: string, targetUid: string, res: { hit: boolean; crit: boolean; dmg: number; power?: boolean; ambush?: boolean }) {
     const a = this.ds.get(uid), b = this.ds.get(targetUid); if (!a || !b) return;
     a.face = b.x >= a.x ? 1 : -1;
-    const wolf = uid !== "p";
-    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1, reach = this.size * (wolf ? 0.7 : res.power ? 0.55 : 0.38);
+    const au = this.view.units.find(u => u.uid === uid); const beast = !!au && au.side !== "player" && ENEMIES[au.def ?? "kurt"]?.species !== "insan";
+    const wolf = uid !== "p"; // oyuncu dışı saldıran (ısırık/kılıç darbesi kırmızı yazılır)
+    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1, reach = this.size * (beast ? 0.7 : res.power ? 0.55 : 0.4);
     a.pose = wolf ? "leap" : "swing";
     const dur = wolf ? 420 : res.power ? 420 : 320;
     // 1) atılış: kurt yay çizerek sıçrar, insan öne savurur
-    await this.tween(dur * 0.55, t => { const k = ease(t); a.offX = dx / L * reach * k; a.offY = dy / L * reach * k - (wolf ? Math.sin(t * Math.PI / 2) * this.size * 0.45 : 0); });
+    await this.tween(dur * 0.55, t => { const k = ease(t); a.offX = dx / L * reach * k; a.offY = dy / L * reach * k - (beast ? Math.sin(t * Math.PI / 2) * this.size * 0.45 : 0); });
     // 2) çarpma anı
     const hx = b.x, hy = b.y - this.size * 0.4;
     if (res.hit) {
@@ -129,7 +130,7 @@ export class MapRenderer {
       this.shake(big ? 11 : 5, big ? 380 : 240);
       this.burst(hx, hy, res.crit ? "#9E3423" : wolf ? "#9E3423" : "#5B5447", res.crit ? 22 : 9);
       this.splat(hx, hy + this.size * 0.4, res.crit ? this.size * 0.5 : this.size * 0.28, wolf ? "rgba(140,30,20,.55)" : "rgba(42,39,34,.55)");
-      if (!wolf) { const nx = -dy / L, ny = dx / L; this.slashes.push({ x1: hx - nx * this.size * 0.7 - dx / L * this.size * 0.3, y1: hy - ny * this.size * 0.7, x2: hx + nx * this.size * 0.7 + dx / L * this.size * 0.3, y2: hy + ny * this.size * 0.7, t0: performance.now(), color: res.crit ? "#9E3423" : "#2A2722" }); }
+      if (!beast) { const nx = -dy / L, ny = dx / L; this.slashes.push({ x1: hx - nx * this.size * 0.7 - dx / L * this.size * 0.3, y1: hy - ny * this.size * 0.7, x2: hx + nx * this.size * 0.7 + dx / L * this.size * 0.3, y2: hy + ny * this.size * 0.7, t0: performance.now(), color: res.crit ? "#9E3423" : "#2A2722" }); }
       if (res.crit) this.zoom = { x: hx, y: hy, t0: performance.now(), k: 0.28 };
     }
     const txt = !res.hit ? "ıska" : `${res.crit ? "Kritik! " : ""}−${res.dmg}`;
@@ -418,7 +419,7 @@ export class MapRenderer {
     c.translate(x, y);
     if (d.lying) c.rotate(d.face * d.lying * Math.PI / 2 * 0.9);
     const bob = Math.sin(this.now / 380 + (u.uid.charCodeAt(1) || 0)) * 0.6 * k;
-    if (u.side === "player") this.human(k, d, bob, u); else this.wolf(k, d, u);
+    if (u.side === "player") this.human(k, d, bob, u); else if (ENEMIES[u.def ?? "kurt"]?.species === "insan") this.foeHuman(k, d, bob, u); else this.wolf(k, d, u);
     c.restore();
     if (d.alpha > 0.5 && !d.lying) this.unitHud(u, x, y, k);
   }
@@ -448,6 +449,19 @@ export class MapRenderer {
     c.stroke();
     if (this.view.torchLit) { const fx = -8 * k * f, fy = -24 * k; c.strokeStyle = "#5B4630"; c.beginPath(); c.moveTo(-4 * k * f, -16 * k); c.lineTo(fx, fy); c.stroke(); const h = (5 + Math.sin(this.now / 90) * 1.5) * k; c.beginPath(); c.moveTo(fx - 2.5 * k, fy); c.quadraticCurveTo(fx, fy - h * 1.6, fx + 2.5 * k, fy); c.fillStyle = "#F0A040"; c.fill(); }
     d.flash = Math.max(0, d.flash - 0.05);
+  }
+  /** İnsan düşman: kendi görseli (dusman_<tür>) ya da kahraman pozunun boyanmış hâli; yoksa çizim. */
+  private foeHuman(k: number, d: DS, bob: number, u: Unit) {
+    const c = this.ctx; const def = ENEMIES[u.def!];
+    const own = this.img("dusman_" + u.def);
+    const im = own ?? ((d.pose === "leap" && this.img("poz_kahraman_vurus")) || this.img("poz_kahraman_durus"));
+    if (im) {
+      const sc = def.scale ?? 1; const s = 56 * k * sc / 373; const h = own ? 56 * k * sc : im.naturalHeight * s, w = own ? h * im.naturalWidth / im.naturalHeight : im.naturalWidth * s;
+      c.scale(-d.face, 1); c.filter = d.flash > 0 ? "sepia(1) saturate(4) hue-rotate(-30deg)" : own ? "none" : def.tint ?? "none";
+      c.drawImage(im, -w / 2, -h + bob, w, h); c.filter = "none"; d.flash = Math.max(0, d.flash - 0.05); return;
+    }
+    // görsel yoksa: kırmızı yelekli çizim
+    c.save(); c.translate(0, 0); this.human(k, d, bob, { ...u, side: "player" }); c.restore();
   }
   private wolf(k: number, d: DS, u: Unit) {
     const c = this.ctx;

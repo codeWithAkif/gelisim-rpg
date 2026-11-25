@@ -114,7 +114,7 @@ export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string,
       if (dmg > 0) { e.hp = Math.max(0, e.hp - dmg); parts.push(`${e.name} ${dmg} hasar aldı.`); hits.push({ uid: e.uid, dmg }); }
       if (fx.slow) e.slowed = Math.max(e.slowed, fx.slow);
       if (fx.blind) e.blind = Math.max(e.blind ?? 0, fx.blind);
-      if (fx.ignite && b.weather !== "yagmur") e.scared = true; // kurtlar ateşten korkar; yağmurda alev cılız
+      if (fx.ignite && b.weather !== "yagmur" && ENEMIES[e.def!]?.species === "hayvan") e.scared = true; // kurtlar ateşten korkar; yağmurda alev cılız
       if (fx.chain) {
         const wet = b.weather === "yagmur" || ["su", "camur"].includes(b.tiles[e.y][e.x]);
         for (const o of enemies(b)) if (o !== e && dist(o.x, o.y, e.x, e.y) === 1) {

@@ -5,8 +5,7 @@ import type { Config } from "../engine/config";
 import { type GameState, clock, DAY_MINUTES } from "../engine/state";
 import {
   type Plan, type Scenario, type Unit, type XY, makeScenario, prepOptions, assessPlan, planCost, doPrep, prepDone,
-  key, WIND_NAMES,
-} from "../engine/combat";
+  key, WIND_NAMES, foeWords } from "../engine/combat";
 import { MAPS, MAP_CHARS, TERRAIN, ENEMIES } from "../content/world";
 import { esc } from "./sketch";
 import { MapRenderer } from "./battle-render";
@@ -52,20 +51,20 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
     const cost = planCost(s, plan);
     const left = DAY_MINUTES - s.minute - cost.minutes;
     const opts = prepOptions(cfg, s);
-    const adv = assessPlan(cfg, s, sc, plan);
+    const adv = assessPlan(cfg, s, sc, plan); const W = foeWords(enemyIds);
     const prepRow = (id: string, label: string, state: string, btn: string) =>
       `<div class="prep"><div><div class="prep-name">${label}</div><div class="muted tiny">${state}</div></div>${btn}</div>`;
     const o = (id: string) => opts.find(x => x.id === id)!;
     panel.innerHTML = `
       <section class="sec"><h3>Ne zaman?</h3><div class="choices">
-        <button class="choice ${plan.timing === "simdi" ? "on" : ""}" data-t="simdi"><b>Şimdi</b><span>${clock(s)} · ${WEATHER_TR[nowW]}</span><span class="muted tiny">Gündüz: kurtlar inde dinleniyor.</span></button>
-        ${late ? "" : `<button class="choice ${plan.timing === "aksam" ? "on" : ""}" data-t="aksam"><b>Akşamı bekle</b><span>20:00 · tahmin: ${WEATHER_TR[eveW]}</span><span class="muted tiny">Gece: kurtlar avda ve uyanık.</span></button>`}
+        <button class="choice ${plan.timing === "simdi" ? "on" : ""}" data-t="simdi"><b>Şimdi</b><span>${clock(s)} · ${WEATHER_TR[nowW]}</span><span class="muted tiny">Gündüz: ${esc(W.pl)} ${esc(W.rest)}.</span></button>
+        ${late ? "" : `<button class="choice ${plan.timing === "aksam" ? "on" : ""}" data-t="aksam"><b>Akşamı bekle</b><span>20:00 · tahmin: ${WEATHER_TR[eveW]}</span><span class="muted tiny">Gece: ${esc(W.pl)} ${esc(W.hunt)}.</span></button>`}
       </div></section>
       <section class="sec"><h3>Nereden gireceksin?</h3><div class="choices">
         ${m.starts.map((st, i) => `<button class="choice ${plan.start === i ? "on" : ""}" data-s="${i}"><b>${i + 1}. ${esc(st.name)}</b><span class="muted tiny">${esc(st.note)}</span></button>`).join("")}
       </div></section>
       <section class="sec"><h3>Hazırlık</h3>
-        ${prepRow("scout", o("scout").name, plan.scout ? "Yapıldı: kurtların ini kuzeydeki ağaçlıkta, iki kurt." : o("scout").desc + " 30 dk · enerji −4",
+        ${prepRow("scout", o("scout").name, plan.scout ? `Yapıldı: ${enemyIds.length} düşman; haritada yerleri görünüyor.` : o("scout").desc + " 30 dk · enerji −4",
           plan.scout ? `<span class="hand" style="color:var(--green)">✓</span>` : `<button class="btn small" data-p="scout">Keşfet</button>`)}
         ${prepRow("readWind", o("readWind").name, plan.readWind ? (sc.wind.strength === 0 ? "Hava durgun; koku pek taşınmıyor." : `Rüzgâr ${WIND_NAMES[sc.wind.dir]} esiyor (${sc.wind.strength === 2 ? "sert" : "hafif"}). Haritada ok.`) : o("readWind").ok ? o("readWind").desc + " 10 dk" : esc(o("readWind").reason ?? ""),
           plan.readWind ? `<span class="hand" style="color:var(--green)">✓</span>` : `<button class="btn small" data-p="readWind" ${o("readWind").ok ? "" : "disabled"}>Oku</button>`)}

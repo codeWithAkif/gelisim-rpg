@@ -4,6 +4,7 @@ import { slashScore, dirScore, swipeOf, runeScore, RUNES, type P } from "../engi
 import { wolfSketch, esc, WOLF_OUTLINE } from "./sketch";
 import { artUrl } from "./art";
 import { sfx, buzz } from "./feel";
+import { ENEMIES } from "../content/world";
 
 const TAU = Math.PI * 2;
 
@@ -53,23 +54,34 @@ function drawWolf(g: CanvasRenderingContext2D, w: number, ink: string) {
   g.fillStyle = "#E9DFC9"; g.beginPath(); g.arc((36 - 100) * k, (50 - 80) * k, 1.8, 0, 7); g.fill();
 }
 /** Kurdun resmi: görsel varsa o, yoksa eskiz. Sola bakar; zayıf noktalar 0–1 kutu koordinatında. */
-function wolfPic(W: number, H: number, detail: number, aimAt?: [number, number]): string {
-  const url = artUrl("dusman_kurt");
-  const img = url ? `<img src="${url}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain">` : `<div style="position:absolute;inset:0">${wolfSketch({ detail, marks: [], width: W, labels: false })}</div>`;
+/** Düşmanın görseli: kendi görseli (dusman_<tür>), insanlar için kahraman pozunun boyanmış hâli, yoksa kurt. */
+export interface FoeArt { url?: string; attack?: string; aspect: number; filter: string; human: boolean; name: string }
+export function foeArt(foe = "kurt"): FoeArt {
+  const d = ENEMIES[foe] ?? ENEMIES.kurt; const human = d.species === "insan";
+  const own = artUrl("dusman_" + foe);
+  if (human) return { url: own ?? artUrl("poz_kahraman_durus"), attack: own ?? artUrl("poz_kahraman_vurus"), aspect: own ? 1.4 : 373 / 172, filter: own ? "none" : d.tint ?? "none", human, name: d.name };
+  return { url: artUrl("dusman_kurt"), attack: artUrl("poz_kurt_atilma"), aspect: 393 / 640, filter: d.tint ?? "none", human, name: d.name };
+}
+/** Görseli W×H kutuya sığdırınca kapladığı dikdörtgen. */
+const fitRect = (W: number, H: number, aspect: number) => { const w = Math.min(W, H / aspect), h = w * aspect; return { x: (W - w) / 2, y: (H - h) / 2, w, h }; };
+function foePicHtml(W: number, H: number, detail: number, art: FoeArt, aimAt?: [number, number]): string {
+  const img = art.url ? `<img src="${art.url}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:${art.filter}">` : `<div style="position:absolute;inset:0">${wolfSketch({ detail, marks: [], width: W, labels: false })}</div>`;
   const target = aimAt ? `<div class="gx-aim" style="left:${aimAt[0] * W}px;top:${aimAt[1] * H}px"></div>` : "";
   return `<div class="gx-wolf" style="position:absolute;inset:0">${img + target}</div>`;
 }
 
-/* ---------- saldırı: kesik ---------- */
-export function slashPrompt(host: HTMLElement, o: { aimName?: string; aimAt?: [number, number]; aimArtAt?: [number, number]; detail: number; ease: number }): Promise<number> {
+export function slashPrompt(host: HTMLElement, o: { foe?: string; aimName?: string; aimAt?: [number, number]; aimArtAt?: [number, number]; detail: number; ease: number }): Promise<number> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 0.65);
     // görsel varsa zayıf nokta görseldeki yerine taşınır (görsel kutuya sığdırılır, ortalanır)
-    const art = artUrl("dusman_kurt"); const IA = 393 / 640;
-    const aim: [number, number] | undefined = art && o.aimArtAt ? [o.aimArtAt[0], (H - W * IA) / 2 / H + o.aimArtAt[1] * W * IA / H] : o.aimAt;
+    const art = foeArt(o.foe); const R = fitRect(W, H, art.aspect);
+    const toStage = (p: [number, number]): [number, number] => [(R.x + p[0] * R.w) / W, (R.y + p[1] * R.h) / H];
+    const aim: [number, number] | undefined = art.url && o.aimArtAt ? toStage(o.aimArtAt) : o.aimAt;
     o = { ...o, aimAt: aim };
-    const L = layer(host, "slash", o.aimName ? `Kes! ${esc(o.aimName)} hedefinden geçir` : "Kurdun üstünden kes!", W, H, wolfPic(W, H, o.detail, o.aimAt));
-    const body0 = [[0.22, 0.45], [0.42, 0.5], [0.62, 0.5], [0.82, 0.48]].map(([x, y]) => ({ x: x * W, y: y * H, r: W * 0.11 }));
+    const L = layer(host, "slash", o.aimName ? `Kes! ${esc(o.aimName)} hedefinden geçir` : `${esc(art.name)}: üstünden kes!`, W, H, foePicHtml(W, H, o.detail, art, o.aimAt));
+    // gövde: kurt yatay, insan dikey
+    const bodyPts: [number, number][] = art.human ? [[0.5, 0.25], [0.5, 0.45], [0.5, 0.65], [0.5, 0.85]] : [[0.22, 0.45], [0.42, 0.5], [0.62, 0.5], [0.82, 0.48]];
+    const body0 = bodyPts.map(p => { const [x, y] = art.human && art.url ? toStage(p) : p; return { x: x * W, y: y * H, r: (art.human ? R.w * 0.3 : W * 0.11) }; });
     // hassas nokta küçük; kurt da yerinde durmuyor (çevikliği, senin refleksine karşı)
     const weak0 = o.aimAt ? { x: o.aimAt[0] * W, y: o.aimAt[1] * H, r: W * 0.042 } : undefined;
     const wolfEl = L.box.querySelector<HTMLElement>(".gx-wolf"); let ox = 0, oy = 0;
@@ -94,15 +106,16 @@ export function slashPrompt(host: HTMLElement, o: { aimName?: string; aimAt?: [n
 
 /* ---------- savunma: atılan kurttan kaç ---------- */
 /** from: kurdun oyuncuya göre geldiği yön (derece, ekran). */
-export function dodgePrompt(host: HTMLElement, o: { from: number; ease: number }): Promise<number> {
+export function dodgePrompt(host: HTMLElement, o: { foe?: string; from: number; ease: number }): Promise<number> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 0.8);
-    const L = layer(host, "dodge", "Kurt atılıyor! Kenara kaç", W, H);
+    const art = foeArt(o.foe);
+    const L = layer(host, "dodge", `${esc(art.name)} ${art.human ? "saldırıyor" : "atılıyor"}! Kenara kaç`, W, H);
     const cx = W / 2, cy = H / 2; const a = o.from * Math.PI / 180;
     const sx = cx + Math.cos(a) * W * 0.46, sy = cy + Math.sin(a) * H * 0.46;
     const lead = 350 + Math.random() * 350, dur = 900 + Math.random() * 300; const t0 = performance.now();
     const away = (o.from + 180) % 360; let done = false; let trail: P[] = [];
-    const wolf = artUrl("dusman_kurt"); const img = wolf ? Object.assign(new Image(), { src: wolf }) : null;
+    const img = art.attack ?? art.url ? Object.assign(new Image(), { src: (art.attack ?? art.url)! }) : null;
     const draw = () => {
       if (done) return; const now = performance.now() - t0; const p = Math.max(0, Math.min(1.2, (now - lead) / dur));
       const g = L.g; g.clearRect(0, 0, W, H);
@@ -113,7 +126,7 @@ export function dodgePrompt(host: HTMLElement, o: { from: number; ease: number }
       const sc = 0.7 + e * 0.6; const shake = p === 0 ? Math.sin(now / 30) * 2 : 0;
       // kurt oyuncuya bakar: görseller sola bakar, sağdan geliyorsa olduğu gibi
       g.save(); g.translate(wx + shake, wy); g.scale((Math.cos(a) > 0 ? 1 : -1) * sc, sc); if (p > 0) g.rotate(-0.25);
-      if (img?.complete && img.naturalWidth) g.drawImage(img, -48, -30, 96, 96 * img.naturalHeight / img.naturalWidth); else drawWolf(g, 90, L.ink);
+      if (img?.complete && img.naturalWidth) { g.filter = art.filter; const w = art.human ? 52 : 96, h = w * img.naturalHeight / img.naturalWidth; g.drawImage(img, -w / 2, art.human ? -h * 0.7 : -30, w, h); g.filter = "none"; } else drawWolf(g, 90, L.ink);
       g.restore();
       if (p > 0) { g.strokeStyle = L.red; g.globalAlpha = 0.35; g.setLineDash([4, 6]); g.beginPath(); g.moveTo(sx, sy); g.lineTo(cx, cy); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
       if (trail.length) inkTrail(g, trail, L.blue, 0.8);
@@ -210,13 +223,13 @@ export function pushPrompt(host: HTMLElement, o: { dir: number; ease: number; in
 
 /* ---------- ok: yayı geri çek, rüzgârı hesapla, bırak ---------- */
 /** range: hedefe uzaklık (altıgen); wind: -1..1 yan rüzgâr. Kafaya isabet 1.25 döner. */
-export function bowPrompt(host: HTMLElement, o: { range: number; wind: number; ease: number }): Promise<number> {
+export function bowPrompt(host: HTMLElement, o: { foe?: string; range: number; wind: number; ease: number }): Promise<number> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 1.05);
     const L = layer(host, "bow", "Yayı geri çek, nişan al, bırak", W, H);
-    const img = artUrl("dusman_kurt"); const wimg = img ? Object.assign(new Image(), { src: img }) : null;
+    const art = foeArt(o.foe); const wimg = art.url ? Object.assign(new Image(), { src: art.url }) : null;
     const scale = Math.max(0.45, 1.15 - o.range * 0.13);           // uzaktaki kurt küçük
-    const ww = W * 0.38 * scale, wh = ww * 0.61; const wy = H * 0.24;
+    const ww = W * (art.human ? 0.16 : 0.38) * scale, wh = ww * art.aspect; const wy = H * 0.24;
     const bx = W / 2, by = H * 0.86; const t0 = performance.now(); const LIMIT = 6000;
     let pull: P | null = null, cur: P | null = null; let arrow: { x: number; y: number; vx: number; vy: number } | null = null; let done = false;
     const wolfX = (now: number) => W / 2 + Math.sin((now - t0) / 700) * W * 0.3 + Math.sin((now - t0) / 260) * W * 0.04 / o.ease;
@@ -230,7 +243,7 @@ export function bowPrompt(host: HTMLElement, o: { range: number; wind: number; e
       const x = wolfX(now);
       const right = Math.cos((now - t0) / 700) > 0; // görsel sola bakar; sağa koşarken çevrilir
       g.save(); g.translate(x, wy); if (right) g.scale(-1, 1);
-      if (wimg?.complete && wimg.naturalWidth) g.drawImage(wimg, -ww / 2, -wh / 2, ww, wh); else { g.fillStyle = "#5E5850"; g.beginPath(); g.ellipse(0, 0, ww / 2, wh / 3, 0, 0, TAU); g.fill(); }
+      if (wimg?.complete && wimg.naturalWidth) { g.filter = art.filter; g.drawImage(wimg, -ww / 2, -wh / 2, ww, wh); g.filter = "none"; } else { g.fillStyle = "#5E5850"; g.beginPath(); g.ellipse(0, 0, ww / 2, wh / 3, 0, 0, TAU); g.fill(); }
       g.restore();
       // rüzgâr
       g.strokeStyle = L.blue; g.lineWidth = 2.5; const wl = o.wind * 50; g.beginPath(); g.moveTo(W / 2 - wl, H * 0.5); g.lineTo(W / 2 + wl, H * 0.5); if (Math.abs(wl) > 3) { g.lineTo(W / 2 + wl - Math.sign(wl) * 8, H * 0.5 - 6); } g.stroke();
@@ -247,8 +260,8 @@ export function bowPrompt(host: HTMLElement, o: { range: number; wind: number; e
         arrow.x += arrow.vx + o.wind * 1.1; arrow.y += arrow.vy;
         g.strokeStyle = "#5B4630"; g.lineWidth = 2.5; g.beginPath(); g.moveTo(arrow.x, arrow.y); g.lineTo(arrow.x - arrow.vx * 3, arrow.y - arrow.vy * 3); g.stroke();
         if (arrow.y <= wy) {
-          const hx = x + (right ? 1 : -1) * ww * 0.38, hy = wy - wh * 0.08; // kafa (görsel sola bakar)
-          const head = Math.hypot(arrow.x - hx, arrow.y - hy) < ww * 0.12 * o.ease;
+          const hx = art.human ? x : x + (right ? 1 : -1) * ww * 0.38, hy = art.human ? wy - wh * 0.38 : wy - wh * 0.08; // kafa (görsel sola bakar)
+          const head = Math.hypot(arrow.x - hx, arrow.y - hy) < (art.human ? ww * 0.3 : ww * 0.12) * o.ease;
           const body = Math.abs(arrow.x - x) < ww * 0.42 * Math.min(1.3, o.ease) && Math.abs(arrow.y - wy) < wh * 0.45;
           return head ? finish(1.25, "Kafasına!") : body ? finish(Math.max(0.55, 1 - Math.abs(arrow.x - x) / ww), "Saplandı") : finish(0, "Iska");
         }

@@ -140,7 +140,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     const dk = darkness(s.minute);
     if (dk > 0.01) out += `<rect x="-400" y="-400" width="1800" height="2200" fill="#141A30" opacity="${(dk * 0.5).toFixed(2)}" pointer-events="none"/>`;
     for (const r of ROADS) {
-      const open = isOpen(place(r.a)!) && isOpen(place(r.b)!);
+      const open = isOpen(place(r.a)!, s) && isOpen(place(r.b)!, s);
       const sa = isSeen(s, r.a), sb = isSeen(s, r.b);
       if (!sa && !sb) continue;
       if (!sa || !sb) {
@@ -163,8 +163,8 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     const regionLabels = view.w > 420;
     for (const p of PLACES) {
       if (!isSeen(s, p.id)) continue;
-      const locked = !isOpen(p);
-      if (!locked && view.w > 700) continue; // ülke ölçeğinde köy içi yerler tek etikette toplanır
+      const locked = !isOpen(p, s);
+      if (!locked && view.w > 700 && !p.hub) continue; // ülke ölçeğinde köy içi yerler tek etikette toplanır
       out += placeIcon(p, icon * (locked ? 1.4 : 1), locked);
       if (sel === p.id) out += `<circle cx="${p.x}" cy="${p.y}" r="${icon * 0.85}" fill="none" stroke="#9E3423" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>`;
       if (!locked || regionLabels) out += `<text x="${p.x}" y="${p.y + icon * 0.95}" font-size="${fs * (locked ? 1.3 : 1)}" text-anchor="middle" class="map-label">${esc(locked ? p.name + " ?" : p.name)}</text>`;
@@ -196,7 +196,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     const people = peopleAt(sel).map(id => NPCS.find(n => n.id === id)!).filter(Boolean);
     const known = (id: string) => s.metNpcs.includes(id);
     const quests = QUESTS.filter(q => q.at === sel && (s.quests[q.id]?.status === "aktif"));
-    if (!isOpen(p)) {
+    if (!isOpen(p, s)) {
       card.innerHTML = `<div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${esc(p.chapter ?? "")}</span></div><p class="tiny" style="margin:0">${esc(p.desc)}</p><p class="muted tiny" style="margin:0">Henüz buraya gidemezsin.</p>`;
       return;
     }
@@ -226,7 +226,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     if (!wasTap || busy) return;
     const w = toWorld(e.clientX, e.clientY); const k = view.w / 300;
     let best: Place | undefined, bd = Infinity;
-    for (const p of PLACES) { if ((isOpen(p) && view.w > 700) || !isSeen(s, p.id)) continue; const d = Math.hypot(p.x - w.x, p.y - w.y); if (d < bd) { bd = d; best = p; } }
+    for (const p of PLACES) { if ((isOpen(p, s) && view.w > 700 && !p.hub) || !isSeen(s, p.id)) continue; const d = Math.hypot(p.x - w.x, p.y - w.y); if (d < bd) { bd = d; best = p; } }
     if (view.w > 700 && Math.hypot(VILLAGE[0] - w.x, VILLAGE[1] - w.y) < 30 * k) { view = LEVELS.vadi(s); applyView(); return; }
     if (best && bd < 26 * k) { sel = best.id; renderCard(); drawDyn(); }
   };

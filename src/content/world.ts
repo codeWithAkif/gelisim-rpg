@@ -1,3 +1,4 @@
+import { CHAPTER_MAPS, CHAPTER_QUESTS, CHAPTER_NPCS, CHAPTER_ENEMIES } from "./chapters";
 // Oyun tarafı içerik: config editöründe henüz ekranı olmayan veriler.
 // İleride editöre "Dünya" sekmesi eklenince buradan taşınacak.
 
@@ -46,14 +47,20 @@ export const CRAFTS: Craft[] = [
 ];
 /** Köy pazarında satılanlar. */
 export const SHOP = ["ekmek", "peynir", "deri", "ip", "ok", "av_yayi"];
+/** Pazarlar: nerede ne satılır. Şehir pazarı daha zengin, daha pahalı. */
+export const MARKETS: Record<string, { name: string; items: string[] }> = {
+  koy_meydani: { name: "Köy pazarı", items: SHOP },
+  karacam: { name: "Karaçam çarşısı", items: ["ekmek", "peynir", "ok", "av_yayi", "deri", "ip", "deri_zirh"] },
+  ardic_kul: { name: "Kül mahallesi tezgâhı", items: ["ekmek", "ok"] },
+};
 /** Config eşyalarının köy pazarındaki fiyatı. */
-export const CONFIG_PRICES: Record<string, number> = { av_yayi: 24 };
+export const CONFIG_PRICES: Record<string, number> = { av_yayi: 24, deri_zirh: 40 };
 
 /** Config'deki ekipmanların silah değerleri (config'de hasar alanı gelene kadar). */
 export const CONFIG_WEAPON_DAMAGE: Record<string, number> = { dede_kilici: 10, av_yayi: 7 };
 export const CONFIG_ARMOR: Record<string, number> = { deri_zirh: 3, zincir_zirh: 7 };
 
-export interface Npc { id: string; name: string; role: string; giver: string; teaches?: string[]; fee?: number; minRep?: number; note: string }
+export interface Npc { id: string; name: string; role: string; giver: string; teaches?: string[]; fee?: number; minRep?: number; note: string; region?: string }
 export const NPCS: Npc[] = [
   { id: "hasan", name: "Hasan", role: "Çoban", giver: "koylu", note: "Köyün yukarısında koyun güder. Az konuşur." },
   { id: "ayse", name: "Muhtar Ayşe", role: "Köy muhtarı", giver: "muhtar", minRep: 3, note: "Köyün işlerini o çevirir; yabancıya mesafeli." },
@@ -64,7 +71,7 @@ export const NPCS: Npc[] = [
 /** Ders tipi aktiviteyi kimin verdiği. */
 export function teacherOf(activityId: string): Npc | undefined { return NPCS.find(n => n.teaches?.includes(activityId)); }
 
-export type Terrain = "cayir" | "uzun_ot" | "camur" | "kaya" | "tepe" | "su" | "agac";
+export type Terrain = "cayir" | "uzun_ot" | "camur" | "kaya" | "tepe" | "su" | "agac" | "kar";
 export interface TerrainInfo { name: string; cost: number; env?: string; color: string; ink: string; blocks?: boolean; cover?: number }
 export const TERRAIN: Record<Terrain, TerrainInfo> = {
   cayir: { name: "Çayır", cost: 1, color: "#C9CB98", ink: "#8E9154" },
@@ -74,13 +81,17 @@ export const TERRAIN: Record<Terrain, TerrainInfo> = {
   tepe: { name: "Yüksek zemin", cost: 2, env: "yuksek_zemin", color: "#C7B583", ink: "#8C7744" },
   su: { name: "Dere", cost: 99, color: "#8DB3BF", ink: "#4E7F8F", blocks: true },
   agac: { name: "Ağaçlık", cost: 2, color: "#7F9A62", ink: "#4D6837", cover: 2 },
+  kar: { name: "Derin kar", cost: 2, color: "#E9EDF0", ink: "#9AA8B4" },
 };
 
 export interface WeakPoint { id: string; name: string; need: Record<string, number>; critBonus: number; effect?: "slow" | "bleed"; at: [number, number]; artAt?: [number, number] /* dusman_kurt görselinde (0–1) */ }
+export interface FoeWords { one: string; pl: string; rest: string; hunt: string; den: string }
+export const WOLF_WORDS: FoeWords = { one: "kurt", pl: "kurtlar", rest: "inde dinleniyor", hunt: "avda ve uyanık", den: "ine" };
 export interface EnemyDef {
   id: string; name: string; species: "hayvan" | "insan"; hp: number; damage: [number, number];
   move: number; evasion: number; accuracy: number; armor: number; weakPoints: WeakPoint[]; desc: string;
   anatomyOf?: string;   // zayıf nokta bilgisi hangi türle ortak (deftere aynı sayfaya işlenir)
+  words?: FoeWords;     // savaş metinlerinde nasıl anılır
   scale?: number; tint?: string; // savaşta çizim: boy ve renk
 }
 export const ENEMIES: Record<string, EnemyDef> = {
@@ -111,6 +122,7 @@ export interface QuestDef {
   rewards: { items?: Record<string, number>; money?: number; note: string; gains?: Record<string, number>; relics?: string[]; pet?: string };
   requires?: string[];
   repeatable?: boolean;
+  after?: string;        // bu hikâye sayfasına ulaşılmadan görünmez (bölüm kilidi)
   retiredBy?: string;    // bu iş bitince görev listeden kalkar (ör. sürü dağılınca devriye)
   afterText?: string;    // bitince ne öğrendin (hikâye)
   at: string;            // işin yapıldığı yer (haber verilecek kişi ya da savaş alanı)
@@ -230,4 +242,9 @@ export const MAPS: Record<string, BattleMap> = {
     flock: [3, 6],
   },
 };
-export const MAP_CHARS: Record<string, Terrain> = { ".": "cayir", ",": "uzun_ot", "~": "camur", "^": "kaya", T: "tepe", "=": "su", "*": "agac" };
+export const MAP_CHARS: Record<string, Terrain> = { ".": "cayir", ",": "uzun_ot", "~": "camur", "^": "kaya", T: "tepe", "=": "su", "*": "agac", k: "kar" };
+Object.assign(MAPS, CHAPTER_MAPS);
+QUESTS.push(...CHAPTER_QUESTS);
+NPCS.push(...CHAPTER_NPCS);
+Object.assign(ENEMIES, CHAPTER_ENEMIES);
+for (const id of ["kar_kurdu"]) ENEMIES[id].weakPoints = ENEMIES.kurt.weakPoints;

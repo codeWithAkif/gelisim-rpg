@@ -9,7 +9,7 @@ import { derived, effectiveAttr, maxMana, type Context } from "./derived";
 import { Rng } from "./rng";
 import { applyGain, realUse, summarize, type GainReport } from "./progression";
 import { attackTimingMods, dodgeMod } from "./timing";
-import { ENEMIES, GAME_ITEMS, MAPS, MAP_CHARS, TERRAIN, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, type Terrain, type WeakPoint } from "../content/world";
+import { ENEMIES, GAME_ITEMS, MAPS, MAP_CHARS, TERRAIN, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, WOLF_WORDS, type Terrain, type WeakPoint, type FoeWords } from "../content/world";
 
 export type Weather = "acik" | "yagmur" | "sis";
 export type XY = [number, number];
@@ -83,6 +83,10 @@ export interface Scenario { mapId: string; enemies: string[]; weatherNow: Weathe
 export interface Plan { timing: "simdi" | "aksam"; start: number; scout: boolean; readWind: boolean; traps: XY[]; torch: boolean; paid?: ("scout" | "readWind")[]; ambushed?: boolean }
 export const DEFAULT_PLAN: Plan = { timing: "simdi", start: 0, scout: false, readWind: false, traps: [], torch: false };
 
+/** Savaş metinlerinde düşman nasıl anılır (kurtlar, haydutlar, muhafızlar…). */
+export function foeWords(ids: string[]): FoeWords { const d = ENEMIES[ids.find(i => !ENEMIES[i]?.scale) ?? ids[0]]; return d?.words ?? WOLF_WORDS; }
+export const cap = (x: string) => x.charAt(0).toLocaleUpperCase("tr") + x.slice(1);
+const battleWords = (b: Battle) => foeWords(b.units.filter(u => u.side === "enemy").map(u => u.def!));
 function rollWeather(rng: Rng): Weather { const r = rng.next(); return r < 0.25 ? "yagmur" : r < 0.4 ? "sis" : "acik"; }
 /** Aynı gün aynı iş için aynı koşullar: tekrar açınca hava değişmez. */
 export function makeScenario(s: GameState, mapId: string, enemies: string[], questId = ""): Scenario {
@@ -97,8 +101,8 @@ export interface PrepOption { id: "scout" | "readWind" | "trap" | "torch"; name:
 export function prepOptions(cfg: Config, s: GameState): PrepOption[] {
   const lv = (a: string) => s.attrs[a]?.level ?? 0;
   return [
-    { id: "scout", name: "Araziyi keşfet", minutes: 30, energy: 4, money: 0, ok: true, desc: "Kurtların inini ve sayısını görürsün." },
-    { id: "readWind", name: "Rüzgârı oku", minutes: 10, energy: 0, money: 0, ok: lv("koku") >= 8 || lv("analiz") >= 12, reason: "Koku 8 ya da gözlem 12 gerekir", desc: "Rüzgârın yönünü bilirsen kokunu kurtlardan saklayabilirsin." },
+    { id: "scout", name: "Araziyi keşfet", minutes: 30, energy: 4, money: 0, ok: true, desc: "Düşmanın nerede durduğunu ve kaç kişi olduğunu görürsün." },
+    { id: "readWind", name: "Rüzgârı oku", minutes: 10, energy: 0, money: 0, ok: lv("koku") >= 8 || lv("analiz") >= 12, reason: "Koku 8 ya da gözlem 12 gerekir", desc: "Rüzgârın yönünü bilirsen kokunu ve sesini saklayabilirsin." },
     { id: "trap", name: "Tuzak kur", minutes: 30, energy: 6, money: 0, ok: lv("el_becerisi") >= 10, reason: "El becerisi 10 gerekir", desc: "Haritada bir altıgene kazık-ilmek tuzağı (en çok 2)." },
     { id: "torch", name: "Meşale hazırla", minutes: 10, energy: 0, money: 2, ok: s.money >= 2, reason: "2 bakır gerekir", desc: "Gece görüşün artar; bir kez fırlatıp otu tutuşturabilirsin." },
   ];
@@ -134,29 +138,30 @@ export function assessPlan(cfg: Config, s: GameState, sc: Scenario, p: Plan): Ad
   const weather = p.timing === "aksam" ? sc.weatherEvening : sc.weatherNow;
   const knowsFire = s.knownElements.includes("el_ates");
   const t = tiles[st.at[1]][st.at[0]];
+  const W = foeWords(sc.enemies), P = cap(W.pl);
   if (t === "tepe") out.push({ good: true, text: "Yüksek zemin: aşağıdakilere vuruşun +8 isabetli." });
-  if (st.name.startsWith("Dere")) out.push({ good: true, text: "Dere arkanda: kurtlar seni kuşatamaz." });
-  if (t === "cayir" && !st.name.startsWith("Dere")) out.push({ good: false, text: "Açık arazi: kurtlar iki yandan gelebilir." });
-  if (weather === "yagmur") out.push({ good: false, text: knowsFire ? "Yağmur: ateş %40 zayıf, ot tutuşmaz. Kurtlar ateşten de korkmaz." : "Yağmur: zemin kaygan, ses örtülü." });
-  if (weather === "yagmur") out.push({ good: true, text: "Yağmur kokunu bastırır: kurtlar seni daha geç fark eder." });
-  if (weather === "sis") out.push({ good: false, text: "Sis: görüşün kısa; kurtları geç görürsün." });
-  if (night) out.push(p.torch ? { good: true, text: "Gece ama meşalen var: görüşün +2 altıgen." } : { good: false, text: "Gece: kurtlar avda ve uyanık; görüşün çok kısa." });
-  else out.push({ good: true, text: "Gündüz: kurtlar inde dinleniyor; seni hemen fark etmezler." });
+  if (st.name.startsWith("Dere")) out.push({ good: true, text: `Dere arkanda: ${W.pl} seni kuşatamaz.` });
+  if (t === "cayir" && !st.name.startsWith("Dere")) out.push({ good: false, text: `Açık arazi: ${W.pl} iki yandan gelebilir.` });
+  if (weather === "yagmur") out.push({ good: false, text: knowsFire ? "Yağmur: ateş %40 zayıf, ot tutuşmaz; ateş kimseyi korkutmaz." : "Yağmur: zemin kaygan, ses örtülü." });
+  if (weather === "yagmur") out.push({ good: true, text: `Yağmur kokunu ve sesini bastırır: ${W.pl} seni daha geç fark eder.` });
+  if (weather === "sis") out.push({ good: false, text: "Sis: görüşün kısa; düşmanı geç görürsün." });
+  if (night) out.push(p.torch ? { good: true, text: "Gece ama meşalen var: görüşün +2 altıgen." } : { good: false, text: `Gece: ${W.pl} ${W.hunt}; görüşün çok kısa.` });
+  else out.push({ good: true, text: `Gündüz: ${W.pl} ${W.rest}; seni hemen fark etmezler.` });
   if (p.readWind) {
     const w = windVec(sc.wind.dir); const a = planar(st.at[0], st.at[1]);
     const toDen = m.enemies.map(([x, y]) => { const b = planar(x, y); return { x: b.px - a.px, y: b.py - a.py }; })
       .reduce((acc, v) => ({ x: acc.x + v.x, y: acc.y + v.y }), { x: 0, y: 0 });
     const L = Math.hypot(toDen.x, toDen.y) || 1; const dot = (toDen.x * w.x + toDen.y * w.y) / L;
     if (sc.wind.strength === 0) out.push({ good: true, text: "Rüzgâr yok denecek kadar hafif: koku pek taşınmaz." });
-    else if (dot > 0.4) out.push({ good: false, text: `Rüzgâr ${WIND_NAMES[sc.wind.dir]} esiyor: kokun doğrudan ine gider, seni uzaktan alırlar.` });
+    else if (dot > 0.4) out.push({ good: false, text: `Rüzgâr ${WIND_NAMES[sc.wind.dir]} esiyor: kokun doğrudan ${W.den} gider, seni uzaktan alırlar.` });
     else if (dot < -0.4) out.push({ good: true, text: `Rüzgâr ${WIND_NAMES[sc.wind.dir]} esiyor: kokun arkana gider. Pusu kurabilirsin.` });
-    else out.push({ good: true, text: `Rüzgâr ${WIND_NAMES[sc.wind.dir]} esiyor: yandan; kokun ine az ulaşır.` });
+    else out.push({ good: true, text: `Rüzgâr ${WIND_NAMES[sc.wind.dir]} esiyor: yandan; kokun ${W.den} az ulaşır.` });
   } else out.push({ good: false, text: "Rüzgârı bilmiyorsun: kokun seni ele verebilir." });
-  if (!p.scout) out.push({ good: false, text: "Keşif yapmadın: kurtların nerede olduğunu bilmiyorsun." });
-  if (p.traps.length) out.push({ good: true, text: `${p.traps.length} tuzak kurulu: basan kurt yaralanır ve topallar.` });
+  if (!p.scout) out.push({ good: false, text: `Keşif yapmadın: ${W.pl} nerede, bilmiyorsun.` });
+  if (p.traps.length) out.push({ good: true, text: `${p.traps.length} tuzak kurulu: basan ${W.one} yaralanır ve topallar.` });
   if (knowsFire && weather !== "yagmur") {
     const grass = tiles.flat().filter(x => x === "uzun_ot").length;
-    if (grass > 6) out.push({ good: true, text: "Kuru ot bol: bir Ateş topu yangını kurtlarla arana yayar; kurtlar ateşe girmez." });
+    if (grass > 6) out.push({ good: true, text: `Kuru ot bol: bir Ateş topu yangını ${W.pl} ile arana yayar; kimse ateşe girmez.` });
   }
   if (s.energy < 30) out.push({ good: false, text: "Yorgunsun: isabetin ve hareketin düşük." });
   const cost = planCost(s, p);
@@ -211,7 +216,8 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
     fire: {}, walls: {}, traps, torch: { has: plan.torch, thrown: false }, flock: m.flock,
   };
   startPlayerTurn(cfg, s, b);
-  const opening = plan.ambushed ? "Kurt yolunu kesti; gözünü senden ayırmıyor." : night ? "Gece; kurtlar avda." : "Gündüz; kurtlar inde, seni fark etmediler.";
+  const W = foeWords(enemyIds);
+  const opening = plan.ambushed ? `${cap(W.one)} yolunu kesti; gözünü senden ayırmıyor.` : night ? `Gece; ${W.pl} ${W.hunt}.` : `Gündüz; ${W.pl} ${W.rest}, seni fark etmediler.`;
   b.log.unshift(`${opening} ${weather === "yagmur" ? "Yağmur yağıyor." : weather === "sis" ? "Sis var." : "Hava açık."}`);
   return b;
 }
@@ -352,7 +358,7 @@ export function detect(b: Battle, force: boolean) {
   if (!spotted) return;
   let woke = false;
   for (const e of pack) if (!e.alert) { e.alert = true; woke = true; b.events.push({ k: "alert", uid: e.uid }); }
-  if (woke) b.log.unshift("Kurtlar seni fark etti! Kulaklar dikildi.");
+  if (woke) b.log.unshift(`${cap(battleWords(b).pl)} seni fark etti!`);
 }
 
 /* ---------- eylemler ---------- */
@@ -673,13 +679,13 @@ export function playerShoot(cfg: Config, s: GameState, b: Battle, target: Unit, 
 /** Bu düşman turunda oyuncuya saldırı gelecek mi? (Tur deterministik; kopyada denenir.) */
 export function willBeAttacked(cfg: Config, s: GameState, b: Battle): boolean { return incomingAttack(cfg, s, b) !== null; }
 /** Saldıracak ilk düşmanın saldırı anındaki yeri (kaçış yönü için); saldırı yoksa null. */
-export function incomingAttack(cfg: Config, s: GameState, b: Battle): { from: XY; to: XY } | null {
+export function incomingAttack(cfg: Config, s: GameState, b: Battle): { from: XY; to: XY; def: string } | null {
   const bc = structuredClone(b), sc = structuredClone(s); bc.events = [];
   const p = player(bc); const pid = p.uid; const pos = new Map(bc.units.map(u => [u.uid, [u.x, u.y] as XY]));
   enemyTurn(cfg, sc, bc);
   for (const e of bc.events) {
     if (e.k === "move") pos.set(e.uid, e.path[e.path.length - 1]);
-    if (e.k === "attack" && e.target === pid) return { from: pos.get(e.uid)!, to: [p.x, p.y] };
+    if (e.k === "attack" && e.target === pid) return { from: pos.get(e.uid)!, to: [p.x, p.y], def: unitById(bc, e.uid)?.def ?? "kurt" };
   }
   return null;
 }
@@ -706,7 +712,8 @@ export function finishBattle(cfg: Config, s: GameState, b: Battle): BattleOutcom
   s.satiety = Math.max(0, s.satiety - 6);
   const p = player(b);
   s.hp = b.phase === "lost" ? 1 : p.hp;
-  const head = b.phase === "won" ? (b.units.some(u => u.def === "akyele") ? "Akyele düştü; sürü dağıldı." : "Kurtları uzaklaştırdın.") : b.phase === "fled" ? "Geri çekildin; kurtlar hâlâ orada." : "Yaralı hâlde kendini köye zor attın.";
+  const W = battleWords(b); const boss = b.units.find(u => u.side === "enemy" && ENEMIES[u.def!]?.scale && u.def !== "kopek");
+  const head = b.phase === "won" ? (boss ? `${boss.name} düştü.` : `${cap(W.pl)} dağıldı.`) : b.phase === "fled" ? `Geri çekildin; ${W.pl} hâlâ orada.` : "Yaralı hâlde kendini güvenli bir yere zor attın.";
   const text = `${head} ${summarize(cfg, gains, 4)}`;
   log(s, text, "battle");
   return { result: b.phase, gains, minutes, text };

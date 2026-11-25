@@ -4,9 +4,8 @@
 import type { Config } from "./config";
 import { type GameState, DAY_MINUTES, addRep, hourOf, log } from "./state";
 import { applyGain, type GainReport } from "./progression";
-import { planTravel, place, route } from "./travel";
+import { planTravel, place, route, arrive } from "./travel";
 import { addItem } from "./inventory";
-import { markSeen } from "./explore";
 import { Rng } from "./rng";
 import { ROADS } from "../content/map";
 import { TRAVEL_EVENTS, type TravelEventDef } from "../content/travel-events";
@@ -22,8 +21,8 @@ export interface Journey {
   events: JourneyEvent[]; seed: number; back?: boolean;
 }
 
-function hasPatika(from: string, to: string): boolean {
-  const r = route(from, to); if (!r) return false;
+function hasPatika(from: string, to: string, s?: GameState): boolean {
+  const r = route(from, to, s); if (!r) return false;
   for (let i = 1; i < r.places.length; i++) {
     const a = r.places[i - 1], b = r.places[i];
     if (ROADS.some(x => ((x.a === a && x.b === b) || (x.a === b && x.b === a)) && x.kind === "patika")) return true;
@@ -42,7 +41,7 @@ export function startJourney(cfg: Config, s: GameState, to: string, now: number)
   if (s.journey) return { ok: false, reason: "Zaten yoldasın" };
   const p = planTravel(cfg, s, to); if (!p.ok) return { ok: false, reason: p.reason };
   const rng = new Rng((now ^ (s.seed * 31)) | 0);
-  const patika = hasPatika(s.location, to);
+  const patika = hasPatika(s.location, to, s);
   const pool = TRAVEL_EVENTS.filter(d => eligible(s, d, patika, p.minutes));
   const events: JourneyEvent[] = [];
   const chance = Math.min(85, p.minutes / 60 * 70);
@@ -139,7 +138,7 @@ export function finishJourney(cfg: Config, s: GameState, now: number): { to: str
   s.minute = Math.min(DAY_MINUTES, s.minute + total);
   s.energy = Math.max(0, s.energy - j.energy * (total / Math.max(1, j.minutes)));
   s.satiety = Math.max(0, s.satiety - h * 4);
-  s.location = j.to; s.journey = undefined; markSeen(s, j.to);
+  s.journey = undefined; arrive(s, j.to);
   log(s, `Vardın: ${place(j.to)!.name} (${Math.round(total)} dk yol).`, "info");
   return { to: j.to, minutes: total, gains };
 }

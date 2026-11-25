@@ -1,5 +1,7 @@
 // Kadim eşyalar: nadir bulunan, bulununca güçte ani sıçrama yaratan eşyalar.
 // Etkileri kalıcıdır ve doğrudan seviyeye eklenir (çalışmanın azalan getirisi işlemez).
+import { CHAPTER_RELICS } from "./chapters";
+
 export interface Relic { id: string; name: string; desc: string; boosts: Record<string, number>; source: string; journal?: string[] }
 export const RELICS: Record<string, Relic> = {
   kor_tasi: {
@@ -18,3 +20,4 @@ export const RELICS: Record<string, Relic> = {
     boosts: { mekansal: 4, gorus: 2, odak: 1 },
   },
 };
+Object.assign(RELICS, CHAPTER_RELICS);

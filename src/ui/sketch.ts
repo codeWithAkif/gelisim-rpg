@@ -85,6 +85,21 @@ export function wolfSketch(opts: { detail: number; marks: { name: string; at: [n
   return `<svg width="${width}" height="${h}" viewBox="0 0 200 130" aria-label="Kurt eskizi"><g fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${body}</g>${mk}</svg>`;
 }
 
+/** İnsan eskizi (savaş paneli ve gözlemler): zayıf noktalar 200 × 130 kutuda işaretlenir. */
+export function humanSketch(opts: { marks: { name: string; at: [number, number] }[]; width?: number; labels?: boolean; seed?: number }): string {
+  const { marks, width = 200, labels = true, seed = 3 } = opts;
+  const R = (pts: [number, number][], s: number) => `<path d="${roughPath(pts, 1, seed + s)}"/>`;
+  const body = `<circle cx="100" cy="17" r="10"/>` + R([[100, 27], [100, 32]], 1) + R([[88, 32], [112, 32], [110, 72], [90, 72]], 2).replace("/>", ' fill="rgba(42,39,34,.06)"/>')
+    + R([[90, 35], [72, 52], [60, 66]], 3) + R([[110, 35], [124, 52], [132, 64]], 4) + R([[95, 72], [93, 100], [92, 124]], 5) + R([[105, 72], [107, 100], [110, 124]], 6)
+    + R([[58, 66], [40, 40]], 7).replace("/>", ' stroke-width="2.5" opacity=".7"/>');
+  const mk = marks.map((m, i) => {
+    const x = m.at[0] * 200, y = m.at[1] * 130; const lx = x < 100 ? 4 : 140, ly = 12 + i * 15;
+    return `<g stroke="var(--red)" stroke-width="2" stroke-linecap="round"><path d="M${x - 5},${y - 5} L${x + 5},${y + 5} M${x + 5},${y - 5} L${x - 5},${y + 5}"/></g>
+      ${labels ? `<text x="${lx}" y="${ly}" font-family="var(--f-hand)" font-size="13" fill="var(--red)">${esc(m.name)}</text>` : ""}`;
+  }).join("");
+  return `<svg width="${width}" height="${Math.round(width * 0.65)}" viewBox="0 0 200 130" aria-label="İnsan eskizi"><g fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${body}</g>${mk}</svg>`;
+}
+
 /** Vücut çizimi: kas grupları seviyesine göre koyulaşır, uykuda işlenecek kazanç kesikli yeşil çizilir. */
 export function bodySketch(lv: (id: string) => number, pend: (id: string) => number, names: (id: string) => string): string {
   const s = 3;
