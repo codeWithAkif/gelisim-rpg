@@ -27,7 +27,7 @@ import { applySettings } from "./settings";
 import { sfx, buzz, ambience, unlockAudio } from "./feel";
 import { darkness } from "./daylight";
 import { searchHere, deliverRequest } from "../engine/explore";
-import { itemPic } from "./art";
+import { itemPic, artUrl } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 
@@ -132,8 +132,8 @@ export function startApp(root: HTMLElement) {
     }
     const show = (i: number) => {
       if (i >= fresh.length) { after?.(); return; }
-      const m = fresh[i]; sfx("page");
-      modal(`<p class="hand muted" style="margin:0">Yeni sayfa</p><h2>${esc(m.title)}</h2><p style="font-size:18px;line-height:1.5">${esc(m.text)}</p>`,
+      const m = fresh[i]; sfx("page"); const pic = artUrl("hikaye_" + m.id);
+      modal(`<p class="hand muted" style="margin:0">Yeni sayfa</p><h2>${esc(m.title)}</h2>${pic ? `<img class="story-art small" src="${pic}" alt="">` : ""}<p style="font-size:18px;line-height:1.5">${esc(m.text)}</p>`,
         [{ label: "Deftere işle", cls: "primary", fn: () => show(i + 1) }]);
     };
     show(0);

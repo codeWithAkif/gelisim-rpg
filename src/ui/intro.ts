@@ -1,8 +1,12 @@
 // Açılış: annenin defterinden sayfalar, sonra oyuncunun adını defterin ilk boş sayfasına yazması.
 import { INTRO, type IntroPage } from "../content/story";
 import { esc, roughPath } from "./sketch";
+import { artUrl } from "./art";
 
 export function art(kind: IntroPage["art"]): string {
+  // çizilmiş sahne görseli varsa o (hikaye_<tür>.webp), yoksa eskiz
+  const url = artUrl("hikaye_" + kind);
+  if (url) return `<img class="story-art" src="${url}" alt="">`;
   const g = (d: string, extra = "") => `<path d="${d}" ${extra}/>`;
   let body = "";
   if (kind === "defter") {

@@ -359,3 +359,7 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 .gx .qt-result { top: auto; bottom: 34px; }
 .anatomy { width: 100%; max-width: 360px; border-radius: 6px; filter: brightness(calc(1 - var(--dark, 0) * .3)); }
 .prep-name img { vertical-align: middle; }
+.story-art { display: block; width: 100%; max-width: 320px; max-height: 46vh; object-fit: cover; margin: 0 auto; border-radius: 4px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 75% at 50% 50%, #000 70%, transparent 100%); mask-image: radial-gradient(ellipse 75% 75% at 50% 50%, #000 70%, transparent 100%);
+  filter: brightness(calc(1 - var(--dark, 0) * .3)); }
+.story-art.small { max-height: 30vh; }
