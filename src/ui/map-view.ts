@@ -11,6 +11,7 @@ import { journeyPoint, journeyProgress, journeyLeftMs } from "../engine/journey"
 import { fmtDur } from "../engine/session";
 import { darkness } from "./daylight";
 import { isSeen } from "../engine/explore";
+import { placeActions, nextHint } from "../engine/actions";
 
 const W = 1000, H = 1400;
 function hash(x: number, y: number) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -182,6 +183,18 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     dyn.innerHTML = out;
   }
 
+  /** Buradayken yapılabilecekler: kart üzerinden doğrudan (İşler'e gitmeden). */
+  function hereActions(): string {
+    const acts = placeActions(cfg, s, s.location);
+    if (!acts.length) {
+      const n = nextHint(s);
+      return `<p class="hand blue" style="margin:0">Burada şu an yapacak bir şey yok.</p>${n ? `<div class="here-act next"><div><b>${esc(n.label)}</b>${n.sub ? `<div class="tiny muted">${esc(n.sub)}</div>` : ""}</div>${n.id ? `<button class="btn small blue" data-sel="${n.id}">Haritada göster</button>` : ""}</div>` : ""}`;
+    }
+    const n = acts.some(x => x.primary) ? null : nextHint(s);
+    const nextRow = n && n.id ? `<div class="here-act next"><div><b>${esc(n.label)}</b>${n.sub ? `<div class="tiny muted">${esc(n.sub)}</div>` : ""}</div><button class="btn small blue" data-sel="${n.id}">Göster</button></div>` : "";
+    return `<div class="here-acts">${nextRow}${acts.map(x => `<div class="here-act${x.primary ? " main" : ""}"><div><b>${esc(x.label)}</b>${x.sub ? `<div class="tiny muted">${esc(x.sub)}</div>` : ""}${x.disabled ? `<div class="tiny red">${esc(x.disabled)}</div>` : ""}</div>
+      <button class="btn small ${x.primary ? "red" : x.act === "accept" ? "primary" : ""}" data-act="${x.act}" data-id="${esc(x.id)}" ${x.disabled ? "disabled" : ""}>${x.act === "accept" ? "Üstlen" : x.act === "fight" ? "Hazırlan" : x.act === "walk" ? "Yap" : x.act === "deliver" ? "Ver" : x.act === "search" ? "Ara" : x.act === "market" ? "Aç" : "Başla"}</button></div>`).join("")}</div>`;
+  }
   function renderCard() {
     if (s.journey) {
       const j = s.journey; const now = Date.now(); const f = journeyProgress(s, now);
@@ -201,11 +214,18 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
       return;
     }
     const plan = at ? null : planTravel(cfg, s, sel);
-    card.innerHTML = `${placePic(sel, p.name, "art-thumb")}<div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${at ? "buradasın" : plan ? `${plan.minutes} dk yol · enerji −${plan.energy}` : ""}</span></div>
-      <p class="tiny" style="margin:0">${esc(p.desc)}</p>
-      ${people.length ? `<div class="row">${people.map(n => `<span class="person">${personPic(n, 30, known(n.id))}<span class="tiny">${known(n.id) ? esc(n.name) : "?"}</span></span>`).join("")}</div>` : ""}
-      ${quests.length && at ? `<div class="row">${quests.map(q => `<button class="btn small red" data-qa="${q.id}">${esc(q.battle ? "Meraya çık" : q.doneText ?? "Yap")}: ${esc(q.title)}</button>`).join("")}</div>` : quests.length ? `<p class="hand red" style="margin:0">Burada yapacağın iş var: ${quests.map(q => esc(q.title)).join(", ")}</p>` : ""}
-      <div class="row">${at ? `<span class="hand blue">Buradasın.</span>` : `<button class="btn primary" data-go="${sel}" ${plan?.ok && !busy ? "" : "disabled"}>Git</button>${plan && !plan.ok ? `<span class="lock">${esc(plan.reason ?? "")}</span>` : ""}`}</div>`;
+    const peopleRow = people.length ? `<div class="row">${people.map(n => `<span class="person">${personPic(n, 30, known(n.id))}<span class="tiny">${known(n.id) ? esc(n.name) : "?"}</span></span>`).join("")}</div>` : "";
+    card.classList.toggle("here", at);
+    card.innerHTML = at
+      // buradayken: önce yapılabilecekler, sonra yer bilgisi
+      ? `<div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">buradasın</span></div>
+        ${hereActions()}
+        ${peopleRow}
+        <details class="place-more"><summary class="tiny muted">Bu yer hakkında</summary>${placePic(sel, p.name, "art-thumb")}<p class="tiny" style="margin:0">${esc(p.desc)}</p></details>`
+      : `${placePic(sel, p.name, "art-thumb")}<div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${plan ? `${plan.minutes} dk yol · enerji −${plan.energy}` : ""}</span></div>
+        <p class="tiny" style="margin:0">${esc(p.desc)}</p>${peopleRow}
+        ${(() => { const acts = placeActions(cfg, s, sel); return acts.length ? `<p class="tiny" style="margin:0"><b>Orada:</b> ${acts.slice(0, 3).map(x => esc(x.label)).join(" · ")}${acts.length > 3 ? " …" : ""}</p>` : ""; })()}
+        <div class="row"><button class="btn primary" data-go="${sel}" ${plan?.ok && !busy ? "" : "disabled"}>Git</button>${plan && !plan.ok ? `<span class="lock">${esc(plan.reason ?? "")}</span>` : ""}</div>`;
   }
 
   /* ---------- sürükle, kıstır, tekerlek ---------- */
@@ -239,6 +259,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     if (b.dataset.go) hooks.onTravel(b.dataset.go);
     if (b.dataset.back) hooks.onTurnBack();
     if (b.dataset.qa) hooks.onAct("quest", b.dataset.qa);
+    if (b.dataset.sel) { sel = b.dataset.sel; const p = place(sel); if (p) zoomTo({ cx: p.x, cy: p.y + 55, w: Math.max(view.w, 300) }); renderCard(); drawDyn(); }
   });
   function zoomTo(t: View) {
     const from = { ...view }; const dur = 380 * animScale(); const t0 = performance.now();

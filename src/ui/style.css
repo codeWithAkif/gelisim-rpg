@@ -384,3 +384,13 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
   background: linear-gradient(90deg, rgba(42,39,34,.10), transparent 14px), var(--paper);
   box-shadow: inset -10px 0 14px -12px rgba(42,39,34,.35); }
 .leaf-num { position: absolute; right: 14px; bottom: 8px; font-family: var(--f-hand); color: var(--pencil); font-size: 18px; }
+.here-acts { display: flex; flex-direction: column; gap: 6px; }
+.here-act { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 8px; border: 1px dashed var(--paper-edge); border-radius: 6px; }
+.here-act > div { min-width: 0; }
+.here-act b { font-family: var(--f-hand); font-size: 18px; font-weight: 700; }
+.here-act.main { border: 1.5px solid var(--red); background: rgba(158,52,35,.06); }
+.here-act.next { border-color: var(--blue); }
+.here-act .btn { flex: none; }
+.map-card.here { max-height: 56%; }
+.place-more summary { cursor: pointer; }
+.place-more[open] { display: flex; flex-direction: column; gap: 4px; }

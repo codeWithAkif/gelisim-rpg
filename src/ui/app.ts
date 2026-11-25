@@ -218,6 +218,7 @@ export function startApp(root: HTMLElement) {
       }
       case "menu": persist(); openTitle(); break;
       case "search": doSearch(); break;
+      case "market": tab = "isler"; render(false); setTimeout(() => main.querySelector(".shop-item")?.closest("section")?.scrollIntoView({ behavior: "smooth" }), 50); break;
       case "toggle-done": ui.showDone = !ui.showDone; render(); break;
       case "deliver": {
         const r = deliverRequest(cfg, s, id);
