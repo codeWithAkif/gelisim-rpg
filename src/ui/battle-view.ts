@@ -7,6 +7,8 @@ import {
 } from "../engine/combat";
 import { TERRAIN, ENEMIES, type Terrain } from "../content/world";
 import { esc, wolfSketch } from "./sketch";
+import { spellOptions, previewSpell, castSpell, hexRange, areaHexes } from "../engine/magic";
+import { maxMana } from "../engine/derived";
 
 const SQ3 = Math.sqrt(3);
 const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -18,6 +20,8 @@ export function openBattle(cfg: Config, s: GameState, mapId: string, enemyIds: s
   const b = createBattle(cfg, s, mapId, enemyIds, (s.seed + s.day * 977 + s.minute) | 0, questId);
   let selected: string | null = enemies(b)[0]?.uid ?? null;
   let aim: string | undefined;
+  let spellSel: string | undefined;            // seçili büyü: hedefleme kipi
+  let spellTarget: [number, number] | undefined;
   let busy = false;
 
   const el = document.createElement("div");
@@ -109,7 +113,9 @@ export function openBattle(cfg: Config, s: GameState, mapId: string, enemyIds: s
     const r = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, r.width, r.height);
     const p = player(b); const sight = sightRange(cfg, s, b);
-    const reach = b.phase === "player" && !busy ? reachable(b, p, p.moveLeft) : new Map<string, number>();
+    const reach = b.phase === "player" && !busy && !spellSel ? reachable(b, p, p.moveLeft) : new Map<string, number>();
+    const sp = spellSel ? cfg.spell.get(spellSel) : undefined;
+    const area = sp && spellTarget ? new Set(areaHexes(b, sp, spellTarget[0], spellTarget[1]).map(([x, y]) => x + "," + y)) : new Set<string>();
     // önce yükseltilerin yan yüzü
     for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) {
       const t = b.tiles[y][x]; const { cx, cy } = center(x, y);
@@ -128,6 +134,20 @@ export function openBattle(cfg: Config, s: GameState, mapId: string, enemyIds: s
       if (reach.has(k)) {
         ctx.save(); hexPath(cx, cy + lift, sz * 0.92); ctx.clip(); ctx.strokeStyle = "rgba(46,76,122,.55)"; ctx.lineWidth = 1.2;
         for (let i = -sz * 2; i < sz * 2; i += 6) { ctx.beginPath(); ctx.moveTo(cx + i, cy + sz); ctx.lineTo(cx + i + sz, cy - sz); ctx.stroke(); }
+        ctx.restore();
+      }
+      if (sp && dist(p.x, p.y, x, y) <= hexRange(sp) && !(x === p.x && y === p.y)) {
+        hexPath(cx, cy + lift, sz * 0.86); ctx.setLineDash([3, 3]); ctx.strokeStyle = "rgba(158,52,35,.7)"; ctx.lineWidth = 1.3; ctx.stroke(); ctx.setLineDash([]);
+      }
+      if (area.has(k)) { hexPath(cx, cy + lift, sz * 0.9); ctx.fillStyle = "rgba(158,52,35,.28)"; ctx.fill(); }
+      if (b.walls[k]) {
+        hexPath(cx, cy + lift - 3, sz * 0.8); ctx.fillStyle = "rgba(200,228,240,.92)"; ctx.fill(); ctx.strokeStyle = "#4E7F8F"; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx - sz * 0.3, cy - sz * 0.2); ctx.lineTo(cx, cy + sz * 0.1); ctx.lineTo(cx + sz * 0.25, cy - sz * 0.3); ctx.stroke();
+      }
+      if (b.fire[k]) {
+        ctx.save(); ctx.strokeStyle = "#9E3423"; ctx.fillStyle = "rgba(214,108,40,.55)"; ctx.lineWidth = 1.4;
+        for (let i = 0; i < 3; i++) { const fx = cx + (i - 1) * sz * 0.32, fy = cy + lift + sz * 0.25, h = sz * (0.5 + (i % 2) * 0.2) * (0.85 + Math.sin(rainT / 6 + i + x) * 0.1);
+          ctx.beginPath(); ctx.moveTo(fx - sz * 0.14, fy); ctx.quadraticCurveTo(fx - sz * 0.18, fy - h * 0.5, fx, fy - h); ctx.quadraticCurveTo(fx + sz * 0.18, fy - h * 0.5, fx + sz * 0.14, fy); ctx.closePath(); ctx.fill(); ctx.stroke(); }
         ctx.restore();
       }
       const d = dist(p.x, p.y, x, y);
@@ -151,7 +171,7 @@ export function openBattle(cfg: Config, s: GameState, mapId: string, enemyIds: s
 
   function info() {
     const p = player(b);
-    el.querySelector("#bInfo")!.textContent = `${b.night ? "Gece" : "Gündüz"} · ${b.weather === "yagmur" ? "yağmur" : b.weather === "sis" ? "sis" : "açık"} · tur ${b.turn} · can ${p.hp}/${p.maxHp}`;
+    el.querySelector("#bInfo")!.textContent = `${b.night ? "Gece" : "Gündüz"} · ${b.weather === "yagmur" ? "yağmur" : b.weather === "sis" ? "sis" : "açık"} · tur ${b.turn} · can ${p.hp}/${p.maxHp}${s.knownElements.length ? ` · mana ${Math.floor(s.mana)}/${maxMana(cfg, s)}` : ""}`;
   }
   function renderPanel() {
     info();
@@ -159,7 +179,19 @@ export function openBattle(cfg: Config, s: GameState, mapId: string, enemyIds: s
     const terr = TERRAIN[b.tiles[p.y][p.x]];
     const atEdge = p.x === 0 || p.y === 0 || p.x === b.w - 1 || p.y === b.h - 1;
     let foe = "";
-    if (tgt) {
+    const spells = spellOptions(cfg, s);
+    const spellRow = spells.length && !spellSel ? `<div class="spellbar">${spells.map(o => `<button class="btn small blue" data-spell="${esc(o.spell.id)}" ${!o.ok || p.acted || busy ? "disabled" : ""} title="${esc(o.reason ?? "")}">${esc(o.spell.name)} · ${o.spell.manaCost ?? 0}</button>`).join("")}${spells.some(o => !o.ok) ? `<span class="muted" style="font-size:12px">${esc(spells.find(o => !o.ok)!.reason ?? "")}</span>` : ""}</div>` : "";
+    if (spellSel) {
+      const sp = cfg.spell.get(spellSel)!;
+      let pvHtml = `<p class="muted" style="margin:0;font-size:14px">Kırmızı kesikli altıgenlerden hedefi seç (menzil ${hexRange(sp)}).</p>`;
+      if (spellTarget) {
+        const pv = previewSpell(cfg, s, b, spellSel, spellTarget[0], spellTarget[1]);
+        pvHtml = `<div class="odds"><span>İsabet <b>%${Math.round(pv.hit)}</b></span><span>Bozulma <b>%${Math.round(pv.fizzle)}</b></span><span>Hasar <b>${pv.dmg[0]}–${pv.dmg[1]}</b></span>${pv.envPct ? `<span>Ortam <b>${pv.envPct > 0 ? "+" : ""}${Math.round(pv.envPct)}%</b></span>` : ""}</div>
+          <div class="muted" style="font-size:12px">${pv.targets.length ? `Hedefte: ${pv.targets.map(t => esc(t.name)).join(", ")}` : "Hedefte kimse yok."} ${esc(sp.effect ?? "")}</div>`;
+      }
+      foe = `<div class="entry-head"><span class="entry-title" style="font-size:22px">${esc(sp.name)}</span><span class="hpbar">${sp.manaCost ?? 0} mana · ${sp.castTime ?? 1} sn</span></div>${pvHtml}
+        <div class="row"><button class="btn primary" data-b="cast" ${!spellTarget ? "disabled" : ""}>Büyüyü yap</button><button class="btn" data-b="uncast">Vazgeç</button></div>`;
+    } else if (tgt) {
       const d = ENEMIES[tgt.def!]; const known = knownWeakPoints(cfg, s, d.id); const pv = previewAttack(cfg, s, b, tgt, aim);
       const adj = dist(p.x, p.y, tgt.x, tgt.y) === 1;
       const parts = pv.critParts.sort((a, c) => c.amount - a.amount).slice(0, 4).map(x => `${x.name} ${x.amount >= 0 ? "+" : ""}${x.amount.toFixed(1)}`).join(" · ");
@@ -171,7 +203,7 @@ export function openBattle(cfg: Config, s: GameState, mapId: string, enemyIds: s
         <div class="row"><button class="btn primary" data-b="attack" ${!adj || p.acted || busy ? "disabled" : ""}>${aim ? "Nişanlı vur" : "Saldır"}</button>
         <button class="btn blue" data-b="observe" ${p.acted || busy ? "disabled" : ""}>Gözle</button>${!adj ? `<span class="muted" style="font-size:14px">Vurmak için yanına git.</span>` : ""}</div>`;
     } else foe = `<p class="muted" style="margin:0;font-size:14px">Taralı altıgenlere dokunarak yürü, kurda dokunarak incele.${b.night || b.weather === "sis" ? " Görüşün kısıtlı; karanlıkta olanı göremezsin." : ""}</p>`;
-    panel.innerHTML = `<div class="battle-log">${b.log.slice(0, 2).map(t => `<div>${esc(t)}</div>`).join("")}</div>${foe}
+    panel.innerHTML = `<div class="battle-log">${b.log.slice(0, 2).map(t => `<div>${esc(t)}</div>`).join("")}</div>${foe}${spellRow}
       <div class="row" style="justify-content:space-between"><span class="muted" style="font-size:13px">Durduğun yer: ${esc(terr.name)} · hareket ${p.moveLeft}</span>
       <span class="row"><button class="btn small" data-b="end" ${busy ? "disabled" : ""}>Turu bitir</button>${atEdge ? `<button class="btn small red" data-b="flee" ${busy ? "disabled" : ""}>Geri çekil</button>` : ""}</span></div>`;
     if (!raining) draw();
@@ -206,6 +238,11 @@ export function openBattle(cfg: Config, s: GameState, mapId: string, enemyIds: s
     let best: [number, number] | null = null, bd = Infinity;
     for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) { const { cx, cy } = center(x, y); const d = Math.hypot(cx - mx, (cy - my) / geo.sy); if (d < bd) { bd = d; best = [x, y]; } }
     if (!best || bd > geo.size) return;
+    if (spellSel) {
+      const sp = cfg.spell.get(spellSel)!; const p = player(b);
+      if (dist(p.x, p.y, best[0], best[1]) <= hexRange(sp) && !(best[0] === p.x && best[1] === p.y)) { spellTarget = best; renderPanel(); }
+      return;
+    }
     const u = b.units.find(v => v.hp > 0 && !v.fled && v.x === best![0] && v.y === best![1]);
     if (u && u.side === "enemy" && visible(cfg, s, b, u)) { if (selected !== u.uid) aim = undefined; selected = u.uid; renderPanel(); return; }
     if (movePlayer(cfg, s, b, best[0], best[1])) afterAction();
@@ -213,11 +250,20 @@ export function openBattle(cfg: Config, s: GameState, mapId: string, enemyIds: s
   panel.addEventListener("click", e => {
     const t = (e.target as HTMLElement).closest("button"); if (!t || busy) return;
     if (t.dataset.aim) { aim = aim === t.dataset.aim ? undefined : t.dataset.aim; renderPanel(); return; }
+    if (t.dataset.spell) {
+      spellSel = t.dataset.spell; spellTarget = undefined;
+      const tg = b.units.find(u => u.uid === selected && u.hp > 0 && !u.fled);
+      const sp = cfg.spell.get(spellSel)!; const p = player(b);
+      if (tg && dist(p.x, p.y, tg.x, tg.y) <= hexRange(sp)) spellTarget = [tg.x, tg.y]; // seçili kurt menzildeyse hedef o
+      renderPanel(); return;
+    }
     const tgt = b.units.find(u => u.uid === selected);
     switch (t.dataset.b) {
       case "attack": if (tgt) { playerAttack(cfg, s, b, tgt, aim); persist(); afterAction(); } break;
       case "observe": if (tgt) { observe(cfg, s, b, tgt); persist(); afterAction(); } break;
-      case "end": endTurn(); break;
+      case "cast": if (spellSel && spellTarget) { castSpell(cfg, s, b, spellSel, spellTarget[0], spellTarget[1]); spellSel = undefined; spellTarget = undefined; persist(); afterAction(); } break;
+      case "uncast": spellSel = undefined; spellTarget = undefined; renderPanel(); break;
+      case "end": spellSel = undefined; spellTarget = undefined; endTurn(); break;
       case "flee": if (tryFlee(b)) finish(); break;
     }
   });

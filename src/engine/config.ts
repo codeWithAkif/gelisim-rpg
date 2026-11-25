@@ -34,7 +34,7 @@ export interface Importance { id: string; name: string; mult?: number; repGain?:
 export interface RepDim { id: string; name: string; desc?: string; min?: number; max?: number }
 export interface Element { id: string; name: string; color?: string; state?: string; temperature?: number; manaCost?: number; mastery?: string; desc?: string }
 export interface Combo { id: string; name: string; color?: string; kind?: string; state?: string; temperature?: number; manaMult?: number; minMastery?: number; desc?: string; ingredients: { id: string; ratio: number }[]; manaTotal?: number }
-export interface Spell { id: string; name: string; mastery?: string; minMastery?: number; manaCost?: number; castTime?: number; range?: number; area?: number; damage?: number; duration?: number; effect?: string; sources: { id: string; amount: number }[] }
+export interface Spell { id: string; name: string; desc?: string; mastery?: string; minMastery?: number; manaCost?: number; castTime?: number; range?: number; area?: number; damage?: number; duration?: number; focusNeed?: number; effect?: string; sources: { id: string; amount: number }[] }
 
 export interface GameConfig {
   attributeCategories: Category[]; environmentCategories: Category[];
@@ -51,6 +51,9 @@ export class Config {
   readonly env = new Map<string, Environment>();
   readonly item = new Map<string, Item>();
   readonly cat = new Map<string, Category>();
+  readonly spell = new Map<string, Spell>();
+  readonly element = new Map<string, Element>();
+  readonly combo = new Map<string, Combo>();
   constructor(data: GameConfig) {
     this.data = data;
     for (const a of data.attributes) this.attr.set(a.id, a);
@@ -59,6 +62,9 @@ export class Config {
     for (const e of data.environment) this.env.set(e.id, e);
     for (const i of data.items) this.item.set(i.id, i);
     for (const c of data.attributeCategories) this.cat.set(c.id, c);
+    for (const x of data.spells) this.spell.set(x.id, x);
+    for (const x of data.elements) this.element.set(x.id, x);
+    for (const x of data.combos) this.combo.set(x.id, x);
   }
   giver(id: string) { return this.data.reputation.givers.find(g => g.id === id); }
   importance(id: string) { return this.data.reputation.questImportance.find(i => i.id === id); }

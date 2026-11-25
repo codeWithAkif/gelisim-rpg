@@ -11,6 +11,8 @@ import { esc, ICONS } from "./sketch";
 import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, gainList, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
 import { checkForUpdates } from "../update";
+import { showIntro } from "./intro";
+import { advanceStory } from "../engine/story";
 
 type Tab = "defter" | "vucut" | "calis" | "isler";
 const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["calis", "Çalış"], ["isler", "İşler"]];
@@ -35,6 +37,19 @@ export function startApp(root: HTMLElement) {
     root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"));
     if (keepScroll) main.scrollTop = y; else main.scrollTop = 0;
   }
+  /** Yeni kilometre taşlarını sırayla "Yeni sayfa" olarak gösterir. */
+  function storyTick(after?: () => void) {
+    const fresh = advanceStory(s);
+    if (!fresh.length) { after?.(); return; }
+    persist(); render();
+    const show = (i: number) => {
+      if (i >= fresh.length) { after?.(); return; }
+      const m = fresh[i];
+      modal(`<p class="hand muted" style="margin:0">Yeni sayfa</p><h2>${esc(m.title)}</h2><p style="font-size:18px;line-height:1.5">${esc(m.text)}</p>`,
+        [{ label: "Deftere işle", cls: "primary", fn: () => show(i + 1) }]);
+    };
+    show(0);
+  }
   function modal(html: string, buttons: { label: string; cls?: string; fn: () => void }[]) {
     const bg = document.createElement("div"); bg.className = "modal-bg";
     bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${html}<div class="row">${buttons.map((b, i) => `<button class="btn ${b.cls ?? ""}" data-i="${i}">${esc(b.label)}</button>`).join("")}</div></div>`;
@@ -58,7 +73,7 @@ export function startApp(root: HTMLElement) {
         if ("error" in r) { toast(r.error); break; }
         const a = cfg.act.get(id)!;
         ui.lastResult = { title: a.name, gains: r.gains, at: Date.now(), note: r.tired ? "Yorgundun; verim düştü." : r.fee ? `${r.fee} bakır ders ücreti ödedin.` : undefined };
-        persist(); render(); main.scrollTo({ top: 0, behavior: "smooth" }); break;
+        persist(); render(); main.scrollTo({ top: 0, behavior: "smooth" }); storyTick(); break;
       }
       case "eat": { const it = GAME_ITEMS[id]; if (it && eat(s, id, it.satiety ?? 20)) { toast(`${it.name} yedin.`); persist(); render(); } break; }
       case "buy-bread": { if (s.money >= 2) { s.money -= 2; s.inventory.ekmek = (s.inventory.ekmek ?? 0) + 1; s.minute = Math.min(16 * 60, s.minute + 10); toast("Bir somun ekmek aldın."); persist(); render(); } break; }
@@ -69,7 +84,7 @@ export function startApp(root: HTMLElement) {
         modal(`<h2>Gün ${s.day - 1} bitti</h2><p class="lede">${rep.recovery < 1 ? "Aç yattın; vücudun tam dinlenemedi." : "Tok ve yorgun uyudun. Vücut gece çalıştı."}</p>
           <h3>Gece işlenen</h3>${gainList(cfg, rep.applied, 8)}
           ${Object.keys(rep.decayed).length ? `<h3 class="red">Körelen</h3><p class="muted" style="margin:0">${Object.entries(rep.decayed).map(([k, v]) => `${esc(cfg.attr.get(k)?.name ?? k)} −${v.toFixed(2)}`).join(", ")}</p>` : ""}`,
-          [{ label: "Güne başla", cls: "primary", fn: () => {} }]);
+          [{ label: "Güne başla", cls: "primary", fn: () => storyTick() }]);
         break;
       }
       case "accept": acceptQuest(s, id); persist(); render(); toast("İşi üstlendin."); break;
@@ -77,7 +92,7 @@ export function startApp(root: HTMLElement) {
         const r = walkQuest(cfg, s, id);
         if ("error" in r) { toast(r.error); break; }
         persist(); render();
-        modal(`<h2>${esc(QUESTS.find(q => q.id === id)!.title)}</h2><p>${esc(r.note)}</p><p class="hand blue">${Object.entries(r.items).map(([k, n]) => `${itemName(cfg, k)}${n > 1 ? " ×" + n : ""}`).join(", ")} · tanınırlık +${r.rep}</p>`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
+        modal(`<h2>${esc(QUESTS.find(q => q.id === id)!.title)}</h2><p>${esc(r.note)}</p><p class="hand blue">${Object.entries(r.items).map(([k, n]) => `${itemName(cfg, k)}${n > 1 ? " ×" + n : ""}`).join(", ")}${Object.keys(r.items).length ? " · " : ""}tanınırlık +${+r.rep.toFixed(1)}</p>`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
         break;
       }
       case "fight": {
@@ -87,12 +102,12 @@ export function startApp(root: HTMLElement) {
           let extra = "";
           if (o.result === "won") {
             const r = completeQuest(cfg, s, id);
-            extra = `<h3>Ödül</h3><p>${esc(r.note)}</p><p class="hand blue">${Object.entries(r.items).map(([k, n]) => `${itemName(cfg, k)}${n > 1 ? " ×" + n : ""}`).join(", ")} · tanınırlık +${r.rep}</p>`;
+            extra = `<h3>Ödül</h3><p>${esc(r.note)}</p><p class="hand blue">${Object.entries(r.items).map(([k, n]) => `${itemName(cfg, k)}${n > 1 ? " ×" + n : ""}`).join(", ")}${r.money ? ` · ${r.money} bakır` : ""} · tanınırlık +${+r.rep.toFixed(1)}</p>`;
           }
           persist(); render();
           modal(`<h2>${o.result === "won" ? "Kurtlar uzaklaştı" : o.result === "fled" ? "Geri çekildin" : "Yenildin"}</h2>
             <p class="lede">${o.result === "lost" ? "Hasan seni yaralı hâlde bulup köye taşıdı. Dinlenmeden tekrar deneme." : o.result === "fled" ? "Kurtlar hâlâ orada. Hazırlanıp tekrar dene." : "Hasan uzaktan izliyordu; koşarak geldi."}</p>
-            <h3>Savaşta gelişen</h3>${gainList(cfg, o.gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => {} }]);
+            <h3>Savaşta gelişen</h3>${gainList(cfg, o.gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
         }, persist);
         break;
       }
@@ -104,15 +119,20 @@ export function startApp(root: HTMLElement) {
       case "reset":
         modal(`<h2>Yeni oyun</h2><p>Bu defterdeki her şey silinecek: gelişimin, tanıdıkların, eşyaların.</p>`, [
           { label: "Vazgeç", fn: () => {} },
-          { label: "Sil ve baştan başla", cls: "red", fn: () => { reset(); s = newGame(cfg); s.hp = maxHp(cfg, s); persist(); tab = "defter"; render(false); } },
+          { label: "Sil ve baştan başla", cls: "red", fn: () => { reset(); s = newGame(cfg); s.hp = maxHp(cfg, s); persist(); tab = "defter"; render(false); beginIntro(); } },
         ]);
         break;
     }
   });
 
+  function beginIntro() {
+    showIntro(name => { s.name = name; s.introDone = true; persist(); render(false); storyTick(); });
+  }
+
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
   render(false);
   persist();
+  if (!s.introDone) beginIntro(); else storyTick();
 
   // açılışta güncelleme kontrolü (yalnız telefonda; internet yoksa sessizce geçer)
   let veil: HTMLElement | null = null;

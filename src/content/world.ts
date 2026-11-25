@@ -66,6 +66,7 @@ export interface QuestDef {
   text: string; minutes: number; battle?: { enemies: string[]; map: string };
   rewards: { items?: Record<string, number>; money?: number; note: string };
   requires?: string[];
+  repeatable?: boolean;
 }
 export const QUESTS: QuestDef[] = [
   {
@@ -78,6 +79,17 @@ export const QUESTS: QuestDef[] = [
     text: "İki kurt her gece bir kuzu kapıyor. Hasan yalvarıyor: 'Onları uzak tut, elimde ne varsa senin.'",
     battle: { enemies: ["kurt", "kurt"], map: "mera" },
     rewards: { items: { temiz_giysi: 1, el_yapimi_bicak: 1 }, note: "Temiz giysi ve kendi yaptığı bıçak. Bir çoban için büyük fedakârlık." },
+  },
+  {
+    id: "annenin_izi", title: "Annenin izi", giverNpc: "ayse", importance: "onemli", minutes: 60, requires: ["kurt"],
+    text: "Muhtar Ayşe, on iki yıl önce köye gelen defterli kadının Şifacı Zehra'ya bir şey bıraktığını söylüyor. Zehra köyün en üst evinde, otların arasında yaşıyor.",
+    rewards: { note: "Zehra'nın sandığından annenin elinden çıkmış bir sayfa." },
+  },
+  {
+    id: "devriye", title: "Meraya devriye", giverNpc: "hasan", importance: "basit", minutes: 60, requires: ["kurt"], repeatable: true,
+    text: "Kurtlar tamamen gitmedi. Hasan geceleri meraya bir göz atmanı istiyor; karşılığında ne bulursa paylaşacak.",
+    battle: { enemies: ["kurt", "kurt"], map: "mera" },
+    rewards: { items: { peynir: 1 }, money: 1, note: "Bir parça peynir ve bir bakır." },
   },
 ];
 

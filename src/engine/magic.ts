@@ -1,0 +1,134 @@
+// Büyü: fizik kurallarına dayanır. Büyüyü yapabilmek için elementin defter sayfasını bilmek,
+// ustalığın yetmesi ve mana gerekir. Odak dağılırsa büyü bozulur. Ortam elementi güçlendirir ya da
+// zayıflatır (yağmurda ateş sönük, kuru otta yangın büyür).
+import type { Config, Spell } from "./config";
+import type { GameState } from "./state";
+import { effectiveAttr, envPct } from "./derived";
+import { type Battle, type Unit, player, enemies, dist, neighbors, unitAt, ctxAt, moraleCheck } from "./combat";
+import { Rng } from "./rng";
+import { ENEMIES, TERRAIN, type Terrain } from "../content/world";
+
+/** Büyülerin fiziksel sonuçları (config'deki "Fiziksel etki" metninin oyun karşılığı). */
+export const SPELL_FX: Record<string, { ignite?: boolean; wall?: number; slow?: number; blind?: number; chain?: boolean; mud?: boolean }> = {
+  ates_topu: { ignite: true },
+  magma_akintisi: { ignite: true, slow: 2 },
+  buz_duvari: { wall: 4 },
+  buhar_perdesi: { blind: 2 },
+  sis_ortusu: { blind: 3 },
+  simsek_zinciri: { chain: true },
+  elektrik_golu: { chain: true, slow: 1 },
+  camur_tuzagi: { mud: true, slow: 3 },
+  yildirim_firtinasi: { chain: true },
+};
+const IGNITE: Partial<Record<Terrain, number>> = { uzun_ot: 90, agac: 80, cayir: 45 };
+
+/** Bir kaynağın (element ya da birleşim) dayandığı temel elementler. */
+export function baseElements(cfg: Config, id: string, seen = new Set<string>()): string[] {
+  if (cfg.element.has(id)) return [id];
+  const c = cfg.combo.get(id); if (!c || seen.has(id)) return [];
+  seen.add(id);
+  return [...new Set(c.ingredients.flatMap(i => baseElements(cfg, i.id, seen)))];
+}
+export const hexRange = (sp: Spell) => Math.max(1, Math.round((sp.range ?? 5) / 5));
+export const hexArea = (sp: Spell) => Math.floor((sp.area ?? 0) / 5);
+const mastery = (cfg: Config, s: GameState, sp: Spell) => sp.mastery ? (s.attrs[sp.mastery]?.level ?? 0) : 0;
+
+export interface SpellOption { spell: Spell; known: boolean; ok: boolean; reason?: string }
+/** Defterde sayfası olan elementlere dayanan büyüler; yapılabilir olanlar ok. */
+export function spellOptions(cfg: Config, s: GameState): SpellOption[] {
+  return cfg.data.spells.map(sp => {
+    const els = sp.sources.flatMap(src => baseElements(cfg, src.id));
+    const known = els.length > 0 && els.every(e => s.knownElements.includes(e));
+    if (!known) return { spell: sp, known, ok: false, reason: "Defterinde gereken sayfa yok" };
+    const m = mastery(cfg, s, sp), need = sp.minMastery ?? 0;
+    if (m < need) return { spell: sp, known, ok: false, reason: `${cfg.attr.get(sp.mastery ?? "")?.name ?? "Ustalık"} ${m.toFixed(1)}/${need}` };
+    if (s.mana < (sp.manaCost ?? 0)) return { spell: sp, known, ok: false, reason: `Mana yetmiyor (${Math.floor(s.mana)}/${sp.manaCost})` };
+    return { spell: sp, known, ok: true };
+  }).filter(o => o.known);
+}
+
+/** Büyünün elementlerine ortamın yaptığı yüzde etkisi. */
+function spellEnvPct(cfg: Config, s: GameState, b: Battle, sp: Spell): number {
+  const ctx = ctxAt(cfg, s, b, player(b));
+  const els = new Set(sp.sources.flatMap(src => [src.id, ...baseElements(cfg, src.id)]));
+  let p = envPct(cfg, ctx, sp.id);
+  for (const e of els) p += envPct(cfg, ctx, e);
+  return p;
+}
+
+export function areaHexes(b: Battle, sp: Spell, tx: number, ty: number): [number, number][] {
+  const r = hexArea(sp); const out: [number, number][] = [];
+  for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) if (dist(x, y, tx, ty) <= r) out.push([x, y]);
+  return out;
+}
+
+export interface SpellPreview { inRange: boolean; hit: number; fizzle: number; dmg: [number, number]; envPct: number; targets: Unit[] }
+export function previewSpell(cfg: Config, s: GameState, b: Battle, spellId: string, tx: number, ty: number): SpellPreview {
+  const sp = cfg.spell.get(spellId)!; const p = player(b);
+  const m = mastery(cfg, s, sp); const ctx = ctxAt(cfg, s, b, p);
+  const inRange = dist(p.x, p.y, tx, ty) <= hexRange(sp) && !(tx === p.x && ty === p.y);
+  const area = areaHexes(b, sp, tx, ty);
+  const targets = enemies(b).filter(e => area.some(([x, y]) => x === e.x && y === e.y));
+  const single = hexArea(sp) === 0;
+  const ev = targets[0] ? ENEMIES[targets[0].def!].evasion : 0;
+  const hit = single ? Math.max(15, Math.min(97, 70 + effectiveAttr(cfg, s, "mekansal", ctx) * 0.4 + m * 0.4 - ev * 0.5)) : 100;
+  const adjacent = enemies(b).some(e => dist(e.x, e.y, p.x, p.y) === 1);
+  const fizzle = Math.max(0, Math.min(80, ((sp.focusNeed ?? 10) - effectiveAttr(cfg, s, "odak", ctx) - m * 0.3) * 2.5 + (adjacent ? 15 : 0) + (s.energy < 25 ? 10 : 0)));
+  const ep = spellEnvPct(cfg, s, b, sp);
+  const base = (sp.damage ?? 0) * (0.55 + m / 50) * Math.max(0, 1 + ep / 100);
+  return { inRange, hit, fizzle, dmg: [Math.round(base * 0.85), Math.round(base * 1.15)], envPct: ep, targets };
+}
+
+/** Büyüyü yapar. Mana bozulsa da yarısı harcanır; deneme ustalığı yine geliştirir. */
+export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string, tx: number, ty: number): string | null {
+  const sp = cfg.spell.get(spellId); const p = player(b);
+  if (!sp || b.phase !== "player" || p.acted) return null;
+  const opt = spellOptions(cfg, s).find(o => o.spell.id === spellId);
+  if (!opt?.ok) return null;
+  const pv = previewSpell(cfg, s, b, spellId, tx, ty);
+  if (!pv.inRange) return null;
+  const rng = new Rng(b.seed); const fx = SPELL_FX[sp.id] ?? {};
+  p.acted = true; if ((sp.castTime ?? 1) > 2) p.moveLeft = 0;
+  b.stats.casts++; if (sp.mastery) b.stats.castMastery[sp.mastery] = (b.stats.castMastery[sp.mastery] ?? 0) + 1;
+  s.energy = Math.max(0, s.energy - 3);
+  let text: string;
+  if (rng.chance(pv.fizzle)) {
+    s.mana = Math.max(0, s.mana - Math.ceil((sp.manaCost ?? 0) / 2));
+    text = `${sp.name} elinde dağıldı; odağın kaydı.`;
+  } else {
+    s.mana = Math.max(0, s.mana - (sp.manaCost ?? 0));
+    const parts: string[] = [];
+    const single = hexArea(sp) === 0;
+    for (const e of pv.targets) {
+      if (single && !rng.chance(pv.hit)) { parts.push(`${e.name} son anda sıçradı.`); continue; }
+      const dmg = rng.int(pv.dmg[0], pv.dmg[1]);
+      if (dmg > 0) { e.hp = Math.max(0, e.hp - dmg); parts.push(`${e.name} ${dmg} hasar aldı.`); }
+      if (fx.slow) e.slowed = Math.max(e.slowed, fx.slow);
+      if (fx.blind) e.blind = Math.max(e.blind ?? 0, fx.blind);
+      if (fx.ignite && b.weather !== "yagmur") e.scared = true; // kurtlar ateşten korkar; yağmurda alev cılız
+      if (fx.chain) {
+        const wet = b.weather === "yagmur" || ["su", "camur"].includes(b.tiles[e.y][e.x]);
+        for (const o of enemies(b)) if (o !== e && dist(o.x, o.y, e.x, e.y) === 1) {
+          const cd = Math.round(dmg * (wet ? 0.8 : 0.5)); o.hp = Math.max(0, o.hp - cd); parts.push(`Şimşek ${o.name}'e atladı: ${cd}.`);
+          parts.push(moraleCheck(b, o).trim());
+        }
+      }
+      const m = moraleCheck(b, e); if (m) parts.push(m.trim());
+    }
+    for (const [x, y] of areaHexes(b, sp, tx, ty)) {
+      const k = x + "," + y;
+      if (fx.ignite && b.weather !== "yagmur" && rng.chance(IGNITE[b.tiles[y][x]] ?? 0)) { b.fire[k] = 3; parts.push(`${TERRAIN[b.tiles[y][x]].name} tutuştu.`); }
+      if (fx.mud && !TERRAIN[b.tiles[y][x]].blocks) b.tiles[y][x] = "camur";
+    }
+    if (fx.wall) {
+      const spots = [[tx, ty] as [number, number], ...neighbors(b, tx, ty)].filter(([x, y]) => !unitAt(b, x, y) && !TERRAIN[b.tiles[y][x]].blocks).slice(0, 3);
+      spots.forEach(([x, y]) => { b.walls[x + "," + y] = fx.wall!; });
+      parts.push("Önünde buzdan bir duvar yükseldi.");
+    }
+    if (b.weather === "yagmur" && fx.ignite) parts.push("Yağmur alevi bastırıyor.");
+    text = `${sp.name}! ${parts.filter(Boolean).join(" ") || "Boşluğa çarptı."}`;
+  }
+  b.seed = rng.seed; b.log.unshift(text);
+  if (player(b).hp <= 0) b.phase = "lost"; else if (enemies(b).length === 0) b.phase = "won";
+  return text;
+}

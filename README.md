@@ -5,6 +5,16 @@ Klasik level/XP yok: koştukça daha hızlı koşarsın, resim dersi aldıkça g
 anatomi bildikçe kritik vuruşların artar. Kaslar uykuda gelişir; aç uyursan yarım gelişir.
 Arayüz, karakterin kendi defteri gibi çizilir.
 
+## Hikâye
+
+Annen bir Ölçer'di: büyüyü dua değil hesap olarak gören bir loncanın üyesi. On iki yıl önce başkent Ardıç
+bir gecede yandı (Kül Yangını); kral suçu Ölçerlere yükledi, büyüyü yasakladı, annen kayboldu. O günden beri
+kışlar uzuyor. Annenin defterindeki son cümle: "Isı kaybolmaz. Bir yere gider."
+Köylüden krala doğru tanınarak ısının nereye gittiğini ve annene ne olduğunu bulursun.
+
+Bölümler tanınırlık basamaklarını izler: Taşpınar (köy) → Karaçam (tüccar şehri) → Ayazkale (lordun kalesi) →
+Ardıç (başkent). Kilometre taşları `src/content/story.ts` içinde.
+
 ## Telefona kurulum ve güncelleme
 
 **İlk kurulum:** telefonda şu bağlantıyı aç, APK'yı indir ve kur (tarayıcıya "bilinmeyen kaynaklardan yükleme" izni vermen istenebilir):

@@ -50,3 +50,8 @@ export function derived(cfg: Config, s: GameState, id: string, ctx: Context = {}
   v = Math.max(d.min ?? -Infinity, Math.min(d.max ?? Infinity, v));
   return { value: v, base: d.base ?? 0, terms, envPct: ep, items };
 }
+
+/** Büyü gücü havuzu: Büyü kapasitesi özelliğinden. */
+export function maxMana(cfg: Config, s: GameState): number {
+  return Math.round(10 + effectiveAttr(cfg, s, "mana") * 1.5);
+}

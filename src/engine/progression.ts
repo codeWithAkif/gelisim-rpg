@@ -3,6 +3,7 @@
 import type { Config } from "./config";
 import { type GameState, DAY_MINUTES, log, minutesLeft, repOf } from "./state";
 import { teacherOf } from "../content/world";
+import { maxMana } from "./derived";
 
 /** Fiziksel kategori kazançları uykuda işlenir. */
 export const DEFERRED_CATEGORIES = new Set(["fiziksel"]);
@@ -36,6 +37,8 @@ export function canDoActivity(cfg: Config, s: GameState, actId: string): Activit
   if (dur > minutesLeft(s)) return { ok: false, reason: "Bugün buna vakit kalmadı" };
   const fat = act.fatigue ?? 0;
   if (fat > 0 && s.energy < Math.min(fat, 10)) return { ok: false, reason: "Çok yorgunsun" };
+  const el = act.params?.element;
+  if (typeof el === "string" && !s.knownElements.includes(el)) return { ok: false, reason: "Defterinde bu sayfa yok" };
   let fee = 0;
   if (act.kind === "ders") {
     const t = teacherOf(actId);
@@ -107,6 +110,7 @@ export function sleep(cfg: Config, s: GameState): SleepReport {
   }
   const energy = s.satiety >= 40 ? 100 : s.satiety >= 15 ? 85 : 65;
   s.energy = energy;
+  s.mana = maxMana(cfg, s);
   s.satiety = Math.max(0, s.satiety - 30);
   s.day += 1; s.minute = 0;
   const parts = summarize(cfg, applied);

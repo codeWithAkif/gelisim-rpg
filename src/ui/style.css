@@ -53,7 +53,7 @@ button { font: inherit; color: inherit; }
 .status .day { font-family: var(--f-hand); font-size: 26px; line-height: 1; font-weight: 700; }
 .status .day small { font-size: 19px; font-weight: 500; color: var(--ink-soft); margin-left: 6px; }
 .status .money { font-family: var(--f-hand); font-size: 21px; text-align: right; }
-.meters { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 6px; }
+.meters { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin-top: 6px; }
 .meter { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--ink-soft); letter-spacing: .02em; }
 .meter b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
 
@@ -165,3 +165,23 @@ h3 { font-size: 22px; }
 .hpbar { font-size: 13px; color: var(--ink-soft); }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* açılış */
+.intro { position: fixed; inset: 0; z-index: 60; background: var(--paper); display: flex; justify-content: center; overflow-y: auto; }
+.intro-page { width: 100%; max-width: 520px; min-height: 100%; padding: calc(var(--safe-top) + 28px) 22px calc(var(--safe-bottom) + 22px); display: flex; flex-direction: column; gap: 14px; animation: pop .4s ease-out; }
+.intro-art { display: flex; justify-content: center; padding: 10px 0 4px; }
+.intro h1 { font-size: 40px; }
+.intro-text { font-size: 19px; line-height: 1.55; margin: 0; }
+.intro-foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 18px; }
+.name-input { font-family: var(--f-hand); font-size: 32px; background: transparent; border: 0; border-bottom: 1.5px solid var(--ink); padding: 4px 2px; color: var(--blue); width: 100%; outline: none; -webkit-user-select: text; user-select: text; }
+.name-input:focus { border-bottom-color: var(--blue); }
+
+/* hikâye */
+.story-step { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; padding: 4px 0; }
+.story-step .mk { font-family: var(--f-hand); font-size: 22px; line-height: 1; }
+.story-step.done .t { text-decoration: line-through; text-decoration-color: var(--pencil); color: var(--ink-soft); }
+.story-step.now .t { font-weight: 700; }
+.story-step .h { font-size: 14px; color: var(--blue); font-style: italic; }
+.page-sheet { border-left: 3px double var(--red); padding: 4px 0 4px 12px; }
+.page-sheet .ttl { font-family: var(--f-hand); font-size: 24px; font-weight: 700; }
+.spellbar { display: flex; gap: 6px; flex-wrap: wrap; }

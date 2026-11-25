@@ -3,7 +3,7 @@
 // Kritik vuruş: silah ustalığı + alışkınlık + türe özel anatomi + gözlem + pozisyon.
 import type { Config } from "./config";
 import { type GameState, hourOf, log } from "./state";
-import { derived, effectiveAttr, type Context } from "./derived";
+import { derived, effectiveAttr, maxMana, type Context } from "./derived";
 import { Rng } from "./rng";
 import { applyGain, realUse, summarize, type GainReport } from "./progression";
 import { ENEMIES, GAME_ITEMS, MAPS, MAP_CHARS, TERRAIN, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, type Terrain, type WeakPoint } from "../content/world";
@@ -13,6 +13,7 @@ export interface Unit {
   uid: string; side: "player" | "enemy"; def?: string; name: string;
   x: number; y: number; hp: number; maxHp: number;
   moveLeft: number; acted: boolean; slowed: number; fled?: boolean;
+  blind?: number; scared?: boolean;
 }
 export interface Battle {
   w: number; h: number; tiles: Terrain[][];
@@ -20,7 +21,9 @@ export interface Battle {
   units: Unit[]; turn: number;
   phase: "player" | "enemy" | "won" | "lost" | "fled";
   seed: number; log: string[];
-  stats: { attacks: number; hits: number; crits: number; observed: number; dmgTaken: number; moves: number };
+  stats: { attacks: number; hits: number; crits: number; observed: number; dmgTaken: number; moves: number; casts: number; castMastery: Record<string, number> };
+  fire: Record<string, number>;   // "x,y" → kalan yanma turu
+  walls: Record<string, number>;  // "x,y" → kalan buz duvarı turu
   questId?: string;
 }
 
@@ -54,6 +57,7 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
   const weather: Weather = roll < 0.25 ? "yagmur" : roll < 0.4 ? "sis" : "acik";
   const hpMax = maxHp(cfg, s);
   if (!s.hp || s.hp > hpMax) s.hp = hpMax;
+  if (s.mana < 0) s.mana = maxMana(cfg, s);
   const units: Unit[] = [{ uid: "p", side: "player", name: "Sen", x: m.player[0], y: m.player[1], hp: s.hp, maxHp: hpMax, moveLeft: 0, acted: false, slowed: 0 }];
   enemyIds.forEach((id, i) => {
     const d = ENEMIES[id]; const [x, y] = m.enemies[i % m.enemies.length];
@@ -61,7 +65,8 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
   });
   const b: Battle = {
     w: tiles[0].length, h: tiles.length, tiles, weather, night: h >= 20 || h < 6, units, turn: 1, phase: "player",
-    seed: rng.seed, log: [], stats: { attacks: 0, hits: 0, crits: 0, observed: 0, dmgTaken: 0, moves: 0 }, questId,
+    seed: rng.seed, log: [], stats: { attacks: 0, hits: 0, crits: 0, observed: 0, dmgTaken: 0, moves: 0, casts: 0, castMastery: {} }, questId,
+    fire: {}, walls: {},
   };
   startPlayerTurn(cfg, s, b);
   b.log.unshift(`${b.night ? "Gece" : "Gündüz"}, ${weather === "yagmur" ? "yağmur yağıyor" : weather === "sis" ? "sis var" : "hava açık"}.`);
@@ -146,6 +151,8 @@ export function reachable(b: Battle, u: Unit, budget: number): Map<string, numbe
     q.sort((a, c) => c[2] - a[2]); const [x, y, left] = q.shift()!;
     for (const [nx, ny] of neighbors(b, x, y)) {
       const t = TERRAIN[b.tiles[ny][nx]]; if (t.blocks) continue;
+      if (b.walls[key(nx, ny)]) continue;
+      if (u.side === "enemy" && b.fire[key(nx, ny)]) continue; // hayvanlar ateşe girmez
       const occ = unitAt(b, nx, ny); if (occ && occ !== u) continue;
       const rem = left - t.cost; if (rem < 0) continue;
       if ((best.get(key(nx, ny)) ?? -1) < rem) { best.set(key(nx, ny), rem); q.push([nx, ny, rem]); }
@@ -186,10 +193,7 @@ export function playerAttack(cfg: Config, s: GameState, b: Battle, target: Unit,
     if (crit) { dmg = Math.round(dmg * 1.8); b.stats.crits++; if (wp?.effect === "slow") target.slowed = 3; }
     target.hp = Math.max(0, target.hp - dmg);
     res = { hit: true, crit, dmg, text: crit ? `Kritik! ${wp ? wp.name + " hedefine " : ""}${dmg} hasar.` : `${target.name} ${dmg} hasar aldı.` };
-    // moral: sürüden biri düşünce ya da kaçınca diğerleri daha erken kaçar
-    const packBroken = b.units.some(u => u.side === "enemy" && u !== target && (u.hp <= 0 || u.fled));
-    if (target.hp > 0 && target.hp <= target.maxHp * (packBroken ? 0.6 : 0.4)) { target.fled = true; res.text += ` ${target.name} kuyruğunu kısıp kaçtı.`; }
-    else if (target.hp === 0) res.text += ` ${target.name} yere serildi.`;
+    res.text += moraleCheck(b, target);
   }
   b.seed = rng.seed; b.log.unshift(res.text);
   checkEnd(b);
@@ -218,6 +222,40 @@ export function tryFlee(b: Battle): boolean {
   return false;
 }
 
+/** Moral: sürüden biri düşünce, kaçınca ya da ateşle karşılaşınca kurtlar daha erken kaçar. */
+export function moraleCheck(b: Battle, target: Unit): string {
+  if (target.hp === 0) return ` ${target.name} yere serildi.`;
+  const packBroken = b.units.some(u => u.side === "enemy" && u !== target && (u.hp <= 0 || u.fled));
+  const limit = target.scared ? 0.7 : packBroken ? 0.6 : 0.4;
+  if (target.hp <= target.maxHp * limit) { target.fled = true; return ` ${target.name} kuyruğunu kısıp kaçtı.`; }
+  return "";
+}
+
+/** Tur başı ortam: yanan alanlar hasar verir ve yayılır, buz duvarları erir. */
+const FLAMMABLE: Partial<Record<Terrain, number>> = { uzun_ot: 30, agac: 25, cayir: 8 };
+export function tickEnvironment(b: Battle, rng: Rng): string[] {
+  const out: string[] = []; const rain = b.weather === "yagmur";
+  for (const u of b.units) {
+    if (u.hp <= 0 || u.fled || !b.fire[u.x + "," + u.y]) continue;
+    u.hp = Math.max(0, u.hp - 4); if (u.side === "player") b.stats.dmgTaken += 4; else u.scared = true;
+    out.push(`${u.name} alevlerin içinde: 4 hasar.` + (u.side === "enemy" ? moraleCheck(b, u) : ""));
+  }
+  const next: Record<string, number> = {};
+  for (const [k, left] of Object.entries(b.fire)) {
+    const [x, y] = k.split(",").map(Number);
+    if (!rain) for (const [nx, ny] of neighbors(b, x, y)) {
+      const nk = nx + "," + ny, pct = FLAMMABLE[b.tiles[ny][nx]] ?? 0;
+      if (!b.fire[nk] && !next[nk] && rng.chance(pct)) next[nk] = 3;
+    }
+    const l = left - (rain ? 2 : 1); if (l > 0) next[k] = Math.max(next[k] ?? 0, l);
+    else if (b.tiles[y][x] !== "kaya" && b.tiles[y][x] !== "su") b.tiles[y][x] = "cayir"; // yanan ot küle döner
+  }
+  if (Object.keys(next).length > Object.keys(b.fire).length) out.push("Ateş otlara yayılıyor.");
+  b.fire = next;
+  for (const k of Object.keys(b.walls)) { if (--b.walls[k] <= 0) delete b.walls[k]; }
+  return out;
+}
+
 function checkEnd(b: Battle) {
   if (player(b).hp <= 0) b.phase = "lost";
   else if (enemies(b).length === 0) b.phase = "won";
@@ -230,8 +268,10 @@ export function startPlayerTurn(cfg: Config, s: GameState, b: Battle) {
 /** Düşmanların turu. Her adım için olay listesi döner (arayüz canlandırsın diye). */
 export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
   if (b.phase !== "player" && b.phase !== "enemy") return [];
-  b.phase = "enemy"; const rng = new Rng(b.seed); const out: string[] = []; const p = player(b);
-  for (const e of enemies(b)) {
+  b.phase = "enemy"; const rng = new Rng(b.seed); const p = player(b);
+  const out: string[] = tickEnvironment(b, rng);
+  checkEnd(b);
+  for (const e of b.phase === "enemy" ? enemies(b) : []) {
     const d = ENEMIES[e.def!];
     if (dist(e.x, e.y, p.x, p.y) > 1) {
       const r = reachable(b, e, moveRange(cfg, s, b, e));
@@ -241,16 +281,18 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
         const dd = dist(x, y, p.x, p.y);
         // kurtlar yandan dolanır: başka kurdun yanına değil, oyuncunun farklı tarafına
         const crowd = enemies(b).filter(o => o !== e && dist(o.x, o.y, x, y) <= 1).length;
-        const score = dd * 10 + crowd * 3 + (TERRAIN[b.tiles[y][x]].env === "camur" ? 2 : 0);
+        const nearFire = neighbors(b, x, y).some(([fx, fy]) => b.fire[fx + "," + fy]) ? 6 : 0;
+        const score = dd * 10 + crowd * 3 + (TERRAIN[b.tiles[y][x]].env === "camur" ? 2 : 0) + nearFire;
         if (score < bestScore) { bestScore = score; best = [x, y]; }
       }
       if (best) { e.x = best[0]; e.y = best[1]; }
     }
     if (e.slowed > 0) e.slowed--;
+    const blind = (e.blind ?? 0) > 0; if (blind) e.blind!--;
     if (dist(e.x, e.y, p.x, p.y) === 1) {
       const ctx = ctxAt(cfg, s, b, p, d.species);
       const dodge = derived(cfg, s, "kacinma", ctx).value;
-      const hitChance = Math.max(10, Math.min(90, d.accuracy - dodge + (s.energy < 20 ? 10 : 0)));
+      const hitChance = Math.max(10, Math.min(90, d.accuracy - dodge + (s.energy < 20 ? 10 : 0) - (blind ? 30 : 0)));
       if (rng.chance(hitChance)) {
         const dmg = Math.max(1, rng.int(d.damage[0], d.damage[1]) - playerArmor(s));
         p.hp = Math.max(0, p.hp - dmg); b.stats.dmgTaken += dmg;
@@ -273,6 +315,10 @@ export function finishBattle(cfg: Config, s: GameState, b: Battle): BattleOutcom
   if (b.stats.observed) { applyGain(cfg, s, "analiz", 0.4 * b.stats.observed, gains); applyGain(cfg, s, "anatomi_hayvan", 0.3 * b.stats.observed, gains); }
   if (b.stats.dmgTaken) applyGain(cfg, s, "agri", b.stats.dmgTaken * 0.03, gains);
   if (b.stats.moves) applyGain(cfg, s, "bacak", b.stats.moves * 0.03, gains);
+  // büyü: her başarılı/başarısız deneme ilgili ustalığı, odağı ve kapasiteyi geliştirir
+  for (const [attr, n] of Object.entries(b.stats.castMastery)) applyGain(cfg, s, attr, n * 0.5, gains);
+  if (b.stats.casts) { applyGain(cfg, s, "odak", b.stats.casts * 0.15, gains); applyGain(cfg, s, "mana", b.stats.casts * 0.15, gains); }
+  if (b.phase === "won" && b.stats.casts > 0) s.story.flags.buyuluZafer = (s.story.flags.buyuluZafer ?? 0) + 1;
   const minutes = 20 + b.turn * 3;
   s.minute = Math.min(16 * 60, s.minute + minutes);
   s.energy = Math.max(0, s.energy - 6 - b.stats.moves * 0.5);

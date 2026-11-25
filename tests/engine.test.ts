@@ -111,3 +111,65 @@ describe("görevler", () => {
     expect(questList(s).find(q => q.def.id === "kurt")!.status).toBe("yeni");
   });
 });
+
+import { spellOptions, castSpell, previewSpell } from "../src/engine/magic";
+import { advanceStory } from "../src/engine/story";
+import { tickEnvironment } from "../src/engine/combat";
+import { Rng } from "../src/engine/rng";
+
+describe("büyü", () => {
+  it("defter sayfası ve ustalık olmadan büyü yok", () => {
+    const s = newGame(cfg, 1);
+    expect(spellOptions(cfg, s)).toHaveLength(0);
+    s.knownElements.push("el_ates");
+    const o = spellOptions(cfg, s).find(x => x.spell.id === "ates_topu")!;
+    expect(o.ok).toBe(false);              // ustalık 0 < 5
+    s.attrs.ates.level = 6; s.mana = 30;
+    expect(spellOptions(cfg, s).find(x => x.spell.id === "ates_topu")!.ok).toBe(true);
+  });
+  it("ateş çalışması sayfa açılınca yapılabilir", () => {
+    const s = newGame(cfg, 1);
+    expect(canDoActivity(cfg, s, "calisma_ates").ok).toBe(false);
+    s.knownElements.push("el_ates");
+    expect(canDoActivity(cfg, s, "calisma_ates").ok).toBe(true);
+  });
+  it("yağmur ateş topunu zayıflatır, büyü mana harcar ve ustalığı geliştirir", () => {
+    const s = newGame(cfg, 2); s.knownElements.push("el_ates"); s.attrs.ates.level = 10; s.mana = 30;
+    const b = createBattle(cfg, s, "mera", ["kurt"], 9);
+    const e = enemies(b)[0]; const p = player(b);
+    p.x = e.x; p.y = Math.min(b.h - 1, e.y + 2);
+    b.weather = "acik"; const dry = previewSpell(cfg, s, b, "ates_topu", e.x, e.y);
+    b.weather = "yagmur"; const wet = previewSpell(cfg, s, b, "ates_topu", e.x, e.y);
+    expect(wet.dmg[1]).toBeLessThan(dry.dmg[1]);
+    b.weather = "acik";
+    expect(castSpell(cfg, s, b, "ates_topu", e.x, e.y)).toBeTruthy();
+    expect(s.mana).toBeLessThan(30);
+    const before = s.attrs.ates.level; finishBattle(cfg, s, b);
+    expect(s.attrs.ates.level).toBeGreaterThan(before);
+  });
+  it("ateş kuru otta yayılır, yağmurda yayılmaz ve söner", () => {
+    const s = newGame(cfg, 3); const b = createBattle(cfg, s, "mera", ["kurt"], 4);
+    for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) b.tiles[y][x] = "uzun_ot";
+    b.weather = "acik"; b.fire = { "3,4": 3 };
+    const rng = new Rng(1); for (let i = 0; i < 3; i++) tickEnvironment(b, rng);
+    expect(Object.keys(b.fire).length).toBeGreaterThan(1);
+    b.weather = "yagmur"; b.fire = { "3,4": 3 }; tickEnvironment(b, rng); tickEnvironment(b, rng);
+    expect(Object.keys(b.fire).length).toBe(0);
+  });
+});
+
+describe("hikâye", () => {
+  it("kilometre taşları sırayla açılır ve annenin sayfası Ateş'i öğretir", () => {
+    const s = newGame(cfg, 1);
+    expect(advanceStory(s)).toHaveLength(0);
+    s.introDone = true; expect(advanceStory(s).map(m => m.id)).toEqual(["varis"]);
+    s.quests.mesaj = { status: "bitti", count: 1 }; s.quests.kurt = { status: "bitti", count: 1 };
+    s.quests.annenin_izi = { status: "bitti", count: 1 };
+    const got = advanceStory(s).map(m => m.id);
+    expect(got).toEqual(["ilk_is", "suru", "iz"]);
+    expect(s.knownElements).toContain("el_ates");
+    s.attrs.ates.level = 5; s.story.flags.buyuluZafer = 1;
+    expect(advanceStory(s).map(m => m.id)).toEqual(["kivilcim", "ates_kurt"]);
+    s.day += 1; expect(advanceStory(s).map(m => m.id)).toEqual(["mektup"]);
+  });
+});

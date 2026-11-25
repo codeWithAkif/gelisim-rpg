@@ -12,7 +12,7 @@ export interface AttrState {
   lastUsedDay: number;
 }
 export interface LogEntry { day: number; minute: number; text: string; kind?: "gain" | "quest" | "battle" | "info" | "warn" }
-export interface QuestState { status: "aktif" | "bitti" | "basarisiz"; step?: number }
+export interface QuestState { status: "yeni" | "aktif" | "bitti" | "basarisiz"; step?: number; count?: number }
 
 export interface GameState {
   version: number;
@@ -32,6 +32,11 @@ export interface GameState {
   metNpcs: string[];
   hp: number;
   journal: Record<string, string[]>;           // düşman → deftere işlenmiş zayıf noktalar
+  name: string;
+  introDone: boolean;
+  knownElements: string[];                     // annenin defterinden açılmış element sayfaları
+  mana: number;
+  story: { reached: string[]; flags: Record<string, number> };
   log: LogEntry[];
 }
 
@@ -45,7 +50,8 @@ export function newGame(cfg: Config, seed = Date.now() % 2147483647): GameState 
     version: SAVE_VERSION, seed, day: 1, minute: 60, energy: 90, satiety: 70, money: 6,
     region: "taspinar", attrs, rep: {}, inventory: { ekmek: 1, degnek: 1 },
     equipped: { weapon: "degnek" }, familiarity: { degnek: 30 }, quests: {}, metNpcs: [],
-    hp: 0, journal: {}, log: [],
+    hp: 0, journal: {}, name: "Yolcu", introDone: false, knownElements: [], mana: -1,
+    story: { reached: [], flags: {} }, log: [],
   };
   return s;
 }
@@ -53,6 +59,12 @@ export function newGame(cfg: Config, seed = Date.now() % 2147483647): GameState 
 /** Config'e sonradan eklenen özellikleri eski kayda ekler. */
 export function migrate(cfg: Config, s: GameState): GameState {
   s.journal ??= {};
+  s.name ??= "Yolcu";
+  // eski kayıtlar: açılışı zaten geçmiş say
+  s.introDone ??= true;
+  s.knownElements ??= [];
+  s.mana ??= -1;
+  s.story ??= { reached: [], flags: {} };
   for (const a of cfg.data.attributes) {
     if (!s.attrs[a.id]) { const lv = a.base ?? 0; s.attrs[a.id] = { level: lv, pending: 0, peak: lv, lastUsedDay: s.day }; }
   }

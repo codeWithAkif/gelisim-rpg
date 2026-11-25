@@ -1,7 +1,7 @@
 {
   "format": "gelisim-oyun-config",
   "version": 1,
-  "exportedAt": "2026-11-25T05:21:48.096Z",
+  "exportedAt": "2026-11-25T06:16:07.539Z",
   "attributeCategories": [
     {
       "color": "#C0573E",
@@ -1204,6 +1204,182 @@
         },
         {
           "attribute": "simya",
+          "w": 1
+        }
+      ]
+    },
+    {
+      "id": "calisma_ates",
+      "name": "Ateş çalışması",
+      "kind": "aktivite",
+      "duration": 45,
+      "fatigue": 12,
+      "realUse": 1,
+      "teacherRep": 0,
+      "requirement": "Defterde Ateş sayfası",
+      "desc": "Avuçta kıvılcım tutmak: nefesi düzenle, ısıyı tek noktaya topla.",
+      "params": {
+        "element": "el_ates"
+      },
+      "gains": [
+        {
+          "attribute": "ates",
+          "w": 1
+        },
+        {
+          "attribute": "mana",
+          "w": 0.3
+        },
+        {
+          "attribute": "nefes",
+          "w": 0.2
+        },
+        {
+          "attribute": "odak",
+          "w": 0.3
+        }
+      ]
+    },
+    {
+      "id": "calisma_su",
+      "name": "Su çalışması",
+      "kind": "aktivite",
+      "duration": 45,
+      "fatigue": 10,
+      "realUse": 1,
+      "teacherRep": 0,
+      "requirement": "Defterde Su sayfası",
+      "desc": "Dere kenarında suyun akışını yönlendirmek.",
+      "params": {
+        "element": "el_su"
+      },
+      "gains": [
+        {
+          "attribute": "mana",
+          "w": 0.3
+        },
+        {
+          "attribute": "odak",
+          "w": 0.3
+        },
+        {
+          "attribute": "su_buyu",
+          "w": 1
+        }
+      ]
+    },
+    {
+      "id": "calisma_toprak",
+      "name": "Toprak çalışması",
+      "kind": "aktivite",
+      "duration": 45,
+      "fatigue": 14,
+      "realUse": 1,
+      "teacherRep": 0,
+      "requirement": "Defterde Toprak sayfası",
+      "desc": "Taşın içindeki ağırlığı hissetmek, toprağı sıkıştırmak.",
+      "params": {
+        "element": "el_toprak"
+      },
+      "gains": [
+        {
+          "attribute": "core",
+          "w": 0.1
+        },
+        {
+          "attribute": "irade",
+          "w": 0.3
+        },
+        {
+          "attribute": "mana",
+          "w": 0.3
+        },
+        {
+          "attribute": "toprak_buyu",
+          "w": 1
+        }
+      ]
+    },
+    {
+      "id": "calisma_hava",
+      "name": "Hava çalışması",
+      "kind": "aktivite",
+      "duration": 45,
+      "fatigue": 10,
+      "realUse": 1,
+      "teacherRep": 0,
+      "requirement": "Defterde Hava sayfası",
+      "desc": "Basınç farkını hissetmek: önce nefesini, sonra rüzgârı.",
+      "params": {
+        "element": "el_hava"
+      },
+      "gains": [
+        {
+          "attribute": "hava_buyu",
+          "w": 1
+        },
+        {
+          "attribute": "mana",
+          "w": 0.3
+        },
+        {
+          "attribute": "nefes",
+          "w": 0.4
+        }
+      ]
+    },
+    {
+      "id": "calisma_ayaz",
+      "name": "Ayaz çalışması",
+      "kind": "aktivite",
+      "duration": 45,
+      "fatigue": 12,
+      "realUse": 1,
+      "teacherRep": 0,
+      "requirement": "Defterde Ayaz sayfası",
+      "desc": "Isıyı bir yerden çekip başka yere vermek. Isı kaybolmaz.",
+      "params": {
+        "element": "el_ayaz"
+      },
+      "gains": [
+        {
+          "attribute": "ayaz_buyu",
+          "w": 1
+        },
+        {
+          "attribute": "irade",
+          "w": 0.3
+        },
+        {
+          "attribute": "mana",
+          "w": 0.3
+        }
+      ]
+    },
+    {
+      "id": "calisma_simsek",
+      "name": "Şimşek çalışması",
+      "kind": "aktivite",
+      "duration": 45,
+      "fatigue": 16,
+      "realUse": 1,
+      "teacherRep": 0,
+      "requirement": "Defterde Şimşek sayfası",
+      "desc": "Yünü sürtüp kıvılcımı izlemek; yükün yolunu öngörmek.",
+      "params": {
+        "element": "el_simsek"
+      },
+      "gains": [
+        {
+          "attribute": "mana",
+          "w": 0.3
+        },
+        {
+          "attribute": "refleks",
+          "w": 0.3
+        },
+        {
+          "attribute": "simsek_buyu",
           "w": 1
         }
       ]

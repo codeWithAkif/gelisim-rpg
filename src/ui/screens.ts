@@ -5,6 +5,8 @@ import { type GameState, clock, minutesLeft, repOf } from "../engine/state";
 import { canDoActivity, DEFERRED_CATEGORIES, type GainReport } from "../engine/progression";
 import { questList, itemName, npc } from "../engine/quests";
 import { maxHp } from "../engine/combat";
+import { maxMana } from "../engine/derived";
+import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, GAME_ITEMS, ENEMIES, teacherOf } from "../content/world";
 import { esc, inkBar, portrait, wolfSketch, bodySketch } from "./sketch";
 import { APP_VERSION } from "../update";
@@ -33,6 +35,7 @@ export function statusBar(cfg: Config, s: GameState): string {
       <div class="meter">Enerji <b>${Math.round(s.energy)}</b><div class="bar">${inkBar(s.energy / 100, 0, 11)}</div></div>
       <div class="meter">Tokluk <b>${Math.round(s.satiety)}</b><div class="bar">${inkBar(s.satiety / 100, 0, 12)}</div></div>
       <div class="meter">Can <b>${Math.round(hp)}/${hpM}</b><div class="bar">${inkBar(hp / hpM, 0, 13)}</div></div>
+      ${s.knownElements.length ? (() => { const mm = maxMana(cfg, s), m = s.mana < 0 ? mm : s.mana; return `<div class="meter">Mana <b>${Math.round(m)}/${mm}</b><div class="bar">${inkBar(m / mm, 0, 14)}</div></div>`; })() : ""}
     </div></header>`;
 }
 
@@ -51,10 +54,11 @@ export function defterScreen(cfg: Config, s: GameState): string {
   const analiz = s.attrs.analiz?.level ?? 0;
   const notes = s.log.slice(0, 8).map(l => `<div class="note ${l.kind ?? ""}"><small>G${l.day}</small>${esc(l.text)}</div>`).join("");
   return `<div class="page">
+    ${storySection(cfg, s)}
     <section class="sec">
       <h1>Taşpınar</h1>
       <p class="lede">Dağ eteğinde, otuz hanelik bir köy. ${rep <= 0 ? "Burada kimse seni tanımıyor." : rep < 5 ? "Birkaç kişi adını duymuş." : rep < 15 ? "Köyde adın anılmaya başladı." : "Köylüler seni selamlıyor."}</p>
-      <p class="hand blue">Tanınırlık ${rep} · güven ${Math.floor(repOf(s, s.region, "guven"))}</p>
+      <p class="hand blue">${esc(s.name)} · tanınırlık ${rep} · güven ${Math.floor(repOf(s, s.region, "guven"))}</p>
     </section>
 
     <section class="sec">
@@ -72,6 +76,8 @@ export function defterScreen(cfg: Config, s: GameState): string {
 
     <section class="sec"><h2>Tanıdıklar</h2><div class="people">${people}</div></section>
 
+    ${s.knownElements.length ? `<section class="sec"><h2>Annemin sayfaları</h2>${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` : ""}
+
     ${sawWolf ? `<section class="sec"><h2>Gözlemler</h2>
       <div class="card"><div class="entry-head"><span class="entry-title">Kurt</span><span class="entry-meta">${wolfMarks.length}/${ENEMIES.kurt.weakPoints.length} zayıf nokta</span></div>
       ${wolfSketch({ detail: analiz, marks: wolfMarks.map(w => ({ name: w.name, at: w.at })), width: 300 })}
@@ -81,6 +87,22 @@ export function defterScreen(cfg: Config, s: GameState): string {
     <hr class="rule">
     <div class="row" style="justify-content:space-between"><button class="btn small red" data-act="reset">Yeni oyuna başla</button><span class="muted" style="font-size:13px">Sürüm ${esc(APP_VERSION)}</span></div>
   </div>`;
+}
+
+function storySection(_cfg: Config, s: GameState): string {
+  const ch = CHAPTERS.find(c => !c.soon && c.milestones.some(m => !s.story.reached.includes(m.id)));
+  if (!ch) {
+    const next = CHAPTERS.find(c => c.soon);
+    return `<section class="sec"><h2>${esc(s.name)}'in yolu</h2><p class="hand blue">Bölüm 1 tamamlandı. ${next ? esc(next.title) + " yakında." : ""}</p></section>`;
+  }
+  let nowShown = false;
+  const steps = ch.milestones.map(m => {
+    const done = s.story.reached.includes(m.id);
+    if (done) return `<div class="story-step done"><span class="mk" style="color:var(--green)">✓</span><span class="t">${esc(m.title)}</span></div>`;
+    if (!nowShown) { nowShown = true; return `<div class="story-step now"><span class="mk red">→</span><span><span class="t">${esc(m.title)}</span><div class="h">${esc(m.hint)}</div></span></div>`; }
+    return `<div class="story-step"><span class="mk muted">·</span><span class="t muted">…</span></div>`;
+  }).join("");
+  return `<section class="sec"><h2>${esc(ch.title)}</h2><div>${steps}</div></section>`;
 }
 
 /* ---------------- Vücut ---------------- */
@@ -120,11 +142,14 @@ export function calisScreen(cfg: Config, s: GameState, ui: UiState): string {
       <div class="chips">${chips}</div>
       ${chk.ok ? `<div class="row"><button class="btn small" data-act="do" data-id="${esc(id)}">Yap</button></div>` : `<div class="lock">${esc(chk.reason)}</div>`}</div>`;
   };
-  const selfActs = cfg.data.activities.filter(a => a.kind === "aktivite").map(a => row(a.id)).join("");
+  const isMagic = (a: { params?: Record<string, unknown> }) => typeof a.params?.element === "string";
+  const selfActs = cfg.data.activities.filter(a => a.kind === "aktivite" && !isMagic(a)).map(a => row(a.id)).join("");
+  const magicActs = cfg.data.activities.filter(a => isMagic(a) && s.knownElements.includes(String(a.params!.element))).map(a => row(a.id)).join("");
   const lessons = cfg.data.activities.filter(a => a.kind === "ders" && teacherOf(a.id)).map(a => row(a.id)).join("");
   return `<div class="page">
     <section class="sec"><h1>Çalış</h1><p class="lede">Ne yaparsan onda gelişirsin. Aynı şeyi tekrarlamak giderek daha az kazandırır.</p></section>
     ${res ? `<div class="card flash"><span class="entry-title">${esc(res.title)}</span>${gainList(cfg, res.gains)}${res.note ? `<p class="muted" style="margin:0;font-size:14px">${esc(res.note)}</p>` : ""}</div>` : ""}
+    ${magicActs ? `<section class="sec"><h2>Büyü</h2><p class="muted" style="margin:0;font-size:14px">Annenin sayfalarına göre çalış. Büyü de bir beceri: tekrar ettikçe ustalaşırsın.</p><div>${magicActs}</div></section>` : ""}
     <section class="sec"><h2>Kendi başına</h2><div>${selfActs}</div></section>
     <section class="sec"><h2>Dersler</h2><p class="muted" style="margin:0;font-size:14px">Öğretmenler ancak tanıdıkları birine ders verir.</p><div>${lessons}</div></section>
   </div>`;
