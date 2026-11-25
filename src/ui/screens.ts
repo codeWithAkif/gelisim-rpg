@@ -52,7 +52,7 @@ export function defterScreen(cfg: Config, s: GameState): string {
   const sawWolf = s.journal.kurt !== undefined || s.quests.kurt;
   const wolfMarks = (s.journal.kurt ?? []).map(id => ENEMIES.kurt.weakPoints.find(w => w.id === id)!).filter(Boolean);
   const analiz = s.attrs.analiz?.level ?? 0;
-  const notes = s.log.slice(0, 8).map(l => `<div class="note ${l.kind ?? ""}"><small>G${l.day}</small>${esc(l.text)}</div>`).join("");
+  const notes = s.log.slice(0, 8).map(l => `<div class="note${l.kind ? " note-" + l.kind : ""}"><small>G${l.day}</small>${esc(l.text)}</div>`).join("");
   return `<div class="page">
     ${storySection(cfg, s)}
     <section class="sec">

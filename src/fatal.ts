@@ -36,22 +36,37 @@ export function installErrorScreen() {
   });
 }
 
-/** Açılıştan sonra üst şerit ve sekmeler ekranda mı? Değilse tanı göster. */
+function layoutReport(): { ok: boolean; text: string } {
+  const head = document.querySelector(".status"), nav = document.querySelector(".tabs"), main = document.querySelector("main");
+  const vh = window.innerHeight, vw = window.innerWidth, vv = window.visualViewport;
+  const r = (el: Element | null) => { if (!el) return "yok"; const b = el.getBoundingClientRect(); return `${Math.round(b.top)}..${Math.round(b.bottom)}`; };
+  const desc = (el: Element) => { const cs = getComputedStyle(el); return `${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${el.className && typeof el.className === "string" ? "." + el.className.split(" ").join(".") : ""} [${cs.position} z${cs.zIndex}]`; };
+  const stack = document.elementsFromPoint(vw / 2, vh / 2).slice(0, 5).map(desc).join(" > ");
+  const h = head?.getBoundingClientRect(), n = nav?.getBoundingClientRect(), m = main?.getBoundingClientRect();
+  const top = h ? document.elementFromPoint(vw / 2, Math.max(1, h.top + h.height / 2)) : null;
+  const ok = !!(h && n && m && h.height > 10 && h.top > -5 && h.top < vh / 2 && n.bottom <= vh + 5 && n.top > vh / 2 && m.height > 60 && top && head!.contains(top));
+  return { ok, text: [
+    `Sürüm ${APP_VERSION}`,
+    `pencere ${vw}×${vh}, görünür ${vv ? `${Math.round(vv.width)}×${Math.round(vv.height)}` : "?"}, dpr ${window.devicePixelRatio}`,
+    `kaydırma ${window.scrollX},${window.scrollY} · belge ${document.documentElement.scrollHeight}`,
+    `üst şerit ${r(head)} · içerik ${r(main)} · sekmeler ${r(nav)}`,
+    `üst şeridin üstündeki: ${top ? desc(top) : "?"}`,
+    `ortadaki katmanlar: ${stack}`,
+    navigator.userAgent,
+  ].join("\n") };
+}
+
+/** Açılıştan sonra üst şerit ve sekmeler gerçekten görünüyor mu? Pencere açıksa kapanmasını bekler. */
 export function checkLayout(onOk: () => void) {
-  setTimeout(() => {
-    const head = document.querySelector(".status"), nav = document.querySelector(".tabs"), main = document.querySelector("main");
-    if (!head || !nav || !main) return;
-    if (document.querySelector(".intro, .battle, .modal-bg")) { onOk(); return; }
-    const h = head.getBoundingClientRect(), n = nav.getBoundingClientRect(), m = main.getBoundingClientRect();
-    const vh = window.innerHeight, vv = window.visualViewport;
-    const ok = h.height > 10 && h.top > -5 && h.top < vh / 2 && n.bottom <= vh + 5 && n.top > vh / 2 && m.height > 60;
-    if (ok) { onOk(); return; }
-    showProblem("Ekran düzgün yerleşmedi", [
-      `Sürüm ${APP_VERSION}`,
-      `pencere ${window.innerWidth}×${vh}, görünür ${vv ? `${Math.round(vv.width)}×${Math.round(vv.height)}` : "?"}, dpr ${window.devicePixelRatio}`,
-      `kaydırma ${window.scrollX},${window.scrollY} · belge ${document.documentElement.scrollHeight}`,
-      `üst şerit ${Math.round(h.top)}..${Math.round(h.bottom)} · içerik ${Math.round(m.top)}..${Math.round(m.bottom)} · sekmeler ${Math.round(n.top)}..${Math.round(n.bottom)}`,
-      navigator.userAgent,
-    ].join("\n"));
-  }, 2500);
+  let tries = 0;
+  const tick = () => {
+    if (document.querySelector(".intro, .battle[role=dialog], .modal-bg")) { if (tries++ < 60) setTimeout(tick, 2000); else onOk(); return; }
+    const rep = layoutReport();
+    if (rep.ok) onOk(); else showProblem("Ekran düzgün yerleşmedi", rep.text);
+  };
+  setTimeout(tick, 2500);
+  // elle tanı: ekrana 2 saniye basılı tut
+  let timer = 0;
+  window.addEventListener("pointerdown", () => { clearTimeout(timer); timer = window.setTimeout(() => { shown = false; showProblem("Tanı bilgisi", layoutReport().text); }, 2000); });
+  for (const ev of ["pointerup", "pointercancel", "pointermove"]) window.addEventListener(ev, () => clearTimeout(timer));
 }
