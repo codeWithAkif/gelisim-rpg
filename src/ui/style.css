@@ -298,3 +298,15 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 .night .gauge.low .gl b { color: var(--red); }
 .night .card, .night .choice, .night .eq-slot, .night .cell { background: rgba(255,255,255,.06); }
 .night .map-zoom button.on { background: var(--ink); color: var(--paper); }
+
+/* ---------- Çizilmiş görseller (art.ts) ---------- */
+.art-portrait { flex: none; display: inline-block; position: relative; overflow: hidden; border: 1.5px solid var(--ink); border-radius: 46% 54% 50% 50% / 52% 48% 52% 48%; background: var(--paper-2); }
+.art-portrait img { position: absolute; width: 165%; height: 165%; max-width: none; left: -32%; top: -16%; filter: brightness(calc(1 - var(--dark, 0) * .25)); }
+.art-item { flex: none; object-fit: contain; filter: brightness(calc(1 - var(--dark, 0) * .2)); }
+.art-place, .art-thumb { position: relative; overflow: hidden; }
+.art-place img, .art-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; filter: brightness(calc(1 - var(--dark, 0) * .4)) saturate(calc(1 - var(--dark, 0) * .3));
+  -webkit-mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 62%, transparent 100%); mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 62%, transparent 100%); }
+.art-place { height: 185px; margin: -6px -4px -10px; }
+.art-place img { object-position: 50% 45%; }
+.art-thumb { flex: none; height: 84px; margin: -4px -6px 0; }
+.art-thumb img { object-position: 50% 55%; }

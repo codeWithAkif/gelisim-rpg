@@ -4,7 +4,8 @@ import type { GameState } from "../engine/state";
 import { PLACES, ROADS, type Place } from "../content/map";
 import { NPCS, QUESTS } from "../content/world";
 import { place, planTravel, peopleAt, isOpen } from "../engine/travel";
-import { esc, roughPath, portrait } from "./sketch";
+import { esc, roughPath } from "./sketch";
+import { personPic, placePic } from "./art";
 import { animScale } from "./settings";
 import { journeyPoint, journeyProgress, journeyLeftMs } from "../engine/journey";
 import { fmtDur } from "../engine/session";
@@ -173,9 +174,9 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
       return;
     }
     const plan = at ? null : planTravel(cfg, s, sel);
-    card.innerHTML = `<div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${at ? "buradasın" : plan ? `${plan.minutes} dk yol · enerji −${plan.energy}` : ""}</span></div>
+    card.innerHTML = `${placePic(sel, p.name, "art-thumb")}<div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${at ? "buradasın" : plan ? `${plan.minutes} dk yol · enerji −${plan.energy}` : ""}</span></div>
       <p class="tiny" style="margin:0">${esc(p.desc)}</p>
-      ${people.length ? `<div class="row">${people.map(n => `<span class="person">${portrait(n.name, 30, known(n.id))}<span class="tiny">${known(n.id) ? esc(n.name) : "?"}</span></span>`).join("")}</div>` : ""}
+      ${people.length ? `<div class="row">${people.map(n => `<span class="person">${personPic(n, 30, known(n.id))}<span class="tiny">${known(n.id) ? esc(n.name) : "?"}</span></span>`).join("")}</div>` : ""}
       ${quests.length && at ? `<div class="row">${quests.map(q => `<button class="btn small red" data-qa="${q.id}">${esc(q.battle ? "Meraya çık" : q.doneText ?? "Yap")}: ${esc(q.title)}</button>`).join("")}</div>` : quests.length ? `<p class="hand red" style="margin:0">Burada yapacağın iş var: ${quests.map(q => esc(q.title)).join(", ")}</p>` : ""}
       <div class="row">${at ? `<span class="hand blue">Buradasın.</span>` : `<button class="btn primary" data-go="${sel}" ${plan?.ok && !busy ? "" : "disabled"}>Git</button>${plan && !plan.ok ? `<span class="lock">${esc(plan.reason ?? "")}</span>` : ""}`}</div>`;
   }

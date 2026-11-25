@@ -10,7 +10,8 @@ import { planSession, SESSION_OPTIONS, wounded, TIME_SCALE, fmtDur } from "../en
 import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount } from "../engine/inventory";
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, SHOP, CRAFTS } from "../content/world";
-import { esc, inkBar, portrait, wolfSketch, bodySketch, itemIcon, VITAL_ICONS } from "./sketch";
+import { esc, inkBar, wolfSketch, bodySketch, VITAL_ICONS } from "./sketch";
+import { personPic, itemPic, placePic } from "./art";
 import { APP_VERSION } from "../update";
 import { phase, PHASE_ICONS } from "./daylight";
 import { here, place, activityPlace } from "../engine/travel";
@@ -79,7 +80,7 @@ export function defterScreen(cfg: Config, s: GameState): string {
   const rep = Math.floor(repOf(s, s.region, "taninirlik"));
   const people = NPCS.map(n => {
     const known = s.metNpcs.includes(n.id) || rep >= (n.minRep ?? 0);
-    return `<div class="person">${portrait(n.name, 46, known)}<div><div class="nm">${known ? esc(n.name) : "?"}</div><div class="rl">${known ? esc(n.role) : "Henüz tanışmadın"}</div></div></div>`;
+    return `<div class="person">${personPic(n, 46, known)}<div><div class="nm">${known ? esc(n.name) : "?"}</div><div class="rl">${known ? esc(n.role) : "Henüz tanışmadın"}</div></div></div>`;
   }).join("");
   const sawWolf = s.journal.kurt !== undefined || s.quests.kurt;
   const wolfMarks = (s.journal.kurt ?? []).map(id => ENEMIES.kurt.weakPoints.find(w => w.id === id)!).filter(Boolean);
@@ -148,13 +149,13 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
   const slot = (label: string, id: string | undefined, key: string) => {
     const it = id ? itemInfo(cfg, id) : undefined;
     return `<button class="eq-slot ${ui.sel === "eq:" + key ? "sel" : ""}" data-act="pick" data-id="eq:${key}" aria-label="${label}${it ? ": " + esc(it.name) : " boş"}">
-      ${it ? itemIcon(it.id, 40) : `<span class="muted tiny">boş</span>`}<span class="eq-l">${label}</span></button>`;
+      ${it ? itemPic(it.id, 40) : `<span class="muted tiny">boş</span>`}<span class="eq-l">${label}</span></button>`;
   };
   const cells = Array.from({ length: cap }, (_, i) => {
     const x = st[i];
     if (!x) return `<div class="cell empty" aria-hidden="true"></div>`;
     const it = itemInfo(cfg, x.id);
-    return `<button class="cell ${ui.sel === "inv:" + i ? "sel" : ""}" data-act="pick" data-id="inv:${i}" aria-label="${esc(it.name)} ${x.count}">${itemIcon(x.id, 38)}${x.count > 1 ? `<span class="cnt">${x.count}</span>` : ""}</button>`;
+    return `<button class="cell ${ui.sel === "inv:" + i ? "sel" : ""}" data-act="pick" data-id="inv:${i}" aria-label="${esc(it.name)} ${x.count}">${itemPic(x.id, 38)}${x.count > 1 ? `<span class="cnt">${x.count}</span>` : ""}</button>`;
   }).join("");
   // seçili eşya ayrıntısı
   let selId: string | undefined, equippedKey: string | undefined;
@@ -169,13 +170,13 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
     if (!equippedKey && it.kind !== "Çanta") acts.push(`<button class="btn small red" data-act="drop" data-id="${esc(selId)}">Bırak</button>`);
     const stats = [it.damage ? `hasar ${it.damage}` : "", it.armor ? `koruma ${it.armor}` : "", it.capacity ? `${it.capacity} göz` : "", it.satiety ? `tokluk +${it.satiety}` : "",
       it.kind === "Silah" && s.familiarity[selId] !== undefined ? `alışkınlık ${Math.round(s.familiarity[selId] ?? 0)}/100` : ""].filter(Boolean).join(" · ");
-    detail = `<div class="item-detail">${itemIcon(selId, 64)}<div><div class="entry-title">${esc(it.name)}</div><div class="muted tiny">${esc(it.kind)}${stats ? " · " + stats : ""}</div>
+    detail = `<div class="item-detail">${itemPic(selId, 64)}<div><div class="entry-title">${esc(it.name)}</div><div class="muted tiny">${esc(it.kind)}${stats ? " · " + stats : ""}</div>
       <p style="margin:4px 0 8px;font-size:15px">${esc(it.desc)}</p><div class="row">${acts.join("")}</div></div></div>`;
   }
   const crafts = CRAFTS.map(c => {
     const chk = craftCheck(cfg, s, c); const p = itemInfo(cfg, c.product);
     const needs = Object.entries(c.needs).map(([id, n]) => `<span class="chip ${freeCount(cfg, s, id) >= n ? "" : "miss"}">${n} ${esc(itemInfo(cfg, id).name)}</span>`).join("");
-    return `<div class="entry"><div class="item-detail">${itemIcon(c.product, 48)}<div><div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${c.minutes} dk</span></div>
+    return `<div class="entry"><div class="item-detail">${itemPic(c.product, 48)}<div><div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${c.minutes} dk</span></div>
       <div class="chips">${needs}${Object.entries(c.skill).map(([a, v]) => `<span class="chip">${esc(cfg.attr.get(a)?.name ?? a)} ${v}</span>`).join("")}</div>
       ${chk.ok ? `<div class="row" style="margin-top:6px"><button class="btn small" data-act="craft" data-id="${esc(c.id)}">Başla</button></div>` : `<div class="lock">${esc(chk.reason ?? "")}</div>`}</div></div></div>`;
   }).join("");
@@ -258,16 +259,17 @@ export function islerScreen(cfg: Config, s: GameState): string {
       ? `<div class="hand green" style="color:var(--green)">Ödül: ${esc(q.def.rewards.note)}</div>`
       : `<div style="font-size:14px" class="muted">${esc(giver?.name ?? "")} · ${esc(imp?.name ?? "")} iş. Ödülü verenin imkânı kadar olur.</div>`;
     return `<div class="entry"><div class="entry-head"><span class="entry-title">${esc(q.def.title)}</span><span class="entry-meta">${q.status === "bitti" ? "tamamlandı" : q.status === "aktif" ? "üstlendin" : q.status === "kilitli" ? "kilitli" : "yeni"}</span></div>
-      <div class="person">${portrait(g.name, 40)}<div><div class="nm" style="font-size:19px">${esc(g.name)}</div><div class="rl">${esc(g.role)}</div></div></div>
+      <div class="person">${personPic(g, 40)}<div><div class="nm" style="font-size:19px">${esc(g.name)}</div><div class="rl">${esc(g.role)}</div></div></div>
       <p style="margin:0">${esc(q.def.text)}</p>${reward}
       ${q.status === "kilitli" ? `<div class="lock">${esc(q.reason ?? "")}</div>` : ""}<div class="row">${action}</div></div>`;
   }).join("");
   const shop = SHOP.map(id => {
     const it = itemInfo(cfg, id);
-    return `<div class="shop-item">${itemIcon(id, 40)}<div><div class="nm">${esc(it.name)}</div><div class="muted tiny">${esc(it.desc)}</div></div>
+    return `<div class="shop-item">${itemPic(id, 40)}<div><div class="nm">${esc(it.name)}</div><div class="muted tiny">${esc(it.desc)}</div></div>
       <button class="btn small price" data-act="buy" data-id="${id}" ${s.money < (it.price ?? 0) ? "disabled" : ""}><span class="coin">${VITAL_ICONS.coin}</span>${it.price}</button></div>`;
   }).join("");
   return `<div class="page">
+    ${s.journey ? "" : placePic(s.location, here(s).name, "art-place")}
     <section class="sec card"><div class="entry-head"><h2>Bugün</h2><span class="hand">${clock(s)}</span></div>
       <p style="margin:0">${left > 0 ? `Hava kararmadan <b>${Math.floor(left / 60)} saat ${left % 60} dakika</b> var.` : "Gün bitti. Dinlenmezsen yarın hiçbir şey yapamazsın."}</p>
       <div class="row"><button class="btn primary" data-act="sleep">${left > 4 * 60 ? "Erken yat" : "Uyu"}</button>
