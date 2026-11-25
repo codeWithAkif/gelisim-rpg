@@ -11,7 +11,6 @@ import { esc, ICONS } from "./sketch";
 import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, gainList, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
-import { checkForUpdates } from "../update";
 import { showIntro } from "./intro";
 import { advanceStory } from "../engine/story";
 
@@ -135,21 +134,4 @@ export function startApp(root: HTMLElement) {
   persist();
   if (!s.introDone) beginIntro(); else storyTick();
 
-  // açılışta güncelleme kontrolü (yalnız telefonda; internet yoksa sessizce geçer)
-  let veil: HTMLElement | null = null;
-  checkForUpdates({
-    onDownloading(v) {
-      persist();
-      veil = document.createElement("div"); veil.className = "modal-bg"; veil.style.alignItems = "center";
-      veil.innerHTML = `<div class="modal" style="text-align:center"><h2>Defterin yeni sayfaları geliyor</h2><p class="lede">Sürüm ${esc(v)} indiriliyor. Kaydın korunur.</p></div>`;
-      document.body.appendChild(veil);
-    },
-    onDone() { veil?.remove(); veil = null; },
-    onNativeUpdate(v, url) {
-      modal(`<h2>Yeni sürüm: ${esc(v)}</h2><p>Bu sürüm uygulamanın kendisini de değiştiriyor; yeni APK'yı indirip kurman gerekiyor. Kaydın silinmez.</p>`, [
-        { label: "Sonra", fn: () => {} },
-        { label: "APK'yı indir", cls: "primary", fn: () => { persist(); window.location.href = url; } },
-      ]);
-    },
-  });
 }

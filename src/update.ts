@@ -15,6 +15,12 @@ export function newer(a: string, b: string): boolean {
   return false;
 }
 
+/** Oyun gerçekten açıldı: bu paketi sağlam say. Çağrılmazsa eklenti 15 sn sonra önceki pakete döner. */
+export async function markReady() {
+  if (!Capacitor.isNativePlatform()) return;
+  try { const { CapacitorUpdater } = await import("@capgo/capacitor-updater"); await CapacitorUpdater.notifyAppReady(); } catch { /* yok */ }
+}
+
 export interface UpdateHooks {
   onDownloading(version: string): void;
   onDone(): void;
@@ -24,7 +30,6 @@ export interface UpdateHooks {
 export async function checkForUpdates(h: UpdateHooks): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   const { CapacitorUpdater } = await import("@capgo/capacitor-updater");
-  try { await CapacitorUpdater.notifyAppReady(); } catch { /* eski sürüm */ }
   try {
     const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
     const res = await fetch(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" }, signal: ctrl.signal });
