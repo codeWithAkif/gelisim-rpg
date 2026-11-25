@@ -3,14 +3,14 @@
 // refleksi yüksek karakterde savuşturma penceresi geniştir, ressamın çizgi toleransı büyüktür.
 import type { GameState } from "./state";
 
-export type MiniKind = "kosu" | "yuzme" | "odun" | "tirmanma" | "dans" | "ezgi" | "ocak" | "mum" | "isaret" | "savustur" | "yay" | "cizgi" | "hafiza";
+export type MiniKind = "kosu" | "yuzme" | "odun" | "tirmanma" | "dans" | "ezgi" | "ocak" | "mum" | "isaret" | "savustur" | "kesme" | "yay" | "cizgi" | "hafiza";
 
 /** Hangi çalışma hangi mini oyunla oynanır: her iş kendine benzer. */
 const MINI_OF: Record<string, MiniKind> = {
   kosu: "kosu", yuzme: "yuzme", odun: "odun", tirmanma: "tirmanma", dans: "dans", muzik: "ezgi", sarki: "ezgi", demirci: "ocak",
   meditasyon: "mum",
   calisma_ates: "isaret", calisma_su: "isaret", calisma_toprak: "isaret", calisma_hava: "isaret", calisma_ayaz: "isaret", calisma_simsek: "isaret",
-  kilic_idman: "savustur",
+  kilic_idman: "kesme",
   okculuk_idman: "yay", avcilik: "yay",
   resim: "cizgi", anatomi: "cizgi", botanik: "cizgi",
   satranc: "hafiza", hitabet_ders: "hafiza",
@@ -18,11 +18,11 @@ const MINI_OF: Record<string, MiniKind> = {
 /** Mini oyunu kolaylaştıran özellik. */
 const EASE_ATTR: Record<MiniKind, string> = {
   kosu: "kardiyo", yuzme: "nefes", odun: "ust_govde", tirmanma: "kavrama", dans: "esneklik", ezgi: "hafiza", ocak: "refleks",
-  mum: "odak", isaret: "odak", savustur: "refleks", yay: "gorus", cizgi: "el_becerisi", hafiza: "hafiza",
+  mum: "odak", isaret: "odak", savustur: "refleks", kesme: "kilic", yay: "gorus", cizgi: "el_becerisi", hafiza: "hafiza",
 };
 export const MINI_NAMES: Record<MiniKind, string> = {
   kosu: "Patika koşusu", yuzme: "Kulaç", odun: "Balta", tirmanma: "Tutamak", dans: "Adım", ezgi: "Ezgi", ocak: "Örs",
-  mum: "Mum", isaret: "İşaret", savustur: "Savuştur", yay: "Yay", cizgi: "Çizgi", hafiza: "Hafıza",
+  mum: "Mum", isaret: "İşaret", savustur: "Savuştur", kesme: "Havada kes", yay: "Yay", cizgi: "Çizgi", hafiza: "Hafıza",
 };
 export function miniFor(actId: string): MiniKind | undefined { return MINI_OF[actId]; }
 

@@ -49,7 +49,7 @@ test("mini oyunla çalışmak bekleyerek çalışmaktan çok kazandırır", () =
   };
   const idle = run(), good = run(0.9);
   expect(good).toBeGreaterThan(idle * 1.6);
-  expect(miniFor("meditasyon")).toBe("mum"); expect(miniFor("odun")).toBe("odun"); expect(miniFor("calisma_ates")).toBe("isaret");
+  expect(miniFor("meditasyon")).toBe("mum"); expect(miniFor("kilic_idman")).toBe("kesme"); expect(miniFor("odun")).toBe("odun"); expect(miniFor("calisma_ates")).toBe("isaret");
 });
 
 test("savaşta zamanlama: iyi oynayan oyuncu daha sık kazanır ama kurt hâlâ tehlikeli", () => {

@@ -309,6 +309,88 @@ function savustur(S: number, c: Ink, ease: number): Game {
   };
 }
 
+/* ---------- kesme: hocanın havaya attıklarını kılıçla kes, taşa vurma ---------- */
+function kesme(S: number, c: Ink, ease: number): Game {
+  const D = 25000; const G = 0.00055 * S / 400 / Math.sqrt(ease); // yerçekimi: beceri arttıkça şeyler havada daha uzun kalır
+  const KINDS = [
+    { name: "elma", r: 0.055, fill: "#C8463A", inner: "#F2E2B0", pts: 1 },
+    { name: "kabak", r: 0.085, fill: "#D98A2E", inner: "#F2C46A", pts: 1 },
+    { name: "saman", r: 0.07, fill: "#D9BE6A", inner: "#B89A48", pts: 1 },
+    { name: "taş", r: 0.06, fill: "#8A8680", inner: "#8A8680", pts: 0 },
+  ];
+  interface O { k: number; x: number; y: number; vx: number; vy: number; rot: number; vr: number; t0: number; cut?: number; ang?: number; gone?: boolean }
+  const objs: O[] = []; let next = 600; let launched = 0, cut = 0, stones = 0, missed = 0, best = 0;
+  let trail: P[] = []; let swipeCuts = 0; const parts: Part[] = []; const pops: Pop[] = []; let last = 0; let flash = -1e9;
+  const throwOne = (now: number) => {
+    const late = now / D; const stoneP = 0.08 + late * 0.12;
+    const k = rnd() < stoneP ? 3 : Math.floor(rnd() * 3);
+    const x = S * (0.2 + rnd() * 0.6); const tx = S * (0.25 + rnd() * 0.5);
+    const peak = S * (0.15 + rnd() * 0.25); const vy = -Math.sqrt(2 * G * (S + 20 - peak)); const tUp = -vy / G;
+    objs.push({ k, x, y: S + 20, vx: (tx - x) / tUp / 1.6, vy, rot: rnd() * 6, vr: (rnd() - 0.5) * 0.008, t0: now });
+    if (k !== 3) launched++;
+  };
+  const segDist = (px: number, py: number, a: P, b: P) => { const vx = b.x - a.x, vy = b.y - a.y, L2 = vx * vx + vy * vy || 1; const t = Math.max(0, Math.min(1, ((px - a.x) * vx + (py - a.y) * vy) / L2)); return Math.hypot(px - a.x - vx * t, py - a.y - vy * t); };
+  return {
+    hint: "Hoca havaya elma, kabak ve saman demeti atıyor. Parmağını hızla kaydırıp kes; tek savuruşta birkaçını kesersen ustalık. Gri taşa dokunma, kılıcın çentiklenir.",
+    frame(now, g) {
+      const dt = last ? Math.min(40, now - last) : 16; last = now;
+      if (now > next && now < D - 1200) {
+        const n = rnd() < 0.25 + now / D * 0.35 ? 2 + Math.floor(rnd() * 2) : 1;
+        for (let i = 0; i < n; i++) throwOne(now);
+        next = now + (1100 - now / D * 450) / Math.min(1.3, ease) + rnd() * 400; sfx("whoosh");
+      }
+      if (now - flash < 160) { g.fillStyle = "rgba(158,52,35,.18)"; g.fillRect(0, 0, S, S); }
+      for (const o of objs) {
+        if (o.gone) continue;
+        o.vy += G * dt; o.x += o.vx * dt; o.y += o.vy * dt; o.rot += o.vr * dt;
+        const K = KINDS[o.k]; const r = K.r * S;
+        if (o.y > S + 60) { o.gone = true; if (o.cut === undefined && o.k !== 3) { missed++; pops.push({ text: "Düştü", x: Math.max(30, Math.min(S - 30, o.x)), y: S - 30, t: now, color: c.red }); } continue; }
+        g.save(); g.translate(o.x, o.y); g.strokeStyle = c.ink; g.lineWidth = 2;
+        if (o.cut === undefined) {
+          g.rotate(o.rot); g.fillStyle = K.fill; wob(g, 0, 0, r, 1.6, o.k + 1); g.fill(); g.stroke();
+          if (o.k === 0) { g.beginPath(); g.moveTo(0, -r); g.lineTo(2, -r - 8); g.stroke(); g.fillStyle = c.green; g.beginPath(); g.ellipse(6, -r - 6, 5, 2.5, -0.5, 0, TAU); g.fill(); }
+          if (o.k === 1) { g.globalAlpha = 0.5; for (const a of [-0.5, 0, 0.5]) { g.beginPath(); g.ellipse(0, 0, r * Math.abs(Math.cos(a + 1)) * 0.7, r, 0, 0, TAU); g.stroke(); } g.globalAlpha = 1; }
+          if (o.k === 2) { g.globalAlpha = 0.6; for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(i * r * 0.3, -r * 0.9); g.lineTo(i * r * 0.35, r * 0.9); g.stroke(); } g.globalAlpha = 1; g.strokeStyle = "#8A5A30"; g.lineWidth = 3; g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0); g.stroke(); }
+          if (o.k === 3) { g.fillStyle = "rgba(255,255,255,.25)"; g.beginPath(); g.arc(-r * 0.3, -r * 0.3, r * 0.25, 0, TAU); g.fill(); }
+        } else {
+          // iki yarım birbirinden ayrılır
+          const s = (now - o.cut) / 1000; const a = o.ang!;
+          for (const side of [-1, 1]) {
+            g.save(); g.translate(Math.cos(a + Math.PI / 2) * side * s * 60, Math.sin(a + Math.PI / 2) * side * s * 60); g.rotate(a + side * s * 2);
+            g.beginPath(); g.arc(0, 0, r, side > 0 ? 0 : Math.PI, side > 0 ? Math.PI : TAU); g.closePath();
+            g.fillStyle = K.fill; g.fill(); g.stroke();
+            g.beginPath(); g.ellipse(0, 0, r * 0.92, r * 0.18, 0, side > 0 ? 0 : Math.PI, side > 0 ? Math.PI : TAU); g.fillStyle = K.inner; g.fill();
+            g.restore();
+          }
+        }
+        g.restore();
+        // kesik kontrolü: son iz parçası daireyi geçerse ve parmak hızlıysa
+        if (o.cut === undefined && trail.length >= 2) {
+          const a = trail[trail.length - 2], b = trail[trail.length - 1];
+          const sp = Math.hypot(b.x - a.x, b.y - a.y) / Math.max(1, b.t - a.t);
+          if (sp > 0.35 / ease && segDist(o.x, o.y, a, b) < r * (0.9 + ease * 0.2)) {
+            o.cut = now; o.ang = Math.atan2(b.y - a.y, b.x - a.x);
+            if (o.k === 3) { stones++; flash = now; sfx("clang"); buzz("heavy"); pops.push({ text: "Çentik!", x: o.x, y: o.y - 20, t: now, color: c.red }); burst(parts, o.x, o.y, 10, "#FFD27A", now, 3, 2); }
+            else { cut++; swipeCuts++; sfx("hit"); buzz("light"); burst(parts, o.x, o.y, 12, K.inner, now, 3, 3);
+              if (swipeCuts >= 2) { pops.push({ text: swipeCuts >= 3 ? `Üçlü kesik!` : "Çifte kesik!", x: o.x, y: o.y - 30, t: now, color: c.green }); sfx("perfect"); best = Math.max(best, swipeCuts); } }
+          }
+        }
+      }
+      for (let i = objs.length - 1; i >= 0; i--) if (objs[i].gone || (objs[i].cut !== undefined && now - objs[i].cut! > 1200)) objs.splice(i, 1);
+      // kılıç izi: parlak, hızla solan
+      const fresh = trail.filter(p => now - p.t < 140 || p.t > now);
+      if (fresh.length > 1) { g.lineCap = "round"; for (let i = 1; i < fresh.length; i++) { const k = i / fresh.length; g.strokeStyle = `rgba(230,235,240,${k})`; g.lineWidth = 2 + k * 6; g.beginPath(); g.moveTo(fresh[i - 1].x, fresh[i - 1].y); g.lineTo(fresh[i].x, fresh[i].y); g.stroke(); g.strokeStyle = c.ink; g.lineWidth = 1; g.stroke(); } }
+      drawParts(g, parts, now); drawPops(g, pops, now);
+      counter(g, c, S, `${cut} kesik · ${stones ? stones + " çentik · " : ""}${Math.max(0, Math.ceil((D - now) / 1000))} sn`);
+      return now >= D && objs.length === 0;
+    },
+    down(x, y, now) { trail = [{ x, y, t: now }]; swipeCuts = 0; },
+    move(x, y, now) { if (!trail.length) return; trail.push({ x, y, t: now }); if (trail.length > 40) trail.shift(); if (trail.length % 6 === 0) sfx("whoosh"); },
+    up() { trail = []; swipeCuts = 0; },
+    score: () => launched ? clamp01(cut / launched * 1.1 + Math.min(best, 3) * 0.03 - stones * 0.12) : 0,
+  };
+}
+
 /* ---------- yay: geri çek, rüzgârı hesapla, bırak ---------- */
 function yay(S: number, c: Ink, ease: number): Game {
   const N = 5; const res: number[] = []; let pull: P | null = null; let cur: P | null = null; let wind = 0; const newWind = () => { wind = (rnd() - 0.5) * 2; }; newWind();
@@ -566,7 +648,7 @@ function sequence(S: number, c: Ink, ease: number, strings: boolean): Game {
 }
 
 const MAKERS: Record<MiniKind, (S: number, c: Ink, ease: number, o: MiniOpts) => Game> = {
-  kosu, yuzme, odun, tirmanma, dans, ocak, mum, isaret, savustur, yay, cizgi,
+  kosu, yuzme, odun, tirmanma, dans, ocak, mum, isaret, savustur, kesme, yay, cizgi,
   hafiza: (S, c, e) => sequence(S, c, e, false), ezgi: (S, c, e) => sequence(S, c, e, true),
 };
 
