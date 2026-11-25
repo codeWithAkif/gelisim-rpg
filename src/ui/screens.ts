@@ -11,7 +11,7 @@ import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount } from "../eng
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, SHOP, CRAFTS } from "../content/world";
 import { esc, inkBar, wolfSketch, bodySketch, VITAL_ICONS } from "./sketch";
-import { personPic, itemPic, placePic, motherPic } from "./art";
+import { personPic, itemPic, placePic, motherPic, artUrl } from "./art";
 import { collected, seenCount, dailyRequests, searchInfo, canSearch } from "../engine/explore";
 import { COLLECTIBLES, COLL_KIND_NAMES, FINDS, SEARCH_MINUTES, type CollKind } from "../content/explore";
 import { APP_VERSION } from "../update";
@@ -100,7 +100,9 @@ export function defterScreen(cfg: Config, s: GameState): string {
     ${s.knownElements.length ? `<section class="sec"><h2>Annemin sayfaları</h2>${motherPic()}${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` : ""}
     ${sawWolf ? `<section class="sec"><h2>Gözlemler</h2>
       <div class="card"><div class="entry-head"><span class="entry-title">Kurt</span><span class="entry-meta">${wolfMarks.length}/${ENEMIES.kurt.weakPoints.length} zayıf nokta</span></div>
-      ${wolfSketch({ detail: analiz, marks: wolfMarks.map(w => ({ name: w.name, at: w.at })), width: 300 })}
+      ${wolfMarks.length === ENEMIES.kurt.weakPoints.length && artUrl("dusman_kurt_anatomi")
+        ? `<img class="anatomy" src="${artUrl("dusman_kurt_anatomi")}" alt="Kurt anatomisi"><p class="hand blue" style="margin:0">Üç zayıf noktayı da buldun; Zehra'nın gösterdiği gibi iskeletini de çizdin.</p>`
+        : wolfSketch({ detail: analiz, marks: wolfMarks.map(w => ({ name: w.name, at: w.at })), width: 300 })}
       <p style="margin:0;font-size:14px" class="muted">${analiz < 12 ? "Çizimin kaba. Gözlem yeteneğin geliştikçe detaylar oturur (resim dersi işe yarar)." : "Çizgilerin netleşti; hayvanın yapısını görmeye başladın."}</p></div></section>` : ""}
     <section class="sec"><h2>Notlar</h2><div class="notes">${notes || `<div class="note">Köye yeni geldin. Çoban Hasan'ın bir derdi var gibi.</div>`}</div></section>
     <hr class="rule">

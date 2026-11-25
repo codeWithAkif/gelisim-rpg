@@ -231,7 +231,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
         let q: number | undefined;
         if (settings().timing) {
           busy = true; const wp = aim ? ENEMIES[tgt.def!].weakPoints.find(w => w.id === aim) : undefined;
-          q = await slashPrompt(stage(), { aimName: wp?.name, aimAt: wp?.at, detail: s.attrs.analiz?.level ?? 10, ease: skillEase(s, "refleks") * 0.5 + skillEase(s, "kilic") * 0.5 });
+          q = await slashPrompt(stage(), { aimName: wp?.name, aimAt: wp?.at, aimArtAt: wp?.artAt, detail: s.attrs.analiz?.level ?? 10, ease: skillEase(s, "refleks") * 0.5 + skillEase(s, "kilic") * 0.5 });
           busy = false;
         }
         playerAttack(cfg, s, b, tgt, aim, stance, q); stance = "normal"; after();

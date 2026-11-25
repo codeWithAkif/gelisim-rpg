@@ -1,5 +1,6 @@
 // Savaş öncesi hazırlık: araziyi oku, zamanı ve giriş noktasını seç, tuzak kur, meşale al.
 // Her seçimin getirdiği avantaj/dezavantaj anında görünür; plan savaşı gerçekten değiştirir.
+import { itemPic } from "./art";
 import type { Config } from "../engine/config";
 import { type GameState, clock, DAY_MINUTES } from "../engine/state";
 import {
@@ -70,7 +71,7 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
           plan.readWind ? `<span class="hand" style="color:var(--green)">✓</span>` : `<button class="btn small" data-p="readWind" ${o("readWind").ok ? "" : "disabled"}>Oku</button>`)}
         ${prepRow("trap", `${o("trap").name} (${plan.traps.length}/2)`, o("trap").ok ? o("trap").desc + " Her biri 30 dk · enerji −6" : esc(o("trap").reason ?? ""),
           `<button class="btn small ${trapMode ? "primary" : ""}" data-p="trap" ${o("trap").ok ? "" : "disabled"}>${trapMode ? "Bitti" : "Yerleştir"}</button>`)}
-        ${prepRow("torch", o("torch").name, o("torch").desc + " 10 dk · 2 bakır",
+        ${prepRow("torch", `${itemPic("mesale", 30)} ${o("torch").name}`, o("torch").desc + " 10 dk · 2 bakır",
           `<button class="btn small ${plan.torch ? "primary" : ""}" data-p="torch" ${o("torch").ok || plan.torch ? "" : "disabled"}>${plan.torch ? "Alındı" : "Al"}</button>`)}
       </section>
       <section class="sec"><h3>Planın</h3><div class="advice">${adv.map(a => `<div class="${a.good ? "good" : "bad"}"><span>${a.good ? "+" : "−"}</span>${esc(a.text)}</div>`).join("")}</div>

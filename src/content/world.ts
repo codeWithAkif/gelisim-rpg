@@ -72,7 +72,7 @@ export const TERRAIN: Record<Terrain, TerrainInfo> = {
   agac: { name: "Ağaçlık", cost: 2, color: "#7F9A62", ink: "#4D6837", cover: 2 },
 };
 
-export interface WeakPoint { id: string; name: string; need: Record<string, number>; critBonus: number; effect?: "slow" | "bleed"; at: [number, number] }
+export interface WeakPoint { id: string; name: string; need: Record<string, number>; critBonus: number; effect?: "slow" | "bleed"; at: [number, number]; artAt?: [number, number] /* dusman_kurt görselinde (0–1) */ }
 export interface EnemyDef {
   id: string; name: string; species: "hayvan" | "insan"; hp: number; damage: [number, number];
   move: number; evasion: number; accuracy: number; armor: number; weakPoints: WeakPoint[]; desc: string;
@@ -82,9 +82,9 @@ export const ENEMIES: Record<string, EnemyDef> = {
     id: "kurt", name: "Kurt", species: "hayvan", hp: 22, damage: [3, 6], move: 4, evasion: 16, accuracy: 60, armor: 0,
     desc: "Aç ve cesur. Sürüyle avlanır, yandan dolanmayı sever.",
     weakPoints: [
-      { id: "boyun", name: "Boyun", need: { analiz: 12, anatomi_hayvan: 3 }, critBonus: 12, at: [0.25, 0.42] },
-      { id: "arka_bacak", name: "Sol arka bacak (eski yara)", need: { analiz: 18 }, critBonus: 6, effect: "slow", at: [0.78, 0.78] },
-      { id: "burun", name: "Burun", need: { anatomi_hayvan: 8 }, critBonus: 8, at: [0.08, 0.5] },
+      { id: "boyun", name: "Boyun", need: { analiz: 12, anatomi_hayvan: 3 }, critBonus: 12, at: [0.25, 0.42], artAt: [0.24, 0.47] },
+      { id: "arka_bacak", name: "Sol arka bacak (eski yara)", need: { analiz: 18 }, critBonus: 6, effect: "slow", at: [0.78, 0.78], artAt: [0.8, 0.74] },
+      { id: "burun", name: "Burun", need: { anatomi_hayvan: 8 }, critBonus: 8, at: [0.08, 0.5], artAt: [0.03, 0.39] },
     ],
   },
 };

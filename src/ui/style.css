@@ -357,3 +357,5 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 .gx.hit .gx-box { animation: gxHit .25s ease-out; }
 @keyframes gxHit { 0% { transform: translate(0,0); } 25% { transform: translate(-6px,3px); } 50% { transform: translate(5px,-3px); } 75% { transform: translate(-3px,2px); } 100% { transform: translate(0,0); } }
 .gx .qt-result { top: auto; bottom: 34px; }
+.anatomy { width: 100%; max-width: 360px; border-radius: 6px; filter: brightness(calc(1 - var(--dark, 0) * .3)); }
+.prep-name img { vertical-align: middle; }

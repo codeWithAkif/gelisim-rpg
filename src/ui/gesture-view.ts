@@ -59,9 +59,13 @@ function wolfPic(W: number, H: number, detail: number, aimAt?: [number, number])
 }
 
 /* ---------- saldırı: kesik ---------- */
-export function slashPrompt(host: HTMLElement, o: { aimName?: string; aimAt?: [number, number]; detail: number; ease: number }): Promise<number> {
+export function slashPrompt(host: HTMLElement, o: { aimName?: string; aimAt?: [number, number]; aimArtAt?: [number, number]; detail: number; ease: number }): Promise<number> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 0.65);
+    // görsel varsa zayıf nokta görseldeki yerine taşınır (görsel kutuya sığdırılır, ortalanır)
+    const art = artUrl("dusman_kurt"); const IA = 393 / 640;
+    const aim: [number, number] | undefined = art && o.aimArtAt ? [o.aimArtAt[0], (H - W * IA) / 2 / H + o.aimArtAt[1] * W * IA / H] : o.aimAt;
+    o = { ...o, aimAt: aim };
     const L = layer(host, "slash", o.aimName ? `Kes! ${esc(o.aimName)} hedefinden geçir` : "Kurdun üstünden kes!", W, H, wolfPic(W, H, o.detail, o.aimAt));
     const body = [[0.22, 0.45], [0.42, 0.5], [0.62, 0.5], [0.82, 0.48]].map(([x, y]) => ({ x: x * W, y: y * H, r: W * 0.11 }));
     const weak = o.aimAt ? { x: o.aimAt[0] * W, y: o.aimAt[1] * H, r: W * 0.06 } : undefined;
@@ -102,7 +106,7 @@ export function dodgePrompt(host: HTMLElement, o: { from: number; ease: number }
       const sc = 0.7 + e * 0.6; const shake = p === 0 ? Math.sin(now / 30) * 2 : 0;
       // kurt oyuncuya bakar: görseller sola bakar, sağdan geliyorsa olduğu gibi
       g.save(); g.translate(wx + shake, wy); g.scale((Math.cos(a) > 0 ? 1 : -1) * sc, sc); if (p > 0) g.rotate(-0.25);
-      if (img?.complete && img.naturalWidth) g.drawImage(img, -45, -30, 90, 60); else drawWolf(g, 90, L.ink);
+      if (img?.complete && img.naturalWidth) g.drawImage(img, -48, -30, 96, 96 * img.naturalHeight / img.naturalWidth); else drawWolf(g, 90, L.ink);
       g.restore();
       if (p > 0) { g.strokeStyle = L.red; g.globalAlpha = 0.35; g.setLineDash([4, 6]); g.beginPath(); g.moveTo(sx, sy); g.lineTo(cx, cy); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
       if (trail.length) inkTrail(g, trail, L.blue, 0.8);
