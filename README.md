@@ -5,6 +5,22 @@ Klasik level/XP yok: koştukça daha hızlı koşarsın, resim dersi aldıkça g
 anatomi bildikçe kritik vuruşların artar. Kaslar uykuda gelişir; aç uyursan yarım gelişir.
 Arayüz, karakterin kendi defteri gibi çizilir.
 
+## Telefona kurulum ve güncelleme
+
+**İlk kurulum:** telefonda şu bağlantıyı aç, APK'yı indir ve kur (tarayıcıya "bilinmeyen kaynaklardan yükleme" izni vermen istenebilir):
+https://github.com/codeWithAkif/gelisim-rpg/releases/latest/download/gezgin-defteri.apk
+
+**Sonrası:** `main` dalına her gönderilen değişiklik GitHub Actions ile yeni bir sürüm olarak yayınlanır
+(`.github/workflows/release.yml`). Uygulama açılırken son sürümü kontrol eder, yeni oyun paketini
+indirip kendini günceller. Kayıt korunur. İnternet yoksa mevcut sürümle offline açılır.
+
+Yalnız Android tarafı değiştiğinde (yeni Capacitor eklentisi vb.) `native-version.txt` içindeki sayı artırılır;
+uygulama o zaman yeni APK'yı indirmeyi önerir.
+
+**APK imzalama:** repo ayarlarında `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+`ANDROID_KEY_PASSWORD` secret'ları varsa APK kalıcı anahtarla imzalanır. Yoksa geçici anahtar kullanılır;
+bu durumda yeni bir APK kurmak için eskisini kaldırmak gerekir (web güncellemeleri etkilenmez).
+
 ## Çalıştırma
 
 ```bash

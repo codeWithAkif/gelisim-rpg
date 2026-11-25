@@ -19,7 +19,9 @@
   },
   "dependencies": {
     "@capacitor/android": "^7.4.0",
+    "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.4.0",
+    "@capgo/capacitor-updater": "^7.53.0",
     "@fontsource/alegreya": "^5.2.6",
     "@fontsource/caveat": "^5.2.6"
   }

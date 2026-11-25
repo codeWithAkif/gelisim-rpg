@@ -7,6 +7,7 @@ import { questList, itemName, npc } from "../engine/quests";
 import { maxHp } from "../engine/combat";
 import { NPCS, GAME_ITEMS, ENEMIES, teacherOf } from "../content/world";
 import { esc, inkBar, portrait, wolfSketch, bodySketch } from "./sketch";
+import { APP_VERSION } from "../update";
 
 export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number } }
 
@@ -78,7 +79,7 @@ export function defterScreen(cfg: Config, s: GameState): string {
 
     <section class="sec"><h2>Notlar</h2><div class="notes">${notes || `<div class="note">Köye yeni geldin. Çoban Hasan'ın bir derdi var gibi.</div>`}</div></section>
     <hr class="rule">
-    <div class="row"><button class="btn small red" data-act="reset">Yeni oyuna başla</button></div>
+    <div class="row" style="justify-content:space-between"><button class="btn small red" data-act="reset">Yeni oyuna başla</button><span class="muted" style="font-size:13px">Sürüm ${esc(APP_VERSION)}</span></div>
   </div>`;
 }
 

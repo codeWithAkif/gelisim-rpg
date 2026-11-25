@@ -1,0 +1,101 @@
+# Her main push'unda: test → web paketi (dist.zip) + Android APK → GitHub Release.
+# Telefondaki uygulama açılışta son release'i görür; web paketini kendisi indirip uygular.
+# native-version.txt yalnız yerel (Android/Capacitor eklentisi) değişince artırılır;
+# o zaman uygulama kullanıcıya yeni APK'yı indirmesini önerir.
+name: Yayınla
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md"]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sürüm numarası
+        id: v
+        run: |
+          BASE=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          echo "app=$BASE.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "native=$(tr -dc '0-9' < native-version.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Bağımlılıklar
+        run: npm ci
+
+      - name: Testler
+        run: npm test
+
+      - name: Web paketi
+        env:
+          VITE_APP_VERSION: ${{ steps.v.outputs.app }}
+          VITE_NATIVE_VERSION: ${{ steps.v.outputs.native }}
+        run: |
+          npm run build
+          cd dist && zip -qr ../dist.zip . && cd ..
+
+      - name: Android eşitleme
+        run: npx cap sync android
+
+      - name: İmza anahtarı
+        id: ks
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > android/app/release.keystore
+            echo "path=release.keystore" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 secret yok; APK geçici debug anahtarıyla imzalanıyor."
+            echo "path=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: APK derle
+        env:
+          APP_VERSION: ${{ steps.v.outputs.app }}
+          NATIVE_VERSION: ${{ steps.v.outputs.native }}
+          ANDROID_KEYSTORE_PATH: ${{ steps.ks.outputs.path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../gezgin-defteri.apk
+
+      - name: Release oluştur
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.app }}
+          name: Gezgin Defteri ${{ steps.v.outputs.app }}
+          make_latest: "true"
+          body: |
+            native: ${{ steps.v.outputs.native }}
+
+            İlk kurulum: telefonda gezgin-defteri.apk dosyasını indirip aç.
+            Sonraki güncellemeler uygulama açılırken kendiliğinden iner.
+
+            ${{ github.event.head_commit.message }}
+          files: |
+            dist.zip
+            gezgin-defteri.apk
