@@ -63,22 +63,34 @@ export function sfx(k: Sfx) {
 
 /* ---------- titreşim ---------- */
 type HapticsApi = { impact(o: { style: string }): Promise<void>; vibrate(o: { duration: number }): Promise<void> };
-let hap: HapticsApi | null | undefined;
-async function haptics(): Promise<HapticsApi | null> {
-  if (hap !== undefined) return hap;
-  try {
-    const { Capacitor } = await import("@capacitor/core");
-    if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("Haptics")) { hap = (await import("@capacitor/haptics")).Haptics as unknown as HapticsApi; return hap; }
-  } catch { /* yok */ }
-  hap = null; return hap;
+// Dikkat: Capacitor eklentisi bir Proxy'dir; Promise ile doğrudan döndürülürse ".then" aranır ve
+// "Haptics.then() is not implemented" hatası atar. Bu yüzden bir kutu ({ api }) içinde taşınır.
+let hap: { api: HapticsApi | null } | undefined;
+let loading: Promise<void> | null = null;
+function loadHaptics(): Promise<void> {
+  loading ??= (async () => {
+    try {
+      const { Capacitor } = await import("@capacitor/core");
+      if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("Haptics")) {
+        const mod = await import("@capacitor/haptics");
+        hap = { api: mod.Haptics as unknown as HapticsApi }; return;
+      }
+    } catch { /* yok */ }
+    hap = { api: null };
+  })();
+  return loading;
 }
 export type Buzz = "light" | "medium" | "heavy" | "long";
 export function buzz(k: Buzz) {
   if (!settings().haptic) return;
-  void haptics().then(h => {
-    if (h) { if (k === "long") void h.vibrate({ duration: 250 }); else void h.impact({ style: k === "light" ? "LIGHT" : k === "medium" ? "MEDIUM" : "HEAVY" }); return; }
-    try { navigator.vibrate?.(k === "light" ? 10 : k === "medium" ? 25 : k === "heavy" ? 45 : 220); } catch { /* yok */ }
-  });
+  const run = () => {
+    const h = hap?.api;
+    try {
+      if (h) { (k === "long" ? h.vibrate({ duration: 250 }) : h.impact({ style: k === "light" ? "LIGHT" : k === "medium" ? "MEDIUM" : "HEAVY" })).catch(() => {}); return; }
+      navigator.vibrate?.(k === "light" ? 10 : k === "medium" ? 25 : k === "heavy" ? 45 : 220);
+    } catch { /* titreşim yoksa sessizce geç */ }
+  };
+  if (hap) run(); else void loadHaptics().then(run, () => {});
 }
 
 /* ---------- ortam sesi ---------- */
