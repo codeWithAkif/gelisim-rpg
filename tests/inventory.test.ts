@@ -34,15 +34,15 @@ describe("gerçek zamanlı oturum", () => {
     const a = newGame(cfg, 1), b = newGame(cfg, 1);
     startSession(cfg, a, "meditasyon", 3_600_000, 0);
     expect(finishSession(cfg, a, 1000)).toBeNull();          // süre dolmadı
-    expect(sessionProgress(a, 1_800_000)).toBeCloseTo(0.5);
+    expect(sessionProgress(a, 30_000)).toBeCloseTo(0.5); // gerçekte 1 dk
     const ra = finishSession(cfg, a, 3_600_000)!;
-    startSession(cfg, b, "meditasyon", 10_000, 0); const rb = finishSession(cfg, b, 10_000)!;
-    expect(ra.gains.odak).toBeGreaterThan(rb.gains.odak * 100);
+    startSession(cfg, b, "meditasyon", 600_000, 0); const rb = finishSession(cfg, b, 10_000)!;
+    expect(ra.gains.odak).toBeGreaterThan(rb.gains.odak * 5);
     expect(a.session).toBeUndefined();
   });
   it("yarıda bırakınca geçen süre kadar kazanılır", () => {
     const s = newGame(cfg, 1); startSession(cfg, s, "meditasyon", 3_600_000, 0);
-    const r = finishSession(cfg, s, 900_000, true)!;
+    const r = finishSession(cfg, s, 15_000, true)!; // gerçekte 15 sn = oyunda 15 dk
     expect(r.early).toBe(true); expect(r.minutes).toBeCloseTo(15);
   });
   it("enerji yetmezse uzun koşu açılmaz; oturum sürerken ikinci başlamaz", () => {
@@ -50,7 +50,7 @@ describe("gerçek zamanlı oturum", () => {
     expect(planSession(cfg, s, "kosu", 18_000_000).ok).toBe(false); // 5 saat koşu
     expect(planSession(cfg, s, "kosu", 3_600_000).ok).toBe(true);
     startSession(cfg, s, "kosu", 3_600_000, 0);
-    expect(planSession(cfg, s, "meditasyon", 60_000).ok).toBe(false);
+    expect(planSession(cfg, s, "meditasyon", 600_000).ok).toBe(false);
   });
   it("yaralıyken bedensel kazanç düşer", () => {
     const a = newGame(cfg, 1), b = newGame(cfg, 1);

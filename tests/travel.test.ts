@@ -18,9 +18,9 @@ test("oyun yaylada başlar; köye yürümek zaman alır, bacağı geliştirir", 
 test("uzak yerler kilitli; çalışmalar yerinde yapılır", () => {
   const s = newGame(cfg, 1);
   expect(planTravel(cfg, s, "karacam").ok).toBe(false);
-  expect(planSession(cfg, s, "yuzme", 60_000).ok).toBe(false); // yaylada yüzülmez
+  expect(planSession(cfg, s, "yuzme", 600_000).ok).toBe(false); // yaylada yüzülmez
   s.location = "dere";
-  expect(planSession(cfg, s, "yuzme", 60_000).ok).toBe(true);
+  expect(planSession(cfg, s, "yuzme", 600_000).ok).toBe(true);
 });
 
 import { startJourney, journeyProgress, dueEvent, resolveEvent, finishJourney, pauseJourney, resumeJourney, turnBack } from "../src/engine/journey";
@@ -45,7 +45,7 @@ test("yolculuk gerçek zamanlıdır: süre dolmadan varılmaz; sürprizler yolcu
 test("yoldayken çalışılmaz, pazardan alınmaz; geri dönülebilir", () => {
   const s = newGame(cfg, 4); s.location = "koy_meydani";
   startJourney(cfg, s, "dere", 0);
-  expect(planSession(cfg, s, "meditasyon", 60_000).ok).toBe(false);
+  expect(planSession(cfg, s, "meditasyon", 600_000).ok).toBe(false);
   s.journey!.events = [];
   const half = s.journey!.durMs / 2;
   expect(turnBack(s, half)).toBe(true);

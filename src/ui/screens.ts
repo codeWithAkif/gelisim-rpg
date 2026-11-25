@@ -6,7 +6,7 @@ import { DEFERRED_CATEGORIES, type GainReport } from "../engine/progression";
 import { questList, npc } from "../engine/quests";
 import { maxHp } from "../engine/combat";
 import { maxMana } from "../engine/derived";
-import { planSession, SESSION_OPTIONS, wounded } from "../engine/session";
+import { planSession, SESSION_OPTIONS, wounded, TIME_SCALE, fmtDur } from "../engine/session";
 import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount } from "../engine/inventory";
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, SHOP, CRAFTS } from "../content/world";
@@ -66,7 +66,7 @@ export function statusBar(cfg: Config, s: GameState): string {
   const al = alerts(cfg, s);
   return `<header class="status">
     <div class="day">Gün ${s.day}<small>${clock(s)}${late ? " · gün bitti" : ""}</small></div>
-    <div class="money">${s.money} bakır</div>
+    <div class="money"><span class="coin">${VITAL_ICONS.coin}</span>${s.money} bakır</div>
     <button class="where" data-act="show-place" data-id="${esc(s.journey ? s.journey.to : s.location)}">⌖ ${s.journey ? `Yolda → ${esc(place(s.journey.to)?.name ?? "")}` : esc(here(s).name)}</button>
     <div class="vitals">${g}</div>
     ${al.length ? `<div class="alert-strip ${al[0].level}" role="status"><b>!</b><span>${esc(al[0].text)}${al.length > 1 ? ` <i>(+${al.length - 1})</i>` : ""}</span></div>` : ""}
@@ -180,6 +180,7 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
   }).join("");
   return `<div class="page">
     <section class="sec"><div class="entry-head"><h1>Çanta</h1><span class="hand">${st.length}/${cap} göz</span></div>
+      <div class="purse"><span class="coin">${VITAL_ICONS.coin}</span><span>Kese: <b>${s.money} bakır</b></span></div>
       <div class="eq-row">${slot("Silah", s.equipped.weapon, "weapon")}${slot("Giysi", s.equipped.armor, "armor")}${slot("Çanta", bagOf(s), "bag")}</div></section>
     <div class="grid">${cells}</div>
     <section class="sec">${detail}</section>
@@ -211,7 +212,7 @@ export function calisScreen(cfg: Config, s: GameState, ui: UiState): string {
   const magicActs = cfg.data.activities.filter(a => isMagic(a) && s.knownElements.includes(String(a.params!.element))).map(a => row(a.id)).join("");
   const lessons = cfg.data.activities.filter(a => a.kind === "ders" && teacherOf(a.id)).map(a => row(a.id)).join("");
   return `<div class="page">
-    <section class="sec"><h1>Çalış</h1><p class="lede">Bir çalışma seç ve süresini belirle. Süre gerçek zamanda işler; uzun çalışan çok kazanır ama yorulur. Aynı şeyi tekrarlamak giderek daha az kazandırır.</p></section>
+    <section class="sec"><h1>Çalış</h1><p class="lede">Bir çalışma seç ve süresini belirle. Oyunda 1 saat, gerçekte 1 dakika sürer. Uzun çalışan çok kazanır ama yorulur; aynı şeyi tekrarlamak giderek daha az kazandırır.</p></section>
     ${res ? `<div class="card flash"><span class="entry-title">${esc(res.title)}</span>${gainList(cfg, res.gains)}${res.note ? `<p class="muted" style="margin:0;font-size:14px">${esc(res.note)}</p>` : ""}</div>` : ""}
     ${magicActs ? `<section class="sec"><h2>Büyü</h2><p class="muted" style="margin:0;font-size:14px">Annenin sayfalarına göre çalış. Büyü de bir beceri: tekrar ettikçe ustalaşırsın.</p><div>${magicActs}</div></section>` : ""}
     <section class="sec"><h2>Kendi başına</h2><div>${selfActs}</div></section>
@@ -229,14 +230,14 @@ export function sessionSheet(cfg: Config, s: GameState, actId: string): string {
   }).join("");
   const opts = SESSION_OPTIONS.map(o => {
     const p = planSession(cfg, s, actId, o.ms);
-    return `<button class="choice ${p.ok ? "" : "off"}" data-start="${o.ms}" ${p.ok ? "" : "disabled"}><b>${o.label}</b>
+    return `<button class="choice ${p.ok ? "" : "off"}" data-start="${o.ms}" ${p.ok ? "" : "disabled"}><b>${o.label}</b><span class="tiny muted">gerçekte ${fmtDur(o.ms / TIME_SCALE)}</span>
       <span class="tiny">${p.ok ? `enerji −${Math.ceil(p.energy)}${p.fee ? ` · ${p.fee} bakır` : ""}` : esc(p.reason ?? "")}</span></button>`;
   }).join("");
   return `<p class="hand muted" style="margin:0">Ne kadar çalışacaksın?</p><h2>${esc(a.name)}</h2>
     ${a.desc ? `<p style="margin:0" class="muted">${esc(a.desc)}</p>` : ""}
-    <div class="chips"><span class="tiny muted">1 saatte:</span>${hourGain}</div>
+    <div class="chips"><span class="tiny muted">Oyunda 1 saatte (gerçekte 1 dk):</span>${hourGain}</div>
     <div class="choices">${opts}</div>
-    <p class="muted tiny" style="margin:0">Çalışırken başka bir şey yapamazsın. Uygulamayı kapatsan da süre işler; yarıda bırakırsan geçen süre kadar kazanırsın.</p>`;
+    <p class="muted tiny" style="margin:0">Oyunda 1 dakika gerçekte 1 saniye sürer. Çalışırken başka bir şey yapamazsın; uygulamayı kapatsan da süre işler. Yarıda bırakırsan geçen süre kadar kazanırsın.</p>`;
 }
 
 /* ---------------- İşler (karar) ---------------- */
@@ -263,7 +264,7 @@ export function islerScreen(cfg: Config, s: GameState): string {
   const shop = SHOP.map(id => {
     const it = itemInfo(cfg, id);
     return `<div class="shop-item">${itemIcon(id, 40)}<div><div class="nm">${esc(it.name)}</div><div class="muted tiny">${esc(it.desc)}</div></div>
-      <button class="btn small" data-act="buy" data-id="${id}" ${s.money < (it.price ?? 0) ? "disabled" : ""}>${it.price} bakır</button></div>`;
+      <button class="btn small price" data-act="buy" data-id="${id}" ${s.money < (it.price ?? 0) ? "disabled" : ""}><span class="coin">${VITAL_ICONS.coin}</span>${it.price}</button></div>`;
   }).join("");
   return `<div class="page">
     <section class="sec card"><div class="entry-head"><h2>Bugün</h2><span class="hand">${clock(s)}</span></div>

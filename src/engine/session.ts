@@ -1,4 +1,5 @@
-// Gerçek zamanlı çalışma oturumları: 1 gerçek saat = oyunda 1 saat = bir tam oturumun kazancı.
+// Gerçek zamanlı çalışma oturumları, sıkıştırılmış: 1 gerçek saniye = oyunda 1 dakika.
+// Oyunda 1 saat çalışma (gerçekte 1 dk) bir tam oturumun kazancını verir.
 // Oturum sürerken başka bir şey yapılamaz; uygulama kapansa da süre işler.
 import type { Config } from "./config";
 import { type GameState, DAY_MINUTES, log, minutesLeft, repOf } from "./state";
@@ -8,15 +9,20 @@ import { teacherOf, CRAFTS } from "../content/world";
 import { craftById, craftCheck, completeCraft, removeItem, addItem } from "./inventory";
 import { activityPlace, place } from "./travel";
 
+/** Zaman sıkıştırması: oyun süresi / gerçek süre. */
+export const TIME_SCALE = 60;
+/** ms: oyundaki süre. Gerçekte ms / TIME_SCALE beklenir. */
 export interface SessionOption { id: string; label: string; ms: number }
 export const SESSION_OPTIONS: SessionOption[] = [
-  { id: "10s", label: "10 sn", ms: 10_000 },
-  { id: "1m", label: "1 dk", ms: 60_000 },
-  { id: "5m", label: "5 dk", ms: 300_000 },
+  { id: "10m", label: "10 dk", ms: 600_000 },
+  { id: "30m", label: "30 dk", ms: 1_800_000 },
   { id: "1h", label: "1 saat", ms: 3_600_000 },
+  { id: "3h", label: "3 saat", ms: 10_800_000 },
   { id: "5h", label: "5 saat", ms: 18_000_000 },
 ];
-export interface Session { kind: "act" | "craft"; id: string; startMs: number; durMs: number; label: string; fee?: number }
+/** durMs gerçek bekleme süresi, gameMs oyundaki karşılığı. */
+export interface Session { kind: "act" | "craft"; id: string; startMs: number; durMs: number; gameMs?: number; label: string; fee?: number }
+const gameOf = (ss: Session, realMs: number) => realMs * ((ss.gameMs ?? ss.durMs) / ss.durMs);
 
 const LOW_ENERGY = 25;
 /** Yaralıyken bedensel çalışma daha az verir, daha çok yorar. */
@@ -43,7 +49,7 @@ export function planSession(cfg: Config, s: GameState, actId: string, ms: number
     if (!t) return { ok: false, reason: "Bu bölgede öğretmen yok", ...base };
     const need = act.teacherRep ?? 0, have = repOf(s, s.region, "taninirlik");
     if (have < need) return { ok: false, reason: `${t.name} seni tanımıyor (tanınırlık ${Math.floor(have)}/${need})`, ...base };
-    if (ms < 60_000) return { ok: false, reason: "Öğretmen bu kadar kısa ders vermez", ...base };
+    if (ms < 1_800_000) return { ok: false, reason: "Öğretmen yarım saatten kısa ders vermez", ...base };
     fee = (t.fee ?? 0) * Math.max(1, Math.ceil(hours));
     if (s.money < fee) return { ok: false, reason: `Ders ücreti ${fee} bakır`, energy, minutes, fee };
   }
@@ -60,7 +66,7 @@ export function planSession(cfg: Config, s: GameState, actId: string, ms: number
 export function startSession(cfg: Config, s: GameState, actId: string, ms: number, now: number): SessionPlan {
   const p = planSession(cfg, s, actId, ms); if (!p.ok) return p;
   s.money -= p.fee;
-  s.session = { kind: "act", id: actId, startMs: now, durMs: ms, label: cfg.act.get(actId)!.name, fee: p.fee };
+  s.session = { kind: "act", id: actId, startMs: now, durMs: ms / TIME_SCALE, gameMs: ms, label: cfg.act.get(actId)!.name, fee: p.fee };
   return p;
 }
 export function startCraft(cfg: Config, s: GameState, craftId: string, now: number): { ok: boolean; reason?: string } {
@@ -70,7 +76,7 @@ export function startCraft(cfg: Config, s: GameState, craftId: string, now: numb
   if (c.minutes > minutesLeft(s)) return { ok: false, reason: "Hava kararmadan bitmez" };
   const chk = craftCheck(cfg, s, c); if (!chk.ok) return chk;
   for (const [id, n] of Object.entries(c.needs)) removeItem(s, id, n); // malzemeler ayrılır
-  s.session = { kind: "craft", id: craftId, startMs: now, durMs: c.minutes * 60_000, label: c.id };
+  s.session = { kind: "craft", id: craftId, startMs: now, durMs: c.minutes * 60_000 / TIME_SCALE, gameMs: c.minutes * 60_000, label: c.id };
   return { ok: true };
 }
 
@@ -108,17 +114,18 @@ export function finishSession(cfg: Config, s: GameState, now: number, early = fa
   s.session = undefined;
   const report: GainReport = {};
   const hurt = wounded(cfg, s);
+  const gameDone = gameOf(ss, done);
   if (ss.kind === "act") {
-    applyHours(cfg, s, ss.id, done / 3_600_000, report);
-    log(s, `${ss.label} (${fmtDur(done)}${complete ? "" : ", yarıda"}): ${summarize(cfg, report)}`, "gain");
-    return { label: ss.label, gains: report, minutes: done / 60_000, early: !complete, kind: "act", wounded: hurt };
+    applyHours(cfg, s, ss.id, gameDone / 3_600_000, report);
+    log(s, `${ss.label} (${fmtDur(gameDone)}${complete ? "" : ", yarıda"}): ${summarize(cfg, report)}`, "gain");
+    return { label: ss.label, gains: report, minutes: gameDone / 60_000, early: !complete, kind: "act", wounded: hurt };
   }
   const c = craftById(ss.id)!;
   if (!complete) {
     for (const [id, n] of Object.entries(c.needs)) addItem(cfg, s, id, n); // malzemeler geri
-    s.minute = Math.min(DAY_MINUTES, s.minute + done / 60_000);
+    s.minute = Math.min(DAY_MINUTES, s.minute + gameDone / 60_000);
     log(s, "El işini yarıda bıraktın; malzemeleri geri topladın.", "info");
-    return { label: c.id, gains: report, minutes: done / 60_000, early: true, kind: "craft", wounded: hurt };
+    return { label: c.id, gains: report, minutes: gameDone / 60_000, early: true, kind: "craft", wounded: hurt };
   }
   s.minute = Math.min(DAY_MINUTES, s.minute + c.minutes);
   s.energy = Math.max(0, s.energy - 5);

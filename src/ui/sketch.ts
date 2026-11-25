@@ -170,6 +170,7 @@ export function itemIcon(id: string, size = 44): string {
 
 /** Gösterge simgeleri. */
 export const VITAL_ICONS = {
+  coin: `<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="14" rx="8" ry="5" fill="#9C5A2C" stroke="var(--ink)" stroke-width="1.2"/><ellipse cx="12" cy="11" rx="8" ry="5" fill="#C9813F" stroke="var(--ink)" stroke-width="1.2"/><ellipse cx="12" cy="11" rx="4.5" ry="2.6" fill="none" stroke="#7A4420" stroke-width="1"/></svg>`,
   hp: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="#C2483A" stroke="var(--ink)" stroke-width="1.3"/></svg>`,
   energy: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 5 13h6l-1 9 8-12h-6z" fill="#E0B043" stroke="var(--ink)" stroke-width="1.3" stroke-linejoin="round"/></svg>`,
   food: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14c1-5 5-8 8-8s7 3 8 8c-1 3-4 4-8 4s-7-1-8-4z" fill="#C98F4A" stroke="var(--ink)" stroke-width="1.3"/><path d="M9 9l1 4M13 8l1 5M17 10l0 4" stroke="var(--ink)" stroke-width="1" fill="none"/></svg>`,

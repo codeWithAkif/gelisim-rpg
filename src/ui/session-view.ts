@@ -49,7 +49,7 @@ export function openSessionRun(cfg: Config, s: GameState, onDone: (r: SessionRes
     el.innerHTML = `<div class="session-inner">
       <p class="hand muted" style="margin:0">${ss.kind === "craft" ? "El işi" : "Çalışıyorsun"}</p><h1>${esc(title)}</h1>
       <div class="hg">${hourglass(p)}</div>
-      <div class="sess-time">${fmtDur(left)}<span class="muted tiny"> kaldı · toplam ${fmtDur(ss.durMs)}</span></div>
+      <div class="sess-time">${fmtDur(left)}<span class="muted tiny"> kaldı · oyunda ${fmtDur(ss.gameMs ?? ss.durMs)}</span></div>
       <div class="gb big"><div class="gf" style="width:${(p * 100).toFixed(2)}%;background:var(--green)"></div></div>
       ${soFar ? `<h3>Şimdiye kadar</h3>${soFar}` : ""}
       <p class="muted tiny">Çalışırken başka bir şey yapamazsın. Uygulamayı kapatabilirsin; süre işlemeye devam eder.</p>
