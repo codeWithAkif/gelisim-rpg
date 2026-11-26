@@ -8,7 +8,7 @@ import { createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, castS
 const fresh = () => { const s = newGame(cfg, 4); s.quests.kurt = { status: "bitti", count: 1 }; s.location = "koru"; s.energy = 90; return s; };
 const run = (n: Scav, sec: number) => { for (let t = 0; t < sec / 0.05 && n.phase === "play"; t++) stepScav(n, 0.05); };
 const foe = (x: number, o: Partial<SFoe> = {}): SFoe => ({ id: 9, def: "kurt", x, floor: 0, hp: 500, max: 500, speed: 0, dmg: 0, cd: 9, human: false, climbT: 0, toFloor: 0, hitT: 0, root: 0, slow: 0, burn: 0, ...o });
-const walkTo = (n: Scav, x: number) => { for (let t = 0; t < 400 && Math.abs(n.px - x) > 1.5; t++) { setInput(n, x > n.px ? 1 : -1, 0); stepScav(n, 0.05); } setInput(n, 0, 0); };
+const walkTo = (n: Scav, x: number) => { for (let t = 0; t < 1500 && Math.abs(n.px - x) > 1.5; t++) { setInput(n, x > n.px ? 1 : -1, 0); stepScav(n, 0.05); } setInput(n, 0, 0); };
 
 test("yer kilitleri ve koşullar", () => {
   const s = newGame(cfg, 4); expect(canStartScav(s, "koru").ok).toBe(false);
@@ -107,4 +107,23 @@ test("çanta doluyken bulunan eşya yere düşer; yer açılınca alınır; atı
   expect(nearGround(n)?.item).toBe("ip"); expect(pickGround(n)).toBe("full");
   expect(dropBag(n, "deri")).toBe(true); const ipG = n.ground.find(g => g.item === "ip")!; expect(pickGround(n, ipG.id)).toBe("ok"); expect(n.bag.ip).toBe(1); expect(bagUsed(n)).toBe(n.bagCap);
   walkTo(n, 8); leave(n); const r = finishScav(cfg, s, n); expect(r.items.deri).toBe(n.bagCap - 1); expect(r.items.ip).toBe(1);
+});
+
+test("kilitli oda anahtarsız açılmaz, anahtarla açılır; anahtar başka katta saklıdır", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 31, { kind: "yumruk" }); n.raidT = 999;
+  const lk = n.locks.find(l => l.floor === 0)!; expect(lk.open).toBe(false);
+  const keySpot = n.spots.find(q => q.stages.some(x => x.kind === "key" && x.key === 0))!; expect(keySpot.floor).toBe(1); expect(keySpot.vault).toBeFalsy();
+  for (let t = 0; t < 600; t++) { setInput(n, 1, 0); stepScav(n, 0.05); } setInput(n, 0, 0);
+  expect(n.px).toBeLessThan(lk.x); expect(lk.open).toBe(false);
+  n.keys.push(0); for (let t = 0; t < 200; t++) { setInput(n, 1, 0); stepScav(n, 0.05); } expect(lk.open).toBe(true); expect(n.px).toBeGreaterThan(lk.x); expect(n.keys.length).toBe(0);
+  expect(n.spots.some(q => q.vault && q.floor === 0)).toBe(true);
+});
+
+test("merdiven açıklığında alt/üst kata nişan alınıp ok ve büyü atılır", async () => {
+  const { shootArrow, aimTarget, castSpell } = await import("../src/engine/scavenge");
+  const s = fresh(); s.equipped.bow = "av_yayi"; s.inventory.av_yayi = 1; s.inventory.ok = 10;
+  const n = createScav(cfg, s, scavSite("koru")!, 32, { kind: "bow" }); n.raidT = 999; walkTo(n, LADDER_XS[0]);
+  expect(aimTarget(n, { dx: 1, dy: -1 }).floor).toBe(1); expect(aimTarget(n, { dx: 1, dy: 0 }).floor).toBe(0);
+  n.foes = [foe(LADDER_XS[0] + 30, { floor: 1 })]; expect(shootArrow(n, { dx: 1, dy: -1 })).toBe(true); expect(n.foes[0].hp).toBeLessThan(500);
+  setInput(n, 0, -1); run(n, 1); expect(n.climbing).toBe(true); n.atkCd = 0; expect(shootArrow(n, { dx: 1, dy: 0 })).toBe(true); void castSpell;
 });

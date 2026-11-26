@@ -2,7 +2,7 @@
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
-  type Scav, type Spot, type Loadout, SW, EXIT_X, LADDER_XS, SPOT_STAGES, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, leave, rerollScav, pickScavCard, finishScav, scavSite, canStartScav,
+  type Scav, type Spot, type Loadout, SW, EXIT_X, LADDER_XS, SPOT_STAGES, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, rerollScav, pickScavCard, finishScav, scavSite, canStartScav,
   SCARDS, bagUsed, dropBag, nearGround, groundNear, pickGround, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
@@ -47,20 +47,20 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="sc-hud"><span id="scMoney"></span><span id="scRaid"></span><span id="scDanger"></span></div></div>
     <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="scTip"></div>
       <div class="sc-stick" id="scStick"><i id="scKnob"></i></div>
-      <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="pick" id="scPick" hidden></button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
+      <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="pick" id="scPick" hidden></button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act aim" data-a="shoot" id="scShoot" hidden></button><button class="sc-act aim" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
     <div class="nb-hp"><div class="gb"><div class="gf" id="scHp" style="background:var(--red)"></div></div><span id="scHpT"></span></div>
     <div class="sc-bar"><span id="scAmmo"></span><button class="btn small" id="scBag" data-c="bag"></button></div>
     <div class="nb-card" id="scCard" hidden></div><div class="nb-card" id="scPause" hidden></div>`;
   document.body.appendChild(el);
   const cv = el.querySelector("canvas")!; const stage = el.querySelector<HTMLElement>(".siege-stage")!; const g = cv.getContext("2d")!;
   const cardEl = el.querySelector<HTMLElement>("#scCard")!; const pauseEl = el.querySelector<HTMLElement>("#scPause")!; const tip = el.querySelector<HTMLElement>("#scTip")!;
-  let W = 300, H = 400, paused = false, raf = 0, ended = false, last = performance.now(); let shake = 0; let walkT = 0;
+  let W = 300, H = 400, paused = false, raf = 0, ended = false, last = performance.now(); let shake = 0; let walkT = 0; let lastLockedMsg = 0;
   const rings: { x: number; floor: number; t: number; r: number; color: string }[] = []; const pops: { x: number; floor: number; t: number; text: string; color: string }[] = []; const shots: { a: number; b: number; floor: number; t: number }[] = [];
   const F = site.floors; const VIEW = 84;
   const layout = () => { const r = stage.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + "px"; cv.style.height = H + "px"; g.setTransform(dpr, 0, 0, dpr, 0, 0); };
   const sc = () => W / VIEW; const camX = () => Math.max(VIEW / 2, Math.min(SW - VIEW / 2, n.px));
   const X = (x: number) => (x - camX()) * sc() + W / 2;
-  const fh = () => Math.min(H / F, 300);
+  const fh = () => Math.min(H / F, 150);
   const top = () => (H - fh() * F) / 2;
   const floorBottom = (f: number) => top() + fh() * (F - f);           // f=0 en altta
   const groundY = (f: number) => floorBottom(f) - 10;
@@ -77,10 +77,14 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     // tuğla/tahta çizgileri
     g.strokeStyle = "rgba(0,0,0,.12)"; g.lineWidth = 1; for (let k = 1; k < 5; k++) { g.beginPath(); g.moveTo(0, y0 + (fh() / 5) * k); g.lineTo(W, y0 + (fh() / 5) * k); g.stroke(); }
     // oda ayırıcı duvarlar (x=100, 200)
-    g.strokeStyle = "rgba(20,16,10,.55)"; g.lineWidth = 3; for (const wx of [100, 200]) { const px = X(wx); g.beginPath(); g.moveTo(px, y0); g.lineTo(px, y0 + fh() * 0.12); g.moveTo(px, y0 + fh() * 0.78); g.lineTo(px, y1); g.stroke(); }
+    g.strokeStyle = "rgba(20,16,10,.55)"; g.lineWidth = 3; for (const wx of [100, 200, 300, 400, 500, 600]) { if (n.locks.some(l => l.floor === f && !l.open && l.x === wx)) continue; const px = X(wx); g.beginPath(); g.moveTo(px, y0); g.lineTo(px, y0 + fh() * 0.12); g.moveTo(px, y0 + fh() * 0.78); g.lineTo(px, y1); g.stroke(); }
     // zemin ve tavan
     g.fillStyle = "#2A2218"; g.fillRect(0, y1 - 10, W, 10); g.fillRect(0, y0, W, 5);
     g.strokeStyle = ink; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, y1 - 10); g.lineTo(W, y1 - 10); g.stroke();
+    const lk = n.locks.find(l => l.floor === f);
+    if (lk && !lk.open) { const px = X(lk.x); g.fillStyle = "#1B150E"; g.fillRect(px - 5, y0 + 5, 10, fh() - 15); g.strokeStyle = "#B08A3A"; g.lineWidth = 3; g.strokeRect(px - 5, y0 + 5, 10, fh() - 15);
+      const cy = y0 + fh() * 0.5; g.fillStyle = "#D9B84A"; g.fillRect(px - 9, cy - 3, 18, 14); g.strokeStyle = "#D9B84A"; g.lineWidth = 3; g.beginPath(); g.arc(px, cy - 3, 6, Math.PI, 0); g.stroke();
+      g.fillStyle = "rgba(0,0,0,.28)"; if (lk.side === "R") g.fillRect(px + 5, y0, W, fh()); else g.fillRect(-W, y0, px - 5 + W, fh()); }
     if (dim) { g.fillStyle = "rgba(10,8,6,.55)"; g.fillRect(0, y0, W, fh()); }
   }
   function ladders() {
@@ -159,6 +163,12 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       g.globalAlpha = 1; const gr = g.createRadialGradient(x, y, 1, x, y, 11); gr.addColorStop(0, col[0]); gr.addColorStop(1, col[1]); g.fillStyle = gr; g.beginPath(); g.arc(x, y, 10 + Math.sin(now / 60) * 1.5, 0, 7); g.fill(); }
     for (const sh of [...shots]) { const a = Math.max(0, (now - sh.t) / 160); if (a > 1) { shots.splice(shots.indexOf(sh), 1); continue; } g.strokeStyle = `rgba(255,245,210,${1 - a})`; g.lineWidth = 2; g.beginPath(); g.moveTo(X(sh.a), gy(sh.floor) - 12 * sc()); g.lineTo(X(sh.b), gy(sh.floor) - 8 * sc()); g.stroke(); }
     for (const r of [...rings]) { const a = Math.max(0, (now - r.t) / 500); if (a > 1) { rings.splice(rings.indexOf(r), 1); continue; } g.strokeStyle = `${r.color}${(1 - a).toFixed(2)})`; g.lineWidth = 4; g.beginPath(); g.ellipse(X(r.x), gy(r.floor) - 8 * sc(), Math.max(0.1, r.r * sc() * a), Math.max(0.1, r.r * sc() * 0.5 * a), 0, 0, 7); g.stroke(); }
+    if (aim && Math.hypot(aim.dx, aim.dy) > 0.25) {
+      const rv = { dx: -aim.dx, dy: -aim.dy }; const tg = aimTarget(n, rv); const hx = X(n.px), hy = gy(n.py) - 11 * sc(); const len = 90 + Math.hypot(aim.dx, aim.dy) * 60; const ty = tg.floor === n.floor ? 0 : (tg.floor > n.floor ? -1 : 1);
+      g.save(); g.setLineDash([8, 6]); g.strokeStyle = "rgba(255,240,180,.9)"; g.lineWidth = 3; g.beginPath(); g.moveTo(hx, hy);
+      const ex = hx + tg.dir * len, ey = hy + ty * Math.min(fh() * 0.7, 60); g.lineTo(ex, ey); g.stroke(); g.setLineDash([]);
+      g.fillStyle = "rgba(255,240,180,.95)"; g.beginPath(); g.arc(ex, ey, 6, 0, 7); g.fill();
+      if (ty) { g.font = `700 ${Math.max(14, sc() * 1.8)}px Caveat, cursive`; g.textAlign = "center"; g.fillText(ty < 0 ? "üst kat" : "alt kat", ex, ey + (ty < 0 ? -10 : 18)); } g.restore(); }
     for (const p of [...pops]) { const a = Math.max(0, (now - p.t) / 1100); if (a > 1) { pops.splice(pops.indexOf(p), 1); continue; } g.globalAlpha = 1 - a; g.fillStyle = p.color; g.strokeStyle = "rgba(0,0,0,.7)"; g.lineWidth = 3; g.font = `700 ${Math.max(16, sc() * 2.3)}px Caveat, cursive`; g.textAlign = "center";
       const px = X(p.x), py = gy(p.floor) - 24 * sc() / 2.4 - a * 26; g.strokeText(p.text, px, py); g.fillText(p.text, px, py); g.globalAlpha = 1; }
     g.restore();
@@ -170,11 +180,12 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     q("#scMoney").textContent = `◉ ${n.money}`; q("#scRaid").textContent = `Sıradaki baskın: ${Math.max(0, Math.ceil(n.raidT))} sn`; q("#scRaid").classList.toggle("hot", n.raidT < 10);
     q("#scDanger").textContent = `Tehlike ${danger(n)}`;
     (q("#scHp") as HTMLElement).style.width = `${Math.max(0, n.hp / n.maxHp * 100)}%`; q("#scHpT").textContent = `${Math.round(n.hp)}/${n.maxHp}`;
-    q("#scAmmo").textContent = `${n.weaponName}${n.bow ? ` · ok ${n.ammo}` : ""}`; q("#scBag").textContent = `Çanta ${bagUsed(n)}/${n.bagCap}`;
+    q("#scAmmo").textContent = `${n.weaponName}${n.bow ? ` · ok ${n.ammo}` : ""}`; q("#scBag").textContent = `Çanta ${bagUsed(n)}/${n.bagCap}${n.keys.length ? ` · 🔑${n.keys.length}` : ""}`;
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
     const ns = nearSpot(n); const sb = q("#scSearch") as HTMLButtonElement; sb.hidden = !ns; sb.textContent = n.searchId ? "Aranıyor…" : "Ara"; sb.classList.toggle("busy", !!n.searchId);
     const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", bagUsed(n) >= n.bagCap); }
     const tb = q("#scTrap") as HTMLButtonElement; tb.hidden = !n.traps.length; if (n.traps.length) { const hand = trapsInHand(n); const cool = n.traps.filter(x => x.state === "cool").map(x => Math.ceil(x.t)); tb.textContent = hand ? `Tuzak ${hand}` : cool.length ? `Tuzak ${Math.min(...cool)} sn` : "Tuzak 0"; tb.disabled = !hand || n.climbing; }
+    const ob = q("#scShoot") as HTMLButtonElement; ob.hidden = !(n.bow && n.ammo > 0); ob.textContent = `Ok ${n.ammo}`; ob.disabled = n.atkCd > 0;
     const pb = q("#scSpell") as HTMLButtonElement; pb.hidden = !n.spell; if (n.spell) { pb.textContent = n.spell.cd > 0 ? `${n.spell.name} ${Math.ceil(n.spell.cd)}` : n.spell.name; pb.disabled = n.spell.cd > 0; }
   }
   function popFx() {
@@ -191,6 +202,9 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       if (f.k === "spell") { rings.push({ x: f.x, floor: f.floor, t: now, r: f.r, color: f.kind === "buz" ? "rgba(159,211,232," : f.kind === "ates" ? "rgba(230,110,50," : "rgba(160,140,255," }); sfx("crit"); buzz("heavy"); shake = 8; }
       if (f.k === "bite") sfx("hit");
       if (f.k === "cast") buzz("light");
+      if (f.k === "key") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Anahtar buldun!", color: "#F4D35E" }); sfx("perfect"); buzz("medium"); }
+      if (f.k === "unlock") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı açıldı", color: "#9BD36B" }); sfx("win"); buzz("medium"); }
+      if (f.k === "locked") { if (now - lastLockedMsg > 1500) { lastLockedMsg = now; tip.hidden = false; tip.textContent = "Kilitli: başka bir odada anahtar var"; setTimeout(() => { tip.hidden = true; }, 1400); sfx("bad"); } }
       if (f.k === "die") sfx("hit");
       if (f.k === "spot") sfx("good");
       if (f.k === "card") showCards();
@@ -223,13 +237,28 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   stick.addEventListener("pointermove", e => { if (e.pointerId === stickId) stickMove(e); });
   const stickEnd = (e: PointerEvent) => { if (e.pointerId === stickId) stickReset(); };
   stick.addEventListener("pointerup", stickEnd); stick.addEventListener("pointercancel", stickEnd);
-  el.querySelector(".sc-acts")!.addEventListener("click", e => {
+  // nişan: düğmeye basıp sürükle (ok atar gibi), bırakınca fırlar; kısa dokunuş otomatik nişandır
+  let aim: { kind: "spell" | "shoot"; sx: number; sy: number; dx: number; dy: number; id: number } | null = null; const AIM_R = 70;
+  const acts = el.querySelector<HTMLElement>(".sc-acts")!;
+  acts.addEventListener("pointerdown", e => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-a=spell], button[data-a=shoot]"); if (!b || b.disabled || n.phase !== "play" || paused) return;
+    aim = { kind: b.dataset.a as "spell" | "shoot", sx: e.clientX, sy: e.clientY, dx: 0, dy: 0, id: e.pointerId }; (b as HTMLElement).setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  acts.addEventListener("pointermove", e => { if (!aim || e.pointerId !== aim.id) return; aim.dx = Math.max(-1, Math.min(1, (e.clientX - aim.sx) / AIM_R)); aim.dy = Math.max(-1, Math.min(1, (e.clientY - aim.sy) / AIM_R)); });
+  const aimEnd = (e: PointerEvent) => {
+    if (!aim || e.pointerId !== aim.id) return; const a = aim; aim = null; if (n.phase !== "play" || paused) return;
+    const manual = Math.hypot(a.dx, a.dy) > 0.25; const av = manual ? { dx: a.dx, dy: a.dy } : undefined;
+    // sürüklemenin ters yönü: ok gibi geriye çekip bırakınca ters yöne fırlar
+    const rv = av ? { dx: -av.dx, dy: -av.dy } : undefined;
+    if (a.kind === "spell") { if (castSpell(n, rv)) sfx("whoosh"); else sfx("bad"); } else { if (shootArrow(n, rv)) sfx("whoosh"); else sfx("bad"); }
+  };
+  acts.addEventListener("pointerup", aimEnd); acts.addEventListener("pointercancel", () => { aim = null; });
+  acts.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b || b.disabled || n.phase !== "play" || paused) return;
     if (b.dataset.c === "exit") { if (leave(n)) sfx("win"); return; }
     if (b.dataset.a === "pick") { const r = pickGround(n); if (r === "ok") sfx("coin"); else { sfx("bad"); if (r === "full") { tip.hidden = false; tip.textContent = "Çanta dolu: önce bir şey at"; setTimeout(() => { tip.hidden = true; }, 1500); } } }
     if (b.dataset.a === "search") { if (beginSearch(n)) { sfx("tap"); stickReset(); } else sfx("bad"); }
     if (b.dataset.a === "trap") { if (placeTrap(n)) sfx("thunk"); else sfx("bad"); }
-    if (b.dataset.a === "spell") { if (castSpell(n)) sfx("whoosh"); else sfx("bad"); }
   });
   const bagEl = el.querySelector<HTMLElement>("#scPause")!;
   let bagSel = "";

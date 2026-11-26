@@ -588,3 +588,4 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .bag-grid .cell { aspect-ratio: 1; display: grid; place-items: center; border: 1.5px solid var(--ink); border-radius: 8px; background: var(--paper-2); padding: 0; }
 .bag-grid .cell.empty { opacity: .45; border-style: dashed; }
 .bag-grid .cell.sel { box-shadow: inset 0 0 0 2px var(--blue); }
+.sc-act.aim { touch-action: none; user-select: none; }
