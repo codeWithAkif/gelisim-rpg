@@ -546,3 +546,17 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .seek-chip.got { opacity: .45; text-decoration: line-through; }
 .seek-chip b { font-weight: 500; }
 .seek-paw { width: 22px; height: 22px; display: inline-block; background: radial-gradient(circle at 50% 62%, var(--ink) 0 34%, transparent 36%), radial-gradient(circle at 22% 35%, var(--ink) 0 14%, transparent 16%), radial-gradient(circle at 42% 18%, var(--ink) 0 14%, transparent 16%), radial-gradient(circle at 62% 18%, var(--ink) 0 14%, transparent 16%), radial-gradient(circle at 80% 35%, var(--ink) 0 14%, transparent 16%); }
+
+/* nöbet: boss çubuğu, kart ekranı (sayfa çevirme, yıldızlar), yiyecek sütunu */
+.nb-boss { flex: 1; display: flex; flex-direction: column; gap: 2px; font-family: var(--f-hand); font-size: 20px; text-align: center; }
+.nb-boss .gb { height: 12px; border-width: 2px; }
+.nb-owned { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; background: none !important; }
+.nb-own { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper-2); font-family: var(--f-hand); font-size: 15px; }
+.nb-own i { font-style: normal; font-weight: 700; color: var(--red); }
+.nb-stars { display: flex; gap: 3px; font-style: normal; margin-top: 2px; }
+.nb-stars i { font-style: normal; color: var(--pencil); font-size: 16px; }
+.nb-stars i.on { color: #B07A1E; }
+.nb-supply { position: absolute; right: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+.nb-sup { position: relative; width: 42px; height: 42px; border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper); display: grid; place-items: center; padding: 0; cursor: pointer; }
+.nb-sup:disabled { opacity: .45; }
+.nb-sup i { position: absolute; right: -4px; bottom: -4px; font-style: normal; font-family: var(--f-hand); font-size: 14px; background: var(--ink); color: var(--paper); border-radius: 8px; padding: 0 5px; }

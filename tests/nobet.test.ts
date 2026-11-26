@@ -3,7 +3,7 @@ import { test, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
 import { newGame, type GameState } from "../src/engine/state";
 import { Rng } from "../src/engine/rng";
-import { waveScale, milestoneReward, createNobet, stepNobet, buyUpgrade, pickCard, useSpell, startWaves, finishNobet, buyPerm, upgradeCost, nobetSite, canStartNobet, nobetSave, type Nobet, type StatId } from "../src/engine/nobet";
+import { waveScale, milestoneReward, createNobet, stepNobet, buyUpgrade, pickCard, useSpell, startWaves, finishNobet, buyPerm, upgradeCost, canCallWave, callWave, useSupply, rerollCards, nobetSite, canStartNobet, nobetSave, type Nobet, type StatId } from "../src/engine/nobet";
 
 function play(s: GameState, seed: number, bot: "bos" | "akilli", limit = 900): Nobet {
   const n = createNobet(cfg, s, nobetSite("yayla")!, seed);
@@ -65,4 +65,14 @@ test("her beş dalgada ödül; köyde köy kadar, nöbet bitince cebe girer", ()
   const yayla = milestoneReward(nobetSite("yayla")!, 5, new Rng(1)), sehir = milestoneReward(nobetSite("ardic_kul")!, 5, new Rng(1));
   expect(sehir.money).toBeGreaterThan(yayla.money);
   expect(milestoneReward(nobetSite("yayla")!, 15, new Rng(1)).money).toBeGreaterThan(yayla.money);
+});
+
+test("sayfa çevirme, erken dalga çağırma ve yiyecekle kule iyileştirme", () => {
+  const s = fresh(); s.inventory.ekmek = 2;
+  const n = createNobet(cfg, s, nobetSite("yayla")!, 5); n.prep = false; n.wave = 1; n.waveLeft = 0; n.foes = []; n.breakT = 5; n.coins = 0;
+  expect(canCallWave(n)).toBe(true); expect(callWave(n)).toBe(true); expect(n.coins).toBeGreaterThan(0); expect(n.breakT).toBe(0);
+  n.hp = n.maxHp * 0.4; expect(useSupply(s, n, "ekmek")).toBe(true); expect(n.hp).toBeGreaterThan(n.maxHp * 0.6); expect(s.inventory.ekmek).toBe(1);
+  n.phase = "card"; n.offer = ["cift", "buz", "kazik"]; const old = [...n.offer];
+  expect(rerollCards(s, n)).toBe(true); expect(n.rerolls).toBe(1); expect(n.offer.length).toBeGreaterThan(0); expect(n.offer.some(x => !old.includes(x))).toBe(true);
+  const dmg0 = n.dmg; n.offer = ["ofke"]; pickCard(s, n, "ofke"); expect(n.dmg).toBeGreaterThan(dmg0);
 });

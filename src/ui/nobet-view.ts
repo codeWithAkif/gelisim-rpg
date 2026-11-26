@@ -5,13 +5,14 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Nobet, type StatId, type NobetResult, NFIELD, TOWER, STAT_NAMES, CARDS, PERMS, createNobet, stepNobet, buyUpgrade, upgradeCost, statValue,
-  pickCard, useSpell, spellReady, placePet, petGuard, type SpellId, type SpellKind, placeBar, placeTrap, pickUp, startWaves, canPlaceNow, structLeft, BAR_LEN, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave, waveScale, type Loot,
+  pickCard, useSpell, spellReady, placePet, petGuard, type SpellId, type SpellKind, placeBar, placeTrap, pickUp, startWaves, canPlaceNow, structLeft, rerollCards, callWave, canCallWave, useSupply, SUPPLIES, BAR_LEN, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave, waveScale, type Loot,
 } from "../engine/nobet";
 import { ENEMIES } from "../content/world";
 import { hasBow } from "../engine/gear";
 import { structure, owned } from "../engine/engineering";
 import { spellOptions } from "../engine/magic";
-import { artUrl } from "./art";
+import { artUrl, itemPic } from "./art";
+import { itemInfo } from "../engine/inventory";
 import { esc } from "./sketch";
 import { GAME_ITEMS } from "../content/world";
 export const lootText = (l: Loot) => [l.money ? `${l.money} bakır` : "", ...Object.entries(l.items).map(([k, v]) => `${GAME_ITEMS[k]?.name ?? k}${v > 1 ? " ×" + v : ""}`)].filter(Boolean).join(", ");
@@ -53,8 +54,8 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   const n: Nobet = createNobet(cfg, s, site, (s.seed * 31 + s.day * 977 + Math.floor(s.minute)) | 0);
   s.energy = Math.max(0, s.energy - 10); persist();
   const el = document.createElement("div"); el.className = "siege nobet"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Nöbet");
-  el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="nb-waves" id="nbWaves"></div><button class="btn small" data-c="speed">1x</button></div>
-    <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="nbTip"></div></div><div class="nb-spells" id="nbSpells"></div>
+  el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="nb-waves" id="nbWaves"></div><button class="btn small" data-c="call" id="nbCall" title="Sıradaki dalgayı hemen çağır" hidden>⏭</button><button class="btn small" data-c="speed">1x</button></div>
+    <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="nbTip"></div><div class="nb-supply" id="nbSupply"></div></div><div class="nb-spells" id="nbSpells"></div>
     <div class="nb-hp"><div class="gb"><div class="gf" id="nbHp" style="background:var(--red)"></div></div><span id="nbHpT"></span></div>
     <div class="nb-bar"><div class="nb-page" title="Defter sayfası"><div class="gf" id="nbPage"></div></div><span class="nb-coins" id="nbCoins"></span></div>
     <div class="nb-build" id="nbBuild" hidden></div><div class="nb-ups" id="nbUps"></div><div class="nb-card" id="nbCard" hidden></div><div class="nb-card" id="nbPause" hidden></div>`;
@@ -89,16 +90,22 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   });
   function showCards() {
     cardEl.hidden = false; sfx("perfect"); buzz("medium");
-    cardEl.innerHTML = `<p class="hand" style="margin:0;font-size:24px">Defterden bir sayfa</p><p class="tiny muted" style="margin:0">Birini seç; nöbet boyunca seninle.</p>
+    const owned = Object.entries(n.cards).filter(([, v]) => v > 0);
+    cardEl.innerHTML = `<p class="hand" style="margin:0;font-size:26px">Defterden bir sayfa</p><p class="tiny muted" style="margin:0">Birini seç; nöbet boyunca seninle.</p>
+      ${owned.length ? `<div class="nb-owned">${owned.map(([id, v]) => `<span class="nb-own" title="${esc(CARDS.find(c => c.id === id)?.name ?? id)}"><b>${esc((CARDS.find(c => c.id === id)?.name ?? id).slice(0, 10))}</b><i>${v}</i></span>`).join("")}</div>` : ""}
       ${n.offer.map(id => { const c = CARDS.find(x => x.id === id)!; const lv = n.cards[id] ?? 0;
-        return `<button class="choice" data-card="${id}"><b>${esc(c.name)}${lv ? ` ${"I".repeat(lv + 1)}` : ""}</b><span>${esc(c.desc)}</span></button>`; }).join("")}`;
+        const stars = Array.from({ length: c.max }, (_, k) => `<i class="${k <= lv ? "on" : ""}">★</i>`).join("");
+        return `<button class="choice" data-card="${id}"><b>${esc(c.name)}${lv ? ` ${"I".repeat(lv + 1)}` : ""}</b><span>${esc(c.desc)}</span><em class="nb-stars">${stars}</em></button>`; }).join("")}
+      <button class="btn small" data-reroll ${n.rerolls > 0 ? "" : "disabled"}>Sayfayı çevir (${n.rerolls}/2)</button>`;
   }
   cardEl.addEventListener("click", e => {
+    if ((e.target as HTMLElement).closest("[data-reroll]")) { if (rerollCards(s, n)) { sfx("page"); showCards(); } else sfx("bad"); return; }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-card]"); if (!b) return;
     if (pickCard(s, n, b.dataset.card!)) { cardEl.hidden = true; sfx("page"); if (n.phase === "card") showCards(); }
   });
   el.querySelector(".nb-top")!.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-c]"); if (!b) return;
+    if (b.dataset.c === "call") { if (callWave(n)) { sfx("beat"); buzz("light"); } else sfx("bad"); return; }
     if (b.dataset.c === "speed") { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; b.textContent = `${speed}x`; sfx("tap"); }
     if (b.dataset.c === "pause") { paused = true; pauseEl.hidden = false;
       pauseEl.innerHTML = `<p class="hand" style="margin:0;font-size:26px">Mola</p><p class="tiny muted" style="margin:0">${n.wave}. dalga · ${n.stats.kills} düşman</p>
@@ -302,9 +309,22 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     renderSpells(); renderBuild();
     for (const [id, sp] of Object.entries(n.spells)) { const b = spellBar.querySelector<HTMLElement>(`[data-spell="${id}"]`); if (!b) continue;
       (b.querySelector(".cdf") as HTMLElement).style.height = `${(sp!.cd / sp!.max) * 100}%`; b.classList.toggle("ready", sp!.cd <= 0); }
+    (el.querySelector("#nbCall") as HTMLElement).hidden = !canCallWave(n) || n.breakT <= 0.05;
+    renderSupply();
+    const boss = n.foes.find(f => f.boss);
+    if (boss) { const bn = ENEMIES[boss.def]?.name ?? "Lider"; el.querySelector("#nbWaves")!.innerHTML = `<div class="nb-boss"><b>${esc(bn)}</b><div class="gb"><div class="gf" style="width:${Math.max(0, boss.hp / boss.max * 100)}%;background:var(--red)"></div></div></div>`; return; }
     const w = Math.max(1, n.wave); const marks = [0, 1, 2, 3].map(i => w + i);
     el.querySelector("#nbWaves")!.innerHTML = marks.map((m, i) => `<span class="${i === 0 ? "now" : ""} ${isBossWave(m) ? "boss" : ""}">${isBossWave(m) ? "☠" : m}</span>`).join("<i></i>");
   }
+
+  /* ---------- çantadaki yiyecek kuleye can ---------- */
+  const supplyEl = el.querySelector<HTMLElement>("#nbSupply")!; let supplyKey = "";
+  function renderSupply() {
+    const ids = Object.keys(SUPPLIES).filter(id => (s.inventory[id] ?? 0) > 0); const key = ids.map(id => id + s.inventory[id]).join() + (n.hp < n.maxHp);
+    if (key === supplyKey) return; supplyKey = key;
+    supplyEl.innerHTML = ids.map(id => `<button class="nb-sup" data-sup="${id}" ${n.hp >= n.maxHp ? "disabled" : ""} aria-label="${esc(itemInfo(cfg, id).name)}">${itemPic(id, 30)}<i>${s.inventory[id]}</i></button>`).join("");
+  }
+  supplyEl.addEventListener("click", e => { const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-sup]"); if (!b) return; if (useSupply(s, n, b.dataset.sup!)) { sfx("good"); buzz("light"); supplyKey = ""; } else sfx("bad"); });
 
   /* ---------- döngü ---------- */
   let last = performance.now(); let raf = 0; let ended = false; let tick = 0;

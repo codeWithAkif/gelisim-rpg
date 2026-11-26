@@ -74,6 +74,12 @@ export const CARDS: Card[] = [
   { id: "kan", name: "Kurt postu", desc: "Her öldürdüğün düşman bir parça can verir.", max: 3 },
   { id: "kese", name: "Dolu kese", desc: "Düşenlerden %30 daha çok kırıntı.", max: 3 },
   { id: "diken", name: "Dikenli sur", desc: "Sura vuran, vurduğunun yarısını geri yer.", max: 2 },
+  { id: "restorasyon", name: "Restorasyon", desc: "Kule yenilenmesi +%25.", max: 4 },
+  { id: "sans", name: "Şans", desc: "Kritik şansı +%5.", max: 3 },
+  { id: "gorus", name: "Görüş", desc: "Menzil +%8.", max: 3, bow: true },
+  { id: "ofke", name: "Öfke", desc: "Hasar +%8.", max: 4 },
+  { id: "hiz_hasar", name: "Hasar için hız", desc: "Atış hızı +%15, hasar −%4.", max: 3 },
+  { id: "hasar_hiz", name: "Hız için hasar", desc: "Hasar +%15, atış hızı −%4.", max: 3 },
   { id: "nefes", name: "Derin nefes", desc: "Bütün büyüler %20 daha çabuk dolar.", max: 3, spell: true },
 ];
 
@@ -87,7 +93,7 @@ export type NFx =
 export interface Nobet {
   site: NobetSite; phase: "play" | "card" | "over"; time: number; wave: number; waveLeft: number; spawnT: number; breakT: number;
   hp: number; maxHp: number; regen: number; dmg: number; rate: number; range: number; crit: number;
-  lv: Record<StatId, number>; coins: number; cards: Record<string, number>; offer: string[];
+  lv: Record<StatId, number>; rerolls: number; coins: number; cards: Record<string, number>; offer: string[];
   page: number; pageNeed: number; fireCd: number; shotsFired: number;
   spells: Record<SpellId, NSpell>;
   bow: boolean; melee: number; meleeCd: number; meleeFx: number;      // yay varsa uzaktan atar; yanına gelene eldeki silahla vurur
@@ -112,7 +118,7 @@ export function createNobet(cfg: Config, s: GameState, site: NobetSite, seed: nu
     hp, maxHp: hp, regen: 0.3, dmg: dmg, rate: (0.9 + lvA(s, "refleks") / 80) * (1 + pm("cabuk") * 0.05), range: (30 + lvA(s, "gorus") / 8) * (s.pet?.id === "sahin" && (s.pet.bond ?? 0) >= 10 ? 1.1 : 1), crit: 0.05 + lvA(s, "okculuk") / 400 + pm("keskin") * 0.02 + (s.pet?.id === "sahin" && (s.pet.bond ?? 0) >= 75 ? 0.1 : 0),
     bow: hasBow(s), melee: (weaponSet(cfg, s).dmg + lvA(s, "ust_govde") / 10) * (1 + pm("guc") * 0.08), meleeCd: 0, meleeFx: 0,
     prep: owned(s, "kazik_barikat") + trapsOwned(s).reduce((a, x) => a + x.n, 0) > 0, bars: [], traps: [], petBond: s.pet?.bond ?? 0,
-    lv: { dmg: 0, rate: 0, hp: 0, regen: 0, range: 0 }, coins: 8 + pm("miras") * 6, cards: {}, offer: [],
+    lv: { dmg: 0, rate: 0, hp: 0, regen: 0, range: 0 }, rerolls: 2, coins: 8 + pm("miras") * 6, cards: {}, offer: [],
     page: 0, pageNeed: 6, fireCd: 0, shotsFired: 0,
     spells: startSpells(cfg, s), helpers: partyHeroes(s).map((h, i) => ({ id: h.id, name: heroDef(h.id)!.name, role: heroDef(h.id)!.role, cd: 0.6 + i * 0.4, dmg: (heroStats(h).dmg[0] + heroStats(h).dmg[1]) / 2, a: Math.PI * (0.62 + i * 0.28) })), pet: s.pet ? { x: TOWER.x, y: TOWER.y + 16, hx: TOWER.x, hy: TOWER.y + 16, cd: 0, lv: 1, wx: TOWER.x, wy: TOWER.y + 16, wt: 0 } : undefined,
     loot: { money: 0, items: {} }, rewarded: 0, foes: [], shots: [], fx: [], nextId: 1, seed, rng,
@@ -139,10 +145,38 @@ function offerCards(s: GameState, n: Nobet) {
   if (!out.length) return;
   n.offer = out; n.phase = "card"; n.fx.push({ k: "card" });
 }
+/** Sayfa tekrar çevir: seçenekleri yeniler (nöbet başına iki hak). */
+export function rerollCards(s: GameState, n: Nobet): boolean {
+  if (n.phase !== "card" || n.rerolls <= 0) return false;
+  const old = n.offer; const pool = availableCards(s, n).map(c => c.id).filter(id => !old.includes(id)); const out: string[] = [];
+  const rest = availableCards(s, n).map(c => c.id).filter(id => old.includes(id));
+  const all = pool.length >= 3 ? pool : [...pool, ...rest];
+  while (out.length < 3 && all.length) out.push(all.splice(Math.floor(n.rng.next() * all.length), 1)[0]);
+  if (!out.length) return false;
+  n.rerolls--; n.offer = out; return true;
+}
+/** Beklemeden sıradaki dalgayı çağır: kısa bir ödül verir. */
+export const canCallWave = (n: Nobet) => n.phase === "play" && !n.prep && n.waveLeft <= 0 && n.foes.length === 0 && n.wave > 0;
+export function callWave(n: Nobet): boolean {
+  if (!canCallWave(n) || n.breakT <= 0.05) return false;
+  n.coins += 2 + n.wave; n.stats.coins += 2 + n.wave; n.breakT = 0; return true;
+}
+/** Çantadaki yiyecek kuleye can olur. */
+export const SUPPLIES: Record<string, number> = { ekmek: 0.3, peynir: 0.35, elma: 0.15 };
+export function useSupply(s: GameState, n: Nobet, id: string): boolean {
+  const k = SUPPLIES[id]; if (!k || (s.inventory[id] ?? 0) <= 0 || n.phase !== "play" || n.hp >= n.maxHp) return false;
+  s.inventory[id]--; if (s.inventory[id] <= 0) delete s.inventory[id]; n.hp = Math.min(n.maxHp, n.hp + n.maxHp * k); return true;
+}
 export function pickCard(s: GameState, n: Nobet, id: string): boolean {
   if (n.phase !== "card" || !n.offer.includes(id)) return false;
   n.cards[id] = (n.cards[id] ?? 0) + 1; n.offer = []; n.phase = "play"; n.stats.cards++;
   if (id === "kritik") n.crit += 0.08;
+  if (id === "restorasyon") n.regen *= 1.25;
+  if (id === "sans") n.crit += 0.05;
+  if (id === "gorus") n.range = Math.min(58, n.range * 1.08);
+  if (id === "ofke") { n.dmg *= 1.08; n.melee *= 1.08; }
+  if (id === "hiz_hasar") { n.rate *= 1.15; n.dmg *= 0.96; n.melee *= 0.96; }
+  if (id === "hasar_hiz") { n.dmg *= 1.15; n.melee *= 1.15; n.rate *= 0.96; }
   if (id === "nefes") for (const sp of Object.values(n.spells)) sp!.max *= 0.8;
   if (id === "kopek" && n.pet) n.pet.lv++;
   return true;
