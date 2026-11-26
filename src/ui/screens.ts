@@ -1,7 +1,7 @@
 // Ekranlar. Bilgi sayfaları: Defter, Vücut. Karar sayfaları: Çanta, Çalış, İşler.
 // Her ekran HTML üretir; tıklamalar app.ts'deki data-act işleyicilerine gider.
 import type { Config } from "../engine/config";
-import { type GameState, clock, minutesLeft, repOf } from "../engine/state";
+import { type GameState, clock, minutesLeft, minutesToDark, repOf } from "../engine/state";
 import { DEFERRED_CATEGORIES, type GainReport } from "../engine/progression";
 import { questList, npc } from "../engine/quests";
 import { maxHp } from "../engine/combat";
@@ -366,7 +366,8 @@ export function islerScreen(cfg: Config, s: GameState, ui: UiState = {}): string
   return `<div class="page">
     ${s.journey ? "" : placePic(s.location, here(s).name, "art-place")}
     <section class="sec card"><div class="entry-head"><h2>Bugün</h2><span class="hand">${clock(s)}</span></div>
-      <p style="margin:0">${left > 0 ? `Hava kararmadan <b>${Math.floor(left / 60)} saat ${left % 60} dakika</b> var.` : "Gün bitti. Dinlenmezsen yarın hiçbir şey yapamazsın."}</p>
+      <p style="margin:0">${(() => { const dark = minutesToDark(s); const hm = (m: number) => `${Math.floor(m / 60)} saat ${Math.round(m % 60)} dakika`;
+        return dark > 0 ? `Hava kararmadan <b>${hm(dark)}</b> var.` : left > 0 ? `<b class="red">Gece.</b> Kurtlar avda, yollar tehlikeli; ama gece işi daha çok kazandırır. Uykusuzluk sınırına <b>${hm(left)}</b> var; geç yatarsan iyi dinlenemezsin.` : "Gecenin sonu. Uyumazsan yarın hiçbir şey yapamazsın."; })()}</p>
       <div class="row"><button class="btn primary" data-act="sleep">Uyu ya da dinlen</button>
       <span class="muted tiny">Nerede uyuduğun önemli: misafir olunan ev güvenli, açıkta uyumak tehlikeli. Dinlenmek enerji verir ama acıktırır.</span></div></section>
     ${exploreCards(cfg, s)}

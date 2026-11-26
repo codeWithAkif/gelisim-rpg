@@ -20,7 +20,7 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
   const out: PlaceAction[] = [];
   const qs = questList(s);
   for (const q of qs) if (q.status === "aktif" && q.def.at === placeId)
-    out.push({ act: q.def.battle || q.def.siege ? "fight" : "walk", id: q.def.id, label: q.def.siege ? `Savun: ${q.def.title}` : q.def.battle ? `Savaş: ${q.def.title}` : `${q.def.doneText ?? "Yap"}: ${q.def.title}`, sub: q.def.siege ? "Dalga dalga saldırı; önce barikat kurarsın." : q.def.battle ? "Önce hazırlık ekranı açılır." : `${q.def.minutes} dk`, primary: true });
+    out.push({ act: q.def.battle || q.def.siege ? "fight" : "walk", id: q.def.id, label: q.def.siege ? `Savun: ${q.def.title}` : q.def.battle ? `Savaş: ${q.def.title}` : `${q.def.doneText ?? "Yap"}: ${q.def.title}`, sub: q.def.siege ? "Dalga dalga saldırı; önce barikat kurarsın." : q.def.battle ? "Göğüs göğüse, barikat ya da gizlenerek." : `${q.def.minutes} dk`, primary: true });
   for (const q of qs) if (q.status === "yeni" && NPC_PLACE[q.def.giverNpc] === placeId)
     out.push({ act: "accept", id: q.def.id, label: `İşi üstlen: ${q.def.title}`, sub: `${npc(q.def.giverNpc).name} · ${place(q.def.at)?.name ?? ""}` });
   for (const r of dailyRequests(s)) if (r.place === placeId && !r.done)

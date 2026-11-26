@@ -20,6 +20,11 @@ import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaSc
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { openSiege } from "./siege-view";
+import { openStealth } from "./stealth-view";
+import { rollFoes, bonusOf, modeOptions, stealthGoal, siegeFromFoes, groundOf, type Mode, type Context } from "../engine/encounter";
+import { addItem } from "../engine/inventory";
+import { isNight } from "../engine/state";
+import type { BattleOutcome } from "../engine/combat";
 import { SIEGES } from "../engine/siege";
 import { showIntro } from "./intro";
 import { applyDaylight } from "./daylight";
@@ -238,12 +243,12 @@ export function startApp(root: HTMLElement) {
     for (const o of opts) if (o.ok) btns.push({ label: o.kind === "lodging" ? `Burada uyu${o.cost ? ` (${o.cost} bakır)` : ""}` : o.name, cls: o.kind === "lodging" ? "primary" : "", fn: () => doSleep(o.kind) });
     for (const m of [30, 60, 120]) if (left >= m) btns.push({ label: `${m < 60 ? m + " dk" : m / 60 + " saat"} dinlen`, fn: () => doRest(m) });
     btns.push({ label: "Vazgeç", fn: () => {} });
-    modal(`<p class="hand muted" style="margin:0">${left > 4 * 60 ? "Daha erken" : "Gün bitiyor"} · ${clockStr()}</p><h2>Uyu ya da dinlen</h2>
+    modal(`<p class="hand muted" style="margin:0">${isNight(s) ? (left < 120 ? "Gecenin sonu" : "Gece") : "Daha erken"} · ${clockStr()}</p><h2>Uyu ya da dinlen</h2>
       ${opts.map(o => `<div class="here-act${o.kind === "lodging" && o.ok ? " main" : ""}"><div><b>${esc(o.name)}</b><div class="tiny muted">${esc(o.note)}</div>
         <div class="tiny">Dinlenme %${Math.round(o.quality * 100)} · ${pct(o.risk)}${o.risk > 0 ? ` (%${Math.round(o.risk * 100)})` : ""}</div>${o.ok ? "" : `<div class="tiny red">${esc(o.reason ?? "")}</div>`}</div></div>`).join("")}
       <p class="muted tiny" style="margin:0">Dinlenmek zamanı ilerletir: enerjin ve büyü gücün döner ama acıkırsın. Gece kası işler, yarayı uyku kapatır. ${s.pet ? `${esc(s.pet.name)} yanındayken açıkta daha güvendesin.` : ""}</p>`, btns);
   }
-  function clockStr() { const h = 6 + Math.floor(s.minute / 60), mm = Math.floor(s.minute % 60); return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`; }
+  function clockStr() { const h = (6 + Math.floor(s.minute / 60)) % 24, mm = Math.floor(s.minute % 60); return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`; }
   function doRest(m: number) {
     const r = rest(cfg, s, m); if ("error" in r) { toast(r.error); return; }
     sfx("page"); persist(); render();
@@ -296,6 +301,7 @@ export function startApp(root: HTMLElement) {
     if (r.money) items.push(`${r.money} bakır`);
     return `${r.after ? `<p class="story-after">${esc(r.after)}</p>` : ""}
       <p style="margin:0">${esc(r.note)}</p>
+      ${r.bonus ? `<p class="hand red" style="margin:0">${esc(r.bonus)}</p>` : ""}
       <p class="hand blue" style="margin:0">${items.join(", ")}${items.length ? " · " : ""}tanınırlık +${+r.rep.toFixed(1)}</p>
       ${r.relics.map(x => `<div class="relic-card"><div class="relic-glow"></div><div><p class="hand red" style="margin:0">Kadim eşya</p><h3>${esc(x.name)}</h3><p class="tiny" style="margin:0">${esc(x.desc)}</p></div></div>`).join("")}
       ${Object.keys(r.gains).length ? `<h3>${r.relics.length ? "Güç sıçraması" : "Öğrendiklerin"}</h3>${gainList(cfg, r.gains, 8)}` : ""}`;
@@ -308,34 +314,68 @@ export function startApp(root: HTMLElement) {
         modal(`<h2>${esc(QUESTS.find(q => q.id === id)!.title)}</h2>${rewardHtml(r)}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
         return;
         }
+  /** Nasıl savaşacaksın: göğüs göğüse, barikat, gizlenme. Her karşılaşmada sorulur. */
+  function chooseMode(title: string, foes: string[], ctx: Context, pick: (m: Mode) => void, cancel?: () => void) {
+    const counts: Record<string, number> = {}; for (const f of foes) counts[f] = (counts[f] ?? 0) + 1;
+    const who = Object.entries(counts).map(([k, n]) => `${n > 1 ? n + " " : ""}${ENEMIES[k]?.name ?? k}`).join(", ");
+    const opts = modeOptions(s, foes, ctx);
+    const bg = document.createElement("div"); bg.className = "modal-bg";
+    bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">${ctx === "yol" ? "Yolda" : "Karşılaşma"}${isNight(s) ? " · gece" : ""}</p><h2>${esc(title)}</h2>
+      <p style="margin:0">Karşında: <b>${esc(who)}</b>.${isNight(s) ? ` <span class="red">Gece: daha kalabalık, daha tehlikeli; ödülü de fazla.</span>` : ""}</p>
+      <h3 style="margin:4px 0 0">Nasıl karşılayacaksın?</h3>
+      <div class="choices modes">${opts.map(o => `<button class="choice" data-m="${o.id}" ${o.ok ? "" : "disabled"}><b>${esc(o.name)}</b><span>${esc(o.desc)}</span><span class="muted tiny">${esc(o.reason ?? o.outcome)}</span></button>`).join("")}</div>
+      ${cancel ? `<div class="row"><button class="btn" data-m="x">Vazgeç</button></div>` : ""}</div>`;
+    document.body.appendChild(bg); sfx("page");
+    bg.addEventListener("click", e => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-m]"); if (!b || b.disabled) return;
+      bg.remove(); if (b.dataset.m === "x") { cancel?.(); return; } pick(b.dataset.m as Mode);
+    });
+  }
   function doFight(id: string) {
         const q = QUESTS.find(x => x.id === id)!;
         if (s.energy < 15) { toast("Bu yorgunlukla savaşa giremezsin; dinlen."); return; }
-        if (q.siege) {
-          openSiege(cfg, s, SIEGES[q.siege], (s.seed + s.day * 31) | 0, (won, gains) => {
-            let extra = "";
-            if (won) { const r = completeQuest(cfg, s, id); extra = `<h3>Ödül</h3>${rewardHtml(r)}`; }
-            persist(); render();
-            modal(`<h2>${won ? "Gece geçti" : "Savunma düştü"}</h2><p class="lede">${won ? "Son dalga da çekildi. Sabaha kadar nöbet tuttun." : "Geri çekilmek zorunda kaldın. Dinlen, kazıkları daha iyi yerleştir, yeniden dene."}</p>
-              <h3>Savaşta gelişen</h3>${gainList(cfg, gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
-          }, persist);
-          return;
-        }
-        openPlan(cfg, s, id, q.title, q.battle!.map, q.battle!.enemies, (sc, plan) => openBattle(cfg, s, sc, plan, id, (o) => {
+        const siegeEnd = (won: boolean, gains: Record<string, number>, foes?: string[]) => {
+          let extra = "";
+          if (won) { const r = completeQuest(cfg, s, id, foes ? bonusOf(s, q.battle!.enemies, foes) : bonusOf(s, [], [])); extra = `<h3>Ödül</h3>${rewardHtml(r)}`; }
+          persist(); render();
+          modal(`<h2>${won ? "Savunma tuttu" : "Savunma düştü"}</h2><p class="lede">${won ? "Son dalga da çekildi." : "Geri çekilmek zorunda kaldın. Dinlen, kazıkları daha iyi yerleştir, yeniden dene."}</p>
+            <h3>Savaşta gelişen</h3>${gainList(cfg, gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
+        };
+        if (q.siege) { openSiege(cfg, s, SIEGES[q.siege], (s.seed + s.day * 31) | 0, (won, gains) => siegeEnd(won, gains), persist); return; }
+        const base = q.battle!.enemies; const foes = rollFoes(s, base, id);
+        const W = foeWords(foes); const big = foes.find(e => (ENEMIES[e]?.scale ?? 1) > 1);
+        const battleEnd = (o: BattleOutcome) => {
           let extra = "";
           if (o.result === "won") {
-            const r = completeQuest(cfg, s, id);
+            const r = completeQuest(cfg, s, id, bonusOf(s, base, foes));
             if (Object.keys(r.dropped).length) toast("Çantan doluydu; bazı ödülleri taşıyamadın.");
             extra = `<h3>Ödül</h3>${rewardHtml(r)}`; if (r.relics.length) sfx("perfect");
           }
           persist(); render();
           const boss = id === "akyele"; const home = q.giverNpc === "hasan";
-          const W = foeWords(q.battle!.enemies); const big = q.battle!.enemies.find(e => ENEMIES[e]?.scale);
           modal(`<h2>${o.result === "won" ? (big ? `${esc(ENEMIES[big].name)} düştü` : `${esc(cap(W.pl))} dağıldı`) : o.result === "fled" ? "Geri çekildin" : "Yenildin"}</h2>
             <p class="lede">${o.result === "lost" ? (boss ? "Sürü seni inden kovaladı; köylüler seni yarı baygın buldu. Hazırlanmadan dönme." : home ? "Hasan seni yaralı hâlde bulup köye taşıdı. Dinlenmeden tekrar deneme." : "Yaralı hâlde sürünerek kurtuldun. Dinlenmeden, hazırlanmadan tekrar deneme.") : o.result === "fled" ? (big ? `Sağ çıktın. ${esc(ENEMIES[big].name)} seni artık tanıyor.` : `${esc(cap(W.pl))} hâlâ orada. Hazırlanıp tekrar dene.`) : boss ? "Kalan kurtlar uluyarak kuzeye kaçtı." : home ? "Hasan uzaktan izliyordu; koşarak geldi." : "Nefesin yerine geldi; geride sessizlik kaldı."}</p>
             <h3>Savaşta gelişen</h3>${gainList(cfg, o.gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
-        }, persist), () => { persist(); render(); });
-          }
+        };
+        chooseMode(q.title, foes, "gorev", mode => {
+          if (mode === "yakin") { openPlan(cfg, s, id, q.title, q.battle!.map, foes, (sc, plan) => openBattle(cfg, s, sc, plan, id, battleEnd, persist), () => { persist(); render(); }); return; }
+          if (mode === "barikat") { openSiege(cfg, s, siegeFromFoes(q.title, foes, groundOf(s.region, foes)), (s.seed + s.day * 31 + s.minute) | 0, (won, gains) => siegeEnd(won, gains, foes), persist); return; }
+          const goal = stealthGoal(foes, "gorev"); const night = isNight(s);
+          openStealth(cfg, s, q.title, foes, goal, (s.seed * 7 + s.day * 131 + s.minute) | 0, night, (won, gains) => {
+            persist(); render();
+            const sc = makeScenario(s, q.battle!.map, foes, id);
+            if (won && goal === "sizma") {
+              const r = completeQuest(cfg, s, id, bonusOf(s, base, foes)); persist(); render(); if (r.relics.length) sfx("perfect");
+              modal(`<h2>Kimse görmedi</h2><p class="lede">Gölgeden gölgeye geçtin; muhafızlar sırtlarını döndüğünde içerideydin. Tek kılıç çekilmedi.</p>
+                <h3>Gizlenirken gelişen</h3>${gainList(cfg, gains, 6)}<h3>Ödül</h3>${rewardHtml(r)}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
+              return;
+            }
+            modal(won ? `<h2>Pusudasın</h2><p class="lede">${esc(cap(W.pl))} seni fark etmedi. İlk vuruş senin.</p>${gainList(cfg, gains, 4)}`
+              : `<h2>Görüldün!</h2><p class="lede">Bir dal çatırdadı; bakışlar sana döndü. Kaçacak yer yok.</p>${gainList(cfg, gains, 4)}`,
+              [{ label: "Savaş", cls: "primary", fn: () => openBattle(cfg, s, sc, { ...DEFAULT_PLAN, surprise: won, ambushed: !won }, id, battleEnd, persist) }]);
+          }, persist);
+        }, () => {});
+  }
   /* ---------- yolculuk: her saniye ilerleme, sürpriz ve varış ---------- */
   let eventOpen = false;
   function journeyTick() {
@@ -356,11 +396,26 @@ export function startApp(root: HTMLElement) {
         const out = resolveEvent(cfg, s, b.dataset.c!, Date.now()); persist();
         const cont = () => { eventOpen = false; resumeJourney(s, Date.now()); persist(); render(); journeyTick(); };
         if (out.battle) {
-          const sc = makeScenario(s, AMBUSH_MAP, ["kurt"], "pusu" + s.day + s.minute);
-          openBattle(cfg, s, sc, { ...DEFAULT_PLAN, ambushed: true }, undefined, o => {
-            persist(); render();
-            modal(`<h2>${o.result === "won" ? "Kurt kaçtı" : o.result === "fled" ? "Sıyrıldın" : "Yaralandın"}</h2><p class="lede">${o.result === "lost" ? "Kanayan kolunla yoluna devam ettin." : "Soluklanıp yoluna devam ettin."}</p>${gainList(cfg, o.gains, 5)}`, [{ label: "Yola devam", cls: "primary", fn: cont }]);
-          }, persist);
+          const foes = rollFoes(s, out.foes ?? ["kurt"], "yol" + s.day + Math.floor(s.minute)); const night = isNight(s);
+          const spoils = (won: boolean) => won ? (addItem(cfg, s, "deri", night ? 2 : 1) ? "" : ` ${night ? "İki" : "Bir"} deri yüzdün.`) : "";
+          const endModal = (head: string, text: string, gains: Record<string, number>) => { persist(); render(); modal(`<h2>${esc(head)}</h2><p class="lede">${esc(text)}</p>${gainList(cfg, gains, 5)}`, [{ label: "Yola devam", cls: "primary", fn: cont }]); };
+          const melee = (plan = { ...DEFAULT_PLAN, ambushed: true }) => {
+            const sc = makeScenario(s, AMBUSH_MAP, foes, "pusu" + s.day + s.minute);
+            openBattle(cfg, s, sc, plan, undefined, o => endModal(o.result === "won" ? (foes.length > 1 ? "Sürü dağıldı" : "Kurt kaçtı") : o.result === "fled" ? "Sıyrıldın" : "Yaralandın",
+              (o.result === "lost" ? "Kanayan kolunla yoluna devam ettin." : "Soluklanıp yoluna devam ettin.") + spoils(o.result === "won"), o.gains), persist);
+          };
+          chooseMode(due.def.title, foes, "yol", mode => {
+            if (mode === "yakin") { melee(); return; }
+            if (mode === "barikat") {
+              openSiege(cfg, s, siegeFromFoes(due.def.title, foes, groundOf(s.region, foes)), (s.seed + s.day * 17 + s.minute) | 0,
+                (won, gains) => endModal(won ? "Atlattın" : "Yaralandın", (won ? "Kazıkların arkasında sabaha kadar dayandın; sonunda çekildiler." : "Kazıklar dağıldı; zar zor sıyrıldın.") + spoils(won), gains), persist);
+              return;
+            }
+            openStealth(cfg, s, due.def.title, foes, "kacis", (s.seed * 3 + s.day * 53 + s.minute) | 0, night, (won, gains) => {
+              if (won) { endModal("Sıyrıldın", "Görünmeden geçtin; arkanda yalnızca rüzgâr kaldı.", gains); return; }
+              persist(); modal(`<h2>Görüldün!</h2><p class="lede">Kokunu aldılar. Kaçacak yer yok.</p>`, [{ label: "Savaş", cls: "primary", fn: () => melee() }]);
+            }, persist);
+          });
           return;
         }
         modal(`<h2>${esc(due.def.title)}</h2><p style="font-size:17px">${esc(out.text)}</p>${Object.keys(out.gains).length ? gainList(cfg, out.gains, 4) : ""}`, [{ label: "Yola devam", cls: "primary", fn: cont }]);

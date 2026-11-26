@@ -420,3 +420,7 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .spell-btn.on { background: rgba(158,52,35,.18); border-color: var(--red); }
 .spell-btn:disabled { opacity: .55; }
 .spell-btn .cdf { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(46,76,122,.28); transition: height .15s linear; }
+/* gizlenme */
+.sus-row { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
+.modes .choice span { font-size: 13px; }
+.modes { grid-template-columns: 1fr; }

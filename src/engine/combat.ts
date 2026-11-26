@@ -80,7 +80,7 @@ function windVec(dir: number) { const a = dir * Math.PI / 3; return { x: Math.co
 
 /* ---------- senaryo & hazırlık ---------- */
 export interface Scenario { mapId: string; enemies: string[]; weatherNow: Weather; weatherEvening: Weather; wind: { dir: number; strength: number }; seed: number }
-export interface Plan { timing: "simdi" | "aksam"; start: number; scout: boolean; readWind: boolean; traps: XY[]; torch: boolean; paid?: ("scout" | "readWind")[]; ambushed?: boolean }
+export interface Plan { timing: "simdi" | "aksam"; start: number; scout: boolean; readWind: boolean; traps: XY[]; torch: boolean; paid?: ("scout" | "readWind")[]; ambushed?: boolean; surprise?: boolean }
 export const DEFAULT_PLAN: Plan = { timing: "simdi", start: 0, scout: false, readWind: false, traps: [], torch: false };
 
 /** Savaş metinlerinde düşman nasıl anılır (kurtlar, haydutlar, muhafızlar…). */
@@ -181,6 +181,25 @@ export function maxHp(cfg: Config, s: GameState): number {
 }
 
 /** Planı uygular (zaman, yorgunluk, para) ve savaşı kurar. */
+/**
+ * Düşmanların çıktığı yerler: her gün/her seferde başka. Haritanın in yerlerinden biri ya da
+ * giriş noktalarından uzak rastgele bir altıgen merkez alınır; sürü onun çevresine dağılır.
+ * Giriş noktasından bağımsızdır (keşifte görülen yer savaşta da aynıdır).
+ */
+export function enemySpots(mapId: string, count: number, seed: number): XY[] {
+  const m = MAPS[mapId]; const rng = new Rng(seed ^ 0x5bd1e995);
+  const tiles = m.rows.map(r => [...r].map(c => MAP_CHARS[c] ?? "cayir"));
+  const cand: XY[] = [];
+  tiles.forEach((row, y) => row.forEach((t, x) => {
+    if (TERRAIN[t].blocks) return;
+    if (m.starts.every(st => dist(x, y, st.at[0], st.at[1]) >= 4)) cand.push([x, y]);
+  }));
+  if (cand.length < count) return Array.from({ length: count }, (_, i) => m.enemies[i % m.enemies.length]);
+  const center: XY = m.enemies.length && rng.chance(35) ? rng.pick(m.enemies) : rng.pick(cand);
+  const scored = cand.map(c => ({ c, d: dist(c[0], c[1], center[0], center[1]) + rng.next() * 1.6 })).sort((a, b) => a.d - b.d);
+  return scored.slice(0, count).map(v => v.c);
+}
+
 export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds: string[], seed: number, questId?: string, plan: Plan = DEFAULT_PLAN, sc?: Scenario): Battle {
   const m = MAPS[mapId]; const rng = new Rng(seed);
   sc ??= { mapId, enemies: enemyIds, weatherNow: rollWeather(rng), weatherEvening: "acik", wind: { dir: rng.int(0, 5), strength: rng.int(0, 2) }, seed };
@@ -198,9 +217,10 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
   if (s.mana < 0) s.mana = maxMana(cfg, s);
   const st = m.starts[plan.start] ?? m.starts[0];
   const units: Unit[] = [{ uid: "p", side: "player", name: "Sen", x: st.at[0], y: st.at[1], hp: s.hp, maxHp: hpMax, moveLeft: 0, acted: false, slowed: 0 }];
+  const spots = enemySpots(mapId, enemyIds.length, sc.seed);
   enemyIds.forEach((id, i) => {
-    const d = ENEMIES[id]; const [x, y] = m.enemies[i % m.enemies.length];
-    units.push({ uid: "e" + i, side: "enemy", def: id, name: d.scale ? d.name : `${d.name} ${i + 1}`, x, y, hp: d.hp, maxHp: d.hp, moveLeft: 0, acted: false, slowed: 0, alert: night || !!plan.ambushed });
+    const d = ENEMIES[id]; const [x, y] = spots[i];
+    units.push({ uid: "e" + i, side: "enemy", def: id, name: d.scale ? d.name : `${d.name} ${i + 1}`, x, y, hp: d.hp, maxHp: d.hp, moveLeft: 0, acted: false, slowed: 0, alert: (night || !!plan.ambushed) && !plan.surprise });
   });
   if (s.pet) {
     const d = ENEMIES[s.pet.id]; const free = [[st.at[0] - 1, st.at[1]], [st.at[0] + 1, st.at[1]], [st.at[0], st.at[1] - 1], [st.at[0], st.at[1] + 1]]
@@ -217,7 +237,7 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
   };
   startPlayerTurn(cfg, s, b);
   const W = foeWords(enemyIds);
-  const opening = plan.ambushed ? `${cap(W.one)} yolunu kesti; gözünü senden ayırmıyor.` : night ? `Gece; ${W.pl} ${W.hunt}.` : `Gündüz; ${W.pl} ${W.rest}, seni fark etmediler.`;
+  const opening = plan.surprise ? `Gizlice yaklaştın; ${W.pl} seni fark etmedi. İlk vuruş senin.` : plan.ambushed ? `${cap(W.one)} yolunu kesti; gözünü senden ayırmıyor.` : night ? `Gece; ${W.pl} ${W.hunt}.` : `Gündüz; ${W.pl} ${W.rest}, seni fark etmediler.`;
   b.log.unshift(`${opening} ${weather === "yagmur" ? "Yağmur yağıyor." : weather === "sis" ? "Sis var." : "Hava açık."}`);
   return b;
 }

@@ -64,6 +64,8 @@ export function sleepAt(cfg: Config, s: GameState, kind: SleepKind): SleepResult
   const rng = new Rng((s.seed * 9973 + s.day * 7919 + s.location.length * 131) | 0);
   s.money -= opt.cost;
   let event: NightEvent | undefined; let quality = opt.quality;
+  // gece yarısını geçirdiysen uyku kısalır: 22:00'den sonraki her saat dinlenmeyi azaltır
+  const late = Math.max(0, s.minute - 16 * 60) / 60; quality *= 1 - Math.min(0.45, late * 0.08);
   if (kind !== "lodging" && rng.chance(opt.risk * 100)) {
     const pool: NightEvent["id"][] = place(s.location)?.region === "ayazkale" ? ["soguk", "kurt", "soguk"] : place(s.location)?.region === "taspinar" ? ["kurt", "yagmur", "hirsiz"] : ["hirsiz", "yagmur", "kurt"];
     let id = rng.pick(pool);
@@ -93,7 +95,7 @@ export interface RestResult { minutes: number; energy: number; satiety: number; 
 export function rest(cfg: Config, s: GameState, minutes: number): RestResult | { error: string } {
   if (s.journey) return { error: "Yoldayken dinlenemezsin" };
   if (s.session) return { error: "Çalışırken olmaz" };
-  const m = Math.min(minutes, minutesLeft(s)); if (m < 10) return { error: "Hava karardı; artık uyuman lazım" };
+  const m = Math.min(minutes, minutesLeft(s)); if (m < 10) return { error: "Gecenin sonu; artık uyuman lazım" };
   const h = m / 60; const l = lodgingAt(s.location); const good = !!l && !l.unlock(s);
   const e0 = s.energy, f0 = s.satiety, mana0 = s.mana;
   s.energy = Math.min(100, s.energy + h * (good ? 14 : 10) * (s.satiety < 15 ? 0.5 : 1));

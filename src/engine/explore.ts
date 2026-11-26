@@ -52,7 +52,7 @@ export function canSearch(s: GameState): { ok: boolean; reason?: string } {
   if (!FINDS[s.location]) return { ok: false, reason: "Burada aranacak bir şey yok" };
   if (s.session) return { ok: false, reason: "Çalışırken olmaz" };
   if (s.journey) return { ok: false, reason: "Yoldasın" };
-  if (minutesLeft(s) < SEARCH_MINUTES) return { ok: false, reason: "Hava karardı" };
+  if (minutesLeft(s) < SEARCH_MINUTES) return { ok: false, reason: "Çok geç oldu; artık uyu" };
   if (s.energy < 3) return { ok: false, reason: "Çok yorgunsun" };
   if (searchInfo(s).left <= 0) return { ok: false, reason: "Bugün burada bulunacak bir şey kalmadı" };
   return { ok: true };

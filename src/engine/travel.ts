@@ -57,7 +57,7 @@ export function planTravel(cfg: Config, s: GameState, to: string): TravelPlan {
   const energy = Math.round(minutes / 60 * 5 * 10) / 10;
   if (s.session) return { ok: false, reason: "Çalışırken yola çıkamazsın", minutes, energy, pts: r.pts };
   if (s.journey) return { ok: false, reason: "Zaten yoldasın", minutes, energy, pts: r.pts };
-  if (minutes > minutesLeft(s)) return { ok: false, reason: "Hava kararmadan varamazsın", minutes, energy, pts: r.pts };
+  if (minutes > minutesLeft(s)) return { ok: false, reason: "Bu saatte oraya varamazsın; önce uyu", minutes, energy, pts: r.pts };
   if (energy > s.energy) return { ok: false, reason: "Yürüyecek gücün yok", minutes, energy, pts: r.pts };
   return { ok: true, minutes, energy, pts: r.pts };
 }

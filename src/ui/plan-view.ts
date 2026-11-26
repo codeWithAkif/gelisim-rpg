@@ -2,9 +2,9 @@
 // Her seçimin getirdiği avantaj/dezavantaj anında görünür; plan savaşı gerçekten değiştirir.
 import { itemPic } from "./art";
 import type { Config } from "../engine/config";
-import { type GameState, clock, DAY_MINUTES } from "../engine/state";
+import { type GameState, clock, DAY_MINUTES, isNight } from "../engine/state";
 import {
-  type Plan, type Scenario, type Unit, type XY, makeScenario, prepOptions, assessPlan, planCost, doPrep, prepDone,
+  type Plan, type Scenario, type Unit, type XY, makeScenario, enemySpots, prepOptions, assessPlan, planCost, doPrep, prepDone,
   key, WIND_NAMES, foeWords } from "../engine/combat";
 import { MAPS, MAP_CHARS, TERRAIN, ENEMIES } from "../content/world";
 import { esc } from "./sketch";
@@ -20,6 +20,7 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
   const plan: Plan = { timing: "simdi", start: 0, scout: done.scout, readWind: done.readWind, traps: [], torch: false, paid: [] };
   let trapMode = false;
   const tiles = m.rows.map(r => [...r].map(c => MAP_CHARS[c] ?? "cayir"));
+  const spots = enemySpots(mapId, enemyIds.length, sc.seed);
 
   const el = document.createElement("div");
   el.className = "battle plan"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Hazırlık");
@@ -33,7 +34,7 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
   function view() {
     const st = m.starts[plan.start];
     const units: Unit[] = [{ uid: "p", side: "player", name: "Sen", x: st.at[0], y: st.at[1], hp: 1, maxHp: 1, moveLeft: 0, acted: false, slowed: 0 }];
-    if (plan.scout) enemyIds.forEach((id, i) => { const [x, y] = m.enemies[i % m.enemies.length]; units.push({ uid: "e" + i, side: "enemy", def: id, name: ENEMIES[id].name, x, y, hp: 1, maxHp: 1, moveLeft: 0, acted: false, slowed: 0, alert: plan.timing === "aksam" }); });
+    if (plan.scout) enemyIds.forEach((id, i) => { const [x, y] = spots[i]; units.push({ uid: "e" + i, side: "enemy", def: id, name: ENEMIES[id].name, x, y, hp: 1, maxHp: 1, moveLeft: 0, acted: false, slowed: 0, alert: plan.timing === "aksam" }); });
     const traps: Record<string, number> = {}; plan.traps.forEach(([x, y]) => traps[key(x, y)] = 1);
     R.view = { w: tiles[0].length, h: tiles.length, tiles, fire: {}, walls: {}, traps, weather: plan.timing === "aksam" ? sc.weatherEvening : sc.weatherNow, night: plan.timing === "aksam", wind: plan.readWind ? sc.wind : null, units, sight: null, torchLit: plan.torch && plan.timing === "aksam" };
     R.over = {
@@ -57,8 +58,8 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
     const o = (id: string) => opts.find(x => x.id === id)!;
     panel.innerHTML = `
       <section class="sec"><h3>Ne zaman?</h3><div class="choices">
-        <button class="choice ${plan.timing === "simdi" ? "on" : ""}" data-t="simdi"><b>Şimdi</b><span>${clock(s)} · ${WEATHER_TR[nowW]}</span><span class="muted tiny">Gündüz: ${esc(W.pl)} ${esc(W.rest)}.</span></button>
-        ${late ? "" : `<button class="choice ${plan.timing === "aksam" ? "on" : ""}" data-t="aksam"><b>Akşamı bekle</b><span>20:00 · tahmin: ${WEATHER_TR[eveW]}</span><span class="muted tiny">Gece: ${esc(W.pl)} ${esc(W.hunt)}.</span></button>`}
+        <button class="choice ${plan.timing === "simdi" ? "on" : ""}" data-t="simdi"><b>Şimdi</b><span>${clock(s)} · ${WEATHER_TR[nowW]}</span><span class="muted tiny">${isNight(s) ? `Gece: ${esc(W.pl)} ${esc(W.hunt)}. Daha tehlikeli, ödülü daha çok.` : `Gündüz: ${esc(W.pl)} ${esc(W.rest)}.`}</span></button>
+        ${late ? "" : `<button class="choice ${plan.timing === "aksam" ? "on" : ""}" data-t="aksam"><b>Akşamı bekle</b><span>20:00 · tahmin: ${WEATHER_TR[eveW]}</span><span class="muted tiny">Gece: ${esc(W.pl)} ${esc(W.hunt)}. Ödülü daha çok.</span></button>`}
       </div></section>
       <section class="sec"><h3>Nereden gireceksin?</h3><div class="choices">
         ${m.starts.map((st, i) => `<button class="choice ${plan.start === i ? "on" : ""}" data-s="${i}"><b>${i + 1}. ${esc(st.name)}</b><span class="muted tiny">${esc(st.note)}</span></button>`).join("")}
@@ -74,7 +75,7 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
           `<button class="btn small ${plan.torch ? "primary" : ""}" data-p="torch" ${o("torch").ok || plan.torch ? "" : "disabled"}>${plan.torch ? "Alındı" : "Al"}</button>`)}
       </section>
       <section class="sec"><h3>Planın</h3><div class="advice">${adv.map(a => `<div class="${a.good ? "good" : "bad"}"><span>${a.good ? "+" : "−"}</span>${esc(a.text)}</div>`).join("")}</div>
-        <p class="muted tiny" style="margin:0">Savaşa girerken: ${cost.minutes} dk${cost.energy ? ` · enerji −${cost.energy}` : ""}${cost.money ? ` · ${cost.money} bakır` : ""}. ${left < 30 ? "<b class='red'>Hava kararmadan zaman kalmıyor.</b>" : ""}</p></section>
+        <p class="muted tiny" style="margin:0">Savaşa girerken: ${cost.minutes} dk${cost.energy ? ` · enerji −${cost.energy}` : ""}${cost.money ? ` · ${cost.money} bakır` : ""}. ${left < 30 ? "<b class='red'>Gecenin sonuna zaman kalmıyor.</b>" : ""}</p></section>
       <div class="row plan-go"><button class="btn" data-x="cancel">Vazgeç</button><button class="btn primary" data-x="go" ${left < 20 ? "disabled" : ""}>Savaşa gir</button></div>`;
   }
 

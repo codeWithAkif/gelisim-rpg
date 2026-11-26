@@ -22,6 +22,8 @@ export const TRAVEL_EVENTS: TravelEventDef[] = [
     choices: [{ id: "incele", label: "Diz çöküp incele (+10 dk)" }, { id: "gec", label: "Geç" }] },
   { id: "saganak", title: "Ani sağanak", weight: 2, when: { minMinutes: 20 }, text: "Bulutlar bir anda kapandı; iri damlalar düşmeye başladı.",
     choices: [{ id: "sigin", label: "Ağacın altına sığın (+20 dk)" }, { id: "devam", label: "Islanarak devam et" }] },
+  { id: "suru", title: "Karanlıkta parlayan gözler", weight: 3, when: { night: true }, text: "Yolun iki yanında, çalıların arasında gözler parlıyor. Bir değil, birkaç tane. Sürü seni çoktan kokladı.",
+    choices: [{ id: "savas", label: "Karşıla" }, { id: "ates", label: "Avucunda ateş yak", need: "ates" }] },
   { id: "tokez", title: "Taşlı yokuş", weight: 2, when: { patika: true }, text: "Yokuş gevşek taşlarla dolu. Bir taş ayağının altından kaydı.",
     choices: [{ id: "devam", label: "Dengeni bul" }] },
 ];

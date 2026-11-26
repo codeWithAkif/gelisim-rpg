@@ -1,5 +1,6 @@
 // Görevler ve mantıklı ödüller: ödülü verenin imkânı ve görevin onun için önemi belirler.
 import type { Config } from "./config";
+import { type Bonus, bonusMoney } from "./encounter";
 import { type GameState, addRep, log, repOf, DAY_MINUTES } from "./state";
 import { NPCS, QUESTS, GAME_ITEMS, type QuestDef } from "../content/world";
 import { addItem } from "./inventory";
@@ -30,21 +31,23 @@ export function acceptQuest(s: GameState, id: string) {
   log(s, `${npc(def.giverNpc).name}: "${def.title}" işini üstlendin.`, "quest");
 }
 
-export interface RewardReport { items: Record<string, number>; money: number; rep: number; note: string; dropped: Record<string, number>; gains: GainReport; relics: Relic[]; after?: string }
-export function completeQuest(cfg: Config, s: GameState, id: string): RewardReport {
+export interface RewardReport { items: Record<string, number>; money: number; rep: number; note: string; dropped: Record<string, number>; gains: GainReport; relics: Relic[]; after?: string; bonus?: string }
+export function completeQuest(cfg: Config, s: GameState, id: string, bonus?: Bonus): RewardReport {
   const def = QUESTS.find(q => q.id === id)!;
   const count = (s.quests[id]?.count ?? 0) + 1;
   s.quests[id] = { status: "bitti", count };
   const imp = cfg.importance(def.importance);
   // tekrarlanan iş aynı tanınırlığı her seferinde vermez
-  const rep = (imp?.repGain ?? 1) / (def.repeatable ? Math.min(4, count) : 1);
+  const rep = (imp?.repGain ?? 1) / (def.repeatable ? Math.min(4, count) : 1) * (bonus?.night ? 1.3 : 1);
   addRep(s, s.region, "taninirlik", rep);
   addRep(s, s.region, "guven", rep * 0.6);
   if (def.importance !== "basit") addRep(s, s.region, "onur", rep * 0.5);
   const items = def.rewards.items ?? {};
   const dropped: Record<string, number> = {};
   for (const [k, v] of Object.entries(items)) { const d = addItem(cfg, s, k, v); if (d) dropped[k] = d; }
-  s.money += def.rewards.money ?? 0;
+  const extra = bonus ? bonusMoney(def.rewards.money ?? 0, bonus) : 0;
+  s.money += (def.rewards.money ?? 0) + extra;
+  const bonusText = extra ? `${bonus!.night ? "Gece işi" : "Beklenenden kalabalıktı"}${bonus!.night && bonus!.extraFoes ? ", üstelik kalabalık" : ""}: +${extra} bakır.` : undefined;
   const gains: GainReport = {};
   for (const [a, n] of Object.entries(def.rewards.gains ?? {})) applyGain(cfg, s, a, n, gains);
   if (def.rewards.pet && !s.pet) s.pet = { id: def.rewards.pet, name: "Karabaş", bond: 5 };
@@ -55,7 +58,7 @@ export function completeQuest(cfg: Config, s: GameState, id: string): RewardRepo
   if (id === "annenin_izi" && !s.metNpcs.includes("zehra")) s.metNpcs.push("zehra");
   log(s, `${giver.name} teşekkür etti. ${def.rewards.note} ${REGION_NAMES[s.region as keyof typeof REGION_NAMES] ?? "Burada"} tanınırlığın ${Math.floor(repOf(s, s.region, "taninirlik"))}.`, "quest");
   if (def.afterText && count === 1) log(s, def.afterText, "quest");
-  return { items, money: def.rewards.money ?? 0, rep, note: def.rewards.note, dropped, gains, relics, after: count === 1 ? def.afterText : undefined };
+  return { items, money: (def.rewards.money ?? 0) + extra, rep, note: def.rewards.note, dropped, gains, relics, after: count === 1 ? def.afterText : undefined, bonus: bonusText };
 }
 
 /** Savaşsız görevi yerinde bitirir (yolculuk ayrıca haritadan yapılır). */

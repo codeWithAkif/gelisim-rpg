@@ -1,7 +1,7 @@
 // Küçük çaplı para düzeni: satış (günlük fiyat, aynı malı çok satınca düşen fiyat) ve ortaklıklar
 // (birine para koyup her gece payını almak; risk var, para batabilir). DOM yok.
 import type { Config } from "./config";
-import { type GameState, repOf } from "./state";
+import { type GameState, DAY_MINUTES, repOf } from "./state";
 import { itemInfo, freeCount, removeItem } from "./inventory";
 import { Rng } from "./rng";
 import { NPC_PLACE } from "../content/map";
@@ -55,7 +55,7 @@ export function sell(cfg: Config, s: GameState, id: string): SellCheck {
   removeItem(s, id, 1); s.money += c.price;
   if (s.market?.day !== s.day) s.market = { day: s.day, sold: {} };
   s.market.sold[id] = (s.market.sold[id] ?? 0) + 1;
-  s.minute = Math.min(16 * 60, s.minute + 3);
+  s.minute = Math.min(DAY_MINUTES, s.minute + 3);
   ledger(s, `${itemInfo(cfg, id).name} sattın`, c.price);
   return c;
 }

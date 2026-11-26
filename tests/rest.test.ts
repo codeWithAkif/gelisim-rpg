@@ -1,7 +1,7 @@
 // Uyku ve dinlenme: konak güvenli ve dinlendirir; açıkta uyumak tehlikeli; dinlenmek enerji verir, acıktırır.
 import { test, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
-import { newGame } from "../src/engine/state";
+import { newGame, DAY_MINUTES } from "../src/engine/state";
 import { sleepOptions, sleepAt, rest, campRisk } from "../src/engine/rest";
 
 test("konak: misafir olunca açılır, güvenli ve daha dinlendirici", () => {
@@ -29,5 +29,5 @@ test("dinlenmek: enerji artar, tokluk düşer, zaman geçer", () => {
   const s = newGame(cfg, 2); s.energy = 30; s.satiety = 60; const m = s.minute;
   const r = rest(cfg, s, 120); expect("error" in r).toBe(false);
   expect(s.energy).toBeGreaterThan(45); expect(s.satiety).toBeLessThan(50); expect(s.minute).toBe(m + 120);
-  s.minute = 16 * 60 - 5; expect("error" in rest(cfg, s, 60)).toBe(true);
+  s.minute = DAY_MINUTES - 5; expect("error" in rest(cfg, s, 60)).toBe(true);
 });

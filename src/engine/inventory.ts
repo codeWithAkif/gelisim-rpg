@@ -1,7 +1,7 @@
 // Çanta: göz sayısı kuşanılan çantaya bağlı; eşyalar yığın hâlinde göz kaplar.
 // Kuşanılan silah, giysi ve çanta göz kaplamaz.
 import type { Config } from "./config";
-import { type GameState, log } from "./state";
+import { type GameState, DAY_MINUTES, log } from "./state";
 import { applyGain, type GainReport } from "./progression";
 import { GAME_ITEMS, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, CONFIG_PRICES, MARKETS, CRAFTS, type ItemKind, type Craft } from "../content/world";
 
@@ -84,7 +84,7 @@ export function buy(cfg: Config, s: GameState, id: string): { ok: boolean; reaso
   if (!market.items.includes(id)) return { ok: false, reason: `${market.name} bunu satmıyor` };
   if (s.money < price) return { ok: false, reason: `${price} bakır gerekir` };
   if (addItem(cfg, s, id, 1)) return { ok: false, reason: "Çantan dolu" };
-  s.money -= price; s.minute = Math.min(16 * 60, s.minute + 5);
+  s.money -= price; s.minute = Math.min(DAY_MINUTES, s.minute + 5);
   return { ok: true };
 }
 

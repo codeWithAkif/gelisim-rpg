@@ -5,7 +5,8 @@ import type { Journey } from "./journey";
 
 export const SAVE_VERSION = 1;
 export const DAY_START_HOUR = 6;     // uyanış
-export const DAY_MINUTES = 16 * 60;  // 06:00 – 22:00 arası uyanık
+export const DAY_MINUTES = 22 * 60;  // 06:00 – 04:00 arası uyanık kalınabilir (gece tehlikeli)
+export const NIGHT_START = 14 * 60;  // 20:00: gece başlar
 
 export interface AttrState {
   level: number;      // işlenmiş seviye
@@ -104,6 +105,10 @@ export function clock(s: GameState): string {
 }
 export function hourOf(s: GameState): number { return (DAY_START_HOUR * 60 + s.minute) / 60; }
 export function minutesLeft(s: GameState): number { return DAY_MINUTES - s.minute; }
+/** Gece mi: 20:00'den sonra. Gece kurtlar avlanır, yollar tehlikeli, işler daha çok kazandırır. */
+export function isNight(s: GameState): boolean { return s.minute >= NIGHT_START; }
+/** Karanlığa (20:00) kaç dakika var; gece olduysa 0. */
+export function minutesToDark(s: GameState): number { return Math.max(0, NIGHT_START - s.minute); }
 
 export function log(s: GameState, text: string, kind?: LogEntry["kind"]) {
   s.log.unshift({ day: s.day, minute: s.minute, text, kind });

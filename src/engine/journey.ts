@@ -2,7 +2,7 @@
 // Oyun saati yolun gerçek süresi kadar ilerler. Yolda sürprizler çıkar; bir sürpriz gelince
 // yolculuk durur, oyuncu seçince devam eder. Uygulama kapalıyken de ilerler.
 import type { Config } from "./config";
-import { type GameState, DAY_MINUTES, addRep, hourOf, log } from "./state";
+import { type GameState, DAY_MINUTES, addRep, hourOf, isNight, log } from "./state";
 import { applyGain, type GainReport } from "./progression";
 import { planTravel, place, route, arrive } from "./travel";
 import { addItem } from "./inventory";
@@ -44,8 +44,11 @@ export function startJourney(cfg: Config, s: GameState, to: string, now: number)
   const patika = hasPatika(s.location, to, s);
   const pool = TRAVEL_EVENTS.filter(d => eligible(s, d, patika, p.minutes));
   const events: JourneyEvent[] = [];
-  const chance = Math.min(85, p.minutes / 60 * 70);
-  const pick = () => { const total = pool.reduce((a, d) => a + d.weight, 0); let r = rng.next() * total; for (const d of pool) { r -= d.weight; if (r <= 0) return d; } return pool[0]; };
+  // gece yollar tehlikeli: sürpriz daha sık, kurtlar daha çok
+  const night = isNight(s);
+  const chance = Math.min(night ? 95 : 85, p.minutes / 60 * 70 * (night ? 1.6 : 1));
+  const wt = (d: TravelEventDef) => d.weight * (night && ["kurt", "iz", "suru"].includes(d.id) ? 3 : 1);
+  const pick = () => { const total = pool.reduce((a, d) => a + wt(d), 0); let r = rng.next() * total; for (const d of pool) { r -= wt(d); if (r <= 0) return d; } return pool[0]; };
   if (pool.length && rng.chance(chance)) events.push({ id: pick().id, at: 0.2 + rng.next() * 0.3 });
   if (pool.length && events.length && rng.chance(chance * 0.4)) { const d = pick(); if (d.id !== events[0].id) events.push({ id: d.id, at: 0.55 + rng.next() * 0.3 }); }
   s.journey = { from: s.location, to, pts: p.pts, startMs: now, durMs: realMs(p.minutes), pausedMs: 0, minutes: p.minutes, energy: p.energy, spentMin: 0, events, seed: rng.seed };
@@ -86,7 +89,7 @@ export function canUseChoice(s: GameState, need?: string): boolean {
   return true;
 }
 
-export interface EventOutcome { text: string; gains: GainReport; battle?: boolean }
+export interface EventOutcome { text: string; gains: GainReport; battle?: boolean; foes?: string[] }
 /** Seçimi uygular. Ek süre (dakika) yolculuğa gerçek zamanlı eklenir. */
 export function resolveEvent(cfg: Config, s: GameState, choice: string, now: number): EventOutcome {
   const due = dueEvent(s, now) ?? (s.journey ? (() => { const ev = s.journey!.events.find(e => !e.done); return ev ? { ev, def: TRAVEL_EVENTS.find(d => d.id === ev.id)! } : null; })() : null);
@@ -96,12 +99,19 @@ export function resolveEvent(cfg: Config, s: GameState, choice: string, now: num
   const extra = (min: number) => { j.durMs += min * MS_PER_GAME_MIN; j.minutes += min; };
   const lv = (a: string) => s.attrs[a]?.level ?? 0;
   let text = ""; let battle = false;
+  const wolf = s.region === "ayazkale" ? "kar_kurdu" : "kurt";
+  let foes: string[] = [wolf];
   switch (`${due.def.id}:${choice}`) {
     case "kenevir:topla": extra(15); text = addItem(cfg, s, "ip", 1) ? "Lifleri büktün ama çantanda yer yoktu." : "Lifleri büküp bir ip yaptın."; applyGain(cfg, s, "el_becerisi", 0.1, gains); break;
     case "elma:topla": extra(10); { const d = addItem(cfg, s, "elma", 2); text = d === 2 ? "Elmaları taşıyacak yerin yoktu." : `${2 - d} yaban elması topladın.`; } break;
     case "bakir:al": s.money += 3; text = "Üç bakırı cebine koydun."; break;
     case "bakir:teslim": addRep(s, "taspinar", "guven", 1); addRep(s, "taspinar", "onur", 0.5); text = "Bakırları ayırdın; muhtara bırakacaksın. Duyan güvenir."; break;
-    case "kurt:savas": text = "Değneğini kaldırdın; kurt atıldı."; battle = true; break;
+    case "kurt:savas": text = "Kurdun karşısına dikildin."; battle = true; break;
+    case "suru:savas": text = "Sırtını bir kayaya verdin; sürü çember çiziyor."; battle = true; foes = [wolf, wolf, wolf]; break;
+    case "suru:ates":
+      if (canUseChoice(s, "ates")) { s.mana -= 8; applyGain(cfg, s, "ates", 0.4, gains); applyGain(cfg, s, "stres", 0.3, gains); text = "Alevi başının üstüne kaldırdın; gözler birer birer karanlığa çekildi."; }
+      else { text = "Alev tutmadı; sürü üstüne geldi!"; battle = true; foes = [wolf, wolf, wolf]; }
+      break;
     case "kurt:geri": {
       const ok = rng.chance(Math.min(90, 40 + lv("irade") * 1.2 + lv("stres") * 0.8));
       applyGain(cfg, s, "stres", 0.2, gains); applyGain(cfg, s, "irade", 0.15, gains);
@@ -127,7 +137,7 @@ export function resolveEvent(cfg: Config, s: GameState, choice: string, now: num
   }
   j.seed = rng.seed;
   log(s, `${due.def.title}: ${text}`, "info");
-  return { text, gains, battle };
+  return { text, gains, battle, foes: battle ? foes : undefined };
 }
 
 /** Varınca: süre, yorgunluk, yürüme kazancı ve konum. */
@@ -136,7 +146,7 @@ export function finishJourney(cfg: Config, s: GameState, now: number): { to: str
   const total = j.minutes + j.spentMin; const h = total / 60; const gains: GainReport = {};
   applyGain(cfg, s, "bacak", 0.15 * h, gains); applyGain(cfg, s, "kardiyo", 0.1 * h, gains); applyGain(cfg, s, "mekansal", 0.05 * h, gains);
   s.minute = Math.min(DAY_MINUTES, s.minute + total);
-  s.energy = Math.max(0, s.energy - j.energy * (total / Math.max(1, j.minutes)));
+  s.energy = Math.max(0, s.energy - j.energy * (total / Math.max(1, j.minutes)) * (isNight(s) ? 1.25 : 1));
   s.satiety = Math.max(0, s.satiety - h * 4);
   s.journey = undefined; arrive(s, j.to);
   log(s, `Vardın: ${place(j.to)!.name} (${Math.round(total)} dk yol).`, "info");
