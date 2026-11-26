@@ -56,7 +56,7 @@ export function canStartScav(s: GameState, place: string): { ok: boolean; reason
 }
 
 /* ---------- kartlar ---------- */
-export interface SCard { id: string; name: string; desc: string; max: number; bow?: boolean }
+export interface SCard { id: string; name: string; desc: string; max: number; bow?: boolean; spell?: boolean }
 export const SCARDS: SCard[] = [
   { id: "cevik_el", name: "Çevik el", desc: "Arama %25 daha çabuk biter.", max: 3 },
   { id: "genis_cep", name: "Geniş cep", desc: "Çantaya 3 göz daha.", max: 3 },
@@ -65,6 +65,9 @@ export const SCARDS: SCard[] = [
   { id: "demir_ten", name: "Demir ten", desc: "En çok can +%15, biraz iyileşirsin.", max: 3 },
   { id: "hafif_adim", name: "Hafif adım", desc: "Yürüme ve tırmanma %12 hızlı.", max: 3 },
   { id: "sans_eli", name: "Şans eli", desc: "Arama noktasından ikinci bir şey çıkma şansı +%20.", max: 3 },
+  { id: "buyu_hiz", name: "Hızlı büyü", desc: "Büyü her seviyede %20 daha çabuk dolar. (1-3. seviye)", max: 3, spell: true },
+  { id: "buyu_cift", name: "Çifte büyü", desc: "1. seviye: iki büyü üst üste; 2: üç büyü; 3: üç büyü, daha geniş patlama.", max: 3, spell: true },
+  { id: "buyu_guc", name: "Büyü gücü", desc: "Büyü hasarı ve patlama alanı her seviyede %30 artar. (1-3. seviye)", max: 3, spell: true },
   { id: "sessiz", name: "Sessiz ayak", desc: "Sıradaki baskın 10 sn gecikir (her seçişte).", max: 3 },
 ];
 
@@ -103,7 +106,7 @@ export function defaultLoadout(cfg: Config, s: GameState): Loadout {
 /* ---------- durum ---------- */
 export interface Stage { kind: "empty" | "item" | "money" | "weapon" | "key"; key?: number; item?: string; n?: number; money?: number; weapon?: string; time: number }
 export interface Spot { vault?: boolean; id: number; x: number; floor: number; name: string; stages: Stage[]; stage: number; prog: number; done: boolean }
-export interface SFoe { id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
+export interface SFoe { idle?: boolean; id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
 export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
   | { k: "hurt"; dmg: number } | { k: "raid"; n: number } | { k: "card" } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
@@ -116,7 +119,7 @@ export interface Dog { x: number; floor: number; state: "yanda" | "av" | "don"; 
 export interface Scav {
   site: ScavSite; seed: number; rng: Rng; time: number; phase: "play" | "card" | "over"; result?: "exit" | "dead"; load: Loadout;
   px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
-  spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number;
+  spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number; raidHold: number; spellQ: { t: number; dir: 1 | -1; floor: number }[];
   bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
   foundWeapons: string[]; weaponId: string; castT: number; foundT: number; armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[];
   ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number };
@@ -183,10 +186,24 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   if (load.kind === "dog" && s.pet) dog = { x: EXIT_X + 10, floor: 0, state: "yanda", t: 12, cd: 0, moving: false, face: 1, lag: 0 };
   if (load.kind === "trap" && load.id) { const own = trapsOwned(s).find(x => x.id === load.id); for (let i = 0; i < Math.min(3, own?.n ?? 0); i++) traps.push({ id: load.id, state: "hand", x: 0, floor: 0, t: 0 }); }
   if (load.kind === "spell" && load.id) { const o = spellOptions(cfg, { ...s, mana: 999 } as GameState).find(x => x.spell.id === load.id && x.ok); const info = SPELL_KIND[load.id];
-    if (o && info) { const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0; spell = { id: load.id, kind: info.kind, name: o.spell.name, cd: 4, max: info.cd * 1.7 * Math.max(0.6, 1 - m / 120), mul: info.mul * (1 + m / 100), r: info.r }; } }
+    if (o && info) { const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0; spell = { id: load.id, kind: info.kind, name: o.spell.name, cd: 4, max: 5 * Math.max(0.8, 1 - m / 300), mul: info.mul * (1 + m / 100), r: info.r }; } }
+  // bazı odalarda düşmanlar bekler: yaklaşınca uyanıp saldırırlar (kilitli odada daha güçlüler)
+  const guards: SFoe[] = []; let gid2 = 1;
+  for (let f = 0; f < site.floors; f++) {
+    const lk = locks[f]; const spans: [number, number, boolean][] = [[freeSpan(f)[0], freeSpan(f)[1], false], [vaultSpan(f)[0], vaultSpan(f)[1], true]];
+    for (const [lo, hi, vault] of spans) {
+      const cnt = vault ? 1 + (f >= 2 ? 1 : 0) : (f === 0 ? 1 : 1 + (rng.chance(40) ? 1 : 0));
+      for (let k = 0; k < cnt; k++) {
+        let x = lo + rng.next() * (hi - lo); if (f === 0 && !vault && x < 130) x = Math.min(hi, 130 + rng.next() * 60);   // girişin hemen yanında bekçi olmaz
+        const def = site.foes[rng.int(0, site.foes.length - 1)]; const d = ENEMIES[def]; const sc = 1 + f * 0.12 + (vault ? 0.2 : 0);
+        guards.push({ idle: true, id: gid2++, def, x, floor: f, hp: d.hp * sc * 1.35, max: d.hp * sc * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * sc * 0.7, cd: 1.2, human: d.species === "insan", climbT: 0, toFloor: f, hitT: 0, root: 0, slow: 0, burn: 0 });
+      }
+    }
+    void lk;
+  }
   return {
     site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4)), maxHp: Math.round(mh * 1.4),
-    spots, searchId: 0, searchWait: 0, foes: [], nextId: 1, wave: 0, raidT: 15, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
+    spots, searchId: 0, searchWait: 0, foes: guards, nextId: gid2, wave: 0, raidT: 40, raidHold: 0, spellQ: [], bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
     atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
     ground: [], gid: 1, proj: [], locks, keys: [], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
@@ -224,9 +241,16 @@ export function aimTarget(n: Scav, aim?: { dx: number; dy: number }): { floor: n
 /** Büyü: nişan aldığın yöne (merdiven açıklığında alt/üst kata da) bir top fırlatır; çarpınca patlar. */
 export function castSpell(n: Scav, aim?: { dx: number; dy: number }): boolean {
   const sp = n.spell; if (!sp || sp.cd > 0 || n.phase !== "play") return false;
-  const { floor, dir } = aimTarget(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.5;
-  sp.cd = sp.max; n.castT = 0.6; n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + dir * 5, floor, dir, left: 150, base: n.dmg * sp.mul * 0.5, r: sp.r * 0.9 });
+  const { floor, dir } = aimTarget(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.2;
+  sp.cd = sp.max * Math.pow(0.8, n.cards.buyu_hiz ?? 0); n.castT = 0.6;
+  const tier = n.cards.buyu_cift ?? 0; const shots = tier >= 2 ? 3 : tier >= 1 ? 2 : 1;   // çifte büyü: üst üste 2-3 top
+  for (let i = 0; i < shots; i++) n.spellQ.push({ t: i * 0.32, dir, floor });
   n.fx.push({ k: "cast", kind: sp.kind, x: n.px, floor }); return true;
+}
+const spellMul = (n: Scav) => 1 + (n.cards.buyu_guc ?? 0) * 0.3;
+function launchSpell(n: Scav, q: { dir: 1 | -1; floor: number }) {
+  const sp = n.spell; if (!sp) return; const wide = (n.cards.buyu_cift ?? 0) >= 3 ? 1.3 : 1;
+  n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + q.dir * 5, floor: q.floor, dir: q.dir, left: 150, base: n.dmg * sp.mul * 0.5 * spellMul(n), r: sp.r * 0.9 * spellMul(n) * wide });
 }
 /** Elle ok atışı: nişan aldığın yönde/katta ilk düşmana vurur. */
 export function shootArrow(n: Scav, aim?: { dx: number; dy: number }): boolean {
@@ -256,7 +280,7 @@ export function rerollScav(n: Scav): boolean {
   const out: string[] = []; while (out.length < 3 && pool.length) out.push(pool.splice(n.rng.int(0, pool.length - 1), 1)[0]);
   if (!out.length) return false; n.rerolls--; n.offer = out; return true;
 }
-const cardsLeft = (n: Scav) => SCARDS.filter(c => (n.cards[c.id] ?? 0) < c.max && (!c.bow || n.bow)).map(c => c.id);
+const cardsLeft = (n: Scav) => SCARDS.filter(c => (n.cards[c.id] ?? 0) < c.max && (!c.bow || n.bow) && (!c.spell || !!n.spell)).map(c => c.id);
 function offerCards(n: Scav) { const pool = cardsLeft(n); const out: string[] = []; while (out.length < 3 && pool.length) out.push(pool.splice(n.rng.int(0, pool.length - 1), 1)[0]); if (!out.length) return; n.offer = out; n.phase = "card"; n.fx.push({ k: "card" }); }
 export function pickScavCard(n: Scav, id: string): boolean {
   if (n.phase !== "card" || !n.offer.includes(id)) return false;
@@ -297,17 +321,19 @@ function spawnRaid(n: Scav) {
     const floor = n.rng.chance(60) ? n.floor : n.rng.int(0, n.site.floors - 1); const [lo, hi] = freeRange(n, floor); const x = n.rng.chance(50) ? hi - 6 - n.rng.next() * 30 : lo + 10 + n.rng.next() * 30;
     n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale * 1.35, max: d.hp * scale * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + n.rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 0.7, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
-  n.raidT = Math.max(12, 15 - Math.floor(n.wave / 2)); n.fx.push({ k: "raid", n: count });
+  n.raidHold = 10; n.raidT = Math.max(12, 15 - Math.floor(n.wave / 2)); n.fx.push({ k: "raid", n: count });
 }
 function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean, quiet = false) {
-  f.hp -= dmg; f.hitT = 0.2; if (!quiet) n.fx.push({ k: "hit", x: f.x, floor: f.floor, dmg: Math.round(dmg), crit });
+  f.idle = false; f.hp -= dmg; f.hitT = 0.2; if (!quiet) n.fx.push({ k: "hit", x: f.x, floor: f.floor, dmg: Math.round(dmg), crit });
   if (f.hp <= 0 && n.foes.includes(f)) { n.foes = n.foes.filter(q => q !== f); n.kills++; n.fx.push({ k: "die", x: f.x, floor: f.floor }); }
 }
 
 /** Zamanı ilerlet. */
 export function stepScav(n: Scav, dt: number) {
   if (n.phase !== "play") return; dt = Math.min(dt, 0.05); n.time += dt; n.atkFx = Math.max(0, n.atkFx - dt); n.castT = Math.max(0, n.castT - dt); n.foundT = Math.max(0, n.foundT - dt);
-  n.raidT -= dt; if (n.raidT <= 0) spawnRaid(n);   // baskınlar sabit aralıkla gelir; yığılma olabilir
+  if (n.raidHold > 0) n.raidHold = Math.max(0, n.raidHold - dt);       // baskından sonra 10 sn sayaç işlemez
+  else { n.raidT -= dt; if (n.raidT <= 0) spawnRaid(n); }
+  for (const q of [...n.spellQ]) { q.t -= dt; if (q.t <= 0) { n.spellQ = n.spellQ.filter(x => x !== q); launchSpell(n, q); } }
   if (n.spell) n.spell.cd = Math.max(0, n.spell.cd - dt);
   // yönlendirme
   const { dx, dy } = n.input; const moveIn = Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2; n.moving = false;
@@ -369,6 +395,7 @@ export function stepScav(n: Scav, dt: number) {
   for (const f of [...n.foes]) {
     f.hitT = Math.max(0, f.hitT - dt); f.cd -= dt; f.root = Math.max(0, f.root - dt); f.slow = Math.max(0, f.slow - dt);
     if (f.burn > 0) { f.burn -= dt; hurtFoe(n, f, n.dmg * 0.12 * dt, false, true); if (!n.foes.includes(f)) continue; }
+    if (f.idle) { if (f.floor === n.floor && Math.abs(f.x - n.px) <= 48 && !n.climbing) f.idle = false; else continue; }   // bekçi: yaklaşınca uyanır
     if (f.climbT > 0) { f.climbT -= dt; if (f.climbT <= 0) f.floor = f.toFloor; continue; }
     if (f.root > 0) continue;
     const sp = f.speed * (f.slow > 0 ? 0.45 : 1);

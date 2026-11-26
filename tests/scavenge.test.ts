@@ -32,9 +32,11 @@ test("merdivende yavaş yavaş çıkılır, birden değil", () => {
   run(n, 4); expect(n.py).toBe(1); expect(n.floor).toBe(1); expect(n.climbing).toBe(false);
 });
 
-test("ilk baskın en geç 15 sn sonra gelir", () => {
-  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 4, { kind: "yumruk" }); n.hp = n.maxHp = 99999; run(n, 16); expect(n.wave).toBeGreaterThanOrEqual(1);
-  const t0 = n.wave; run(n, 16); expect(n.wave).toBeGreaterThan(t0);
+test("ilk baskın 40 sn sonra gelir, sonra 10 sn sayaç işlemez, ardından 12-15 sn sayar", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 4, { kind: "yumruk" }); n.hp = n.maxHp = 99999; n.foes = [];
+  run(n, 39); expect(n.wave).toBe(0); run(n, 2); expect(n.wave).toBe(1); expect(n.raidHold).toBeGreaterThan(8);
+  const t1 = n.time; const r0 = n.raidT; run(n, 9); expect(n.raidT).toBe(r0);      // bekleme sırasında sayaç sabit
+  run(n, 16); expect(n.wave).toBe(2); expect(n.time - t1).toBeLessThanOrEqual(26.5);
 });
 
 test("baskın gelir; yaysız yumrukla bile vurulur", () => {
@@ -72,7 +74,7 @@ test("yalnız seçilen büyü kullanılır ve dolması beklenir", () => {
   const s = fresh(); s.knownElements = ["el_ates"]; s.mana = 100; for (const r of ["ardic_koku"]) grantRelic(cfg, s, r, {});
   const sp = loadoutOptions(cfg, s).find(o => o.kind === "spell"); if (!sp) return;
   const n = createScav(cfg, s, scavSite("koru")!, 9, { kind: "spell", id: sp.id }); n.raidT = 999; expect(n.spell).toBeTruthy(); n.spell!.cd = 0;
-  n.foes = [foe(n.px + 60)]; expect(castSpell(n)).toBe(true); expect(n.proj.length).toBe(1); run(n, 1.5); expect(n.foes[0].hp).toBeLessThan(500); expect(castSpell(n)).toBe(false);
+  n.foes = [foe(n.px + 60)]; expect(castSpell(n)).toBe(true); expect(n.spellQ.length).toBe(1); run(n, 1.5); expect(n.foes[0].hp).toBeLessThan(500); expect(castSpell(n)).toBe(false);
 });
 
 test("kutudan silah çıkar, kullanılır; çıkışta yalnız parçası cebe girer", () => {
@@ -130,7 +132,7 @@ test("merdiven açıklığında alt/üst kata nişan alınıp ok ve büyü atıl
 
 test("kutunun yanında durunca kendiliğinden arar, hareketle durur; aşamalar arası ara vardır; aranırken ateş edilmez", () => {
   const s = fresh(); s.equipped.bow = "av_yayi"; s.inventory.av_yayi = 1; s.inventory.ok = 10;
-  const n = createScav(cfg, s, scavSite("koru")!, 41, { kind: "bow" }); n.raidT = 999; const sp = n.spots.find(q => q.floor === 0)!;
+  const n = createScav(cfg, s, scavSite("koru")!, 41, { kind: "bow" }); n.raidT = 999; n.foes = []; const sp = n.spots.find(q => q.floor === 0)!;
   walkTo(n, sp.x); run(n, 0.3); expect(n.searchId).toBe(sp.id);
   n.foes = [foe(n.px + 30)]; run(n, 0.6); expect(n.shots).toBe(0);                       // aranırken vurmaz
   setInput(n, 1, 0); run(n, 0.2); expect(n.searchId).toBe(0); setInput(n, 0, 0);
@@ -139,10 +141,11 @@ test("kutunun yanında durunca kendiliğinden arar, hareketle durur; aşamalar a
   expect(sawGap).toBe(true);
 });
 
-test("baskınlar sabit aralıkla gelir (12-15 sn), önceki düşmanlar sağ olsa da", () => {
-  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 42, { kind: "yumruk" }); n.hp = n.maxHp = 99999; const times: number[] = [];
+test("baskınlar arası en az 22 sn (10 bekleme + 12 sayım), önceki düşmanlar sağ olsa da", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 42, { kind: "yumruk" }); n.hp = n.maxHp = 99999; n.foes = []; const times: number[] = [];
   let w = 0; for (let t = 0; t < 200 / 0.05; t++) { stepScav(n, 0.05); if (n.wave > w) { w = n.wave; times.push(n.time); } }
-  expect(times[0]).toBeLessThanOrEqual(15.2); for (let i = 1; i < times.length; i++) { const d = times[i] - times[i - 1]; expect(d).toBeGreaterThanOrEqual(11.9); expect(d).toBeLessThanOrEqual(15.2); }
+  expect(times[0]).toBeGreaterThanOrEqual(39.9); expect(times[0]).toBeLessThanOrEqual(40.2);
+  for (let i = 1; i < times.length; i++) { const d = times[i] - times[i - 1]; expect(d).toBeGreaterThanOrEqual(21.9); expect(d).toBeLessThanOrEqual(25.2); }
 });
 
 test("sargı bezi ve merhem canı doldurur (envanterde ve harabede)", async () => {
@@ -161,4 +164,17 @@ test("ilk yardım becerisi yükseldikçe sargı daha çok can verir ve kullandı
   s.hp = 1; s.inventory.sargi_bezi = 3; const a = useHeal(cfg, s, "sargi_bezi"); const lv0 = s.attrs.ilk_yardim.level; expect(lv0).toBeGreaterThan(3);
   s.attrs.ilk_yardim.level = 50; expect(aidMul(s)).toBeCloseTo(2, 5); s.hp = 1; const b = useHeal(cfg, s, "sargi_bezi");
   expect(b.healed!).toBeGreaterThan(a.healed!); void mh;
+});
+
+
+test("bazı odalarda bekçi düşmanlar vardır: yaklaşınca uyanır, uzakta uyur; çifte büyü üst üste atar", async () => {
+  const { castSpell: cs } = await import("../src/engine/scavenge");
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 61, { kind: "yumruk" }); n.raidT = 999;
+  expect(n.foes.length).toBeGreaterThanOrEqual(3); expect(n.foes.every(f => f.idle)).toBe(true);
+  expect(n.foes.filter(f => f.floor === 0 && !n.locks[0].open).every(f => f.x > 110 || f.x < 2000)).toBe(true);
+  run(n, 3); expect(n.foes.every(f => f.idle)).toBe(true);                                   // giriş odası boş, uyuyanlar hareket etmez
+  const g = n.foes.find(f => f.floor === 0)!; n.px = g.x - 30; run(n, 0.3); expect(g.idle).toBe(false);   // yaklaşınca uyanır
+  const s2 = fresh(); s2.knownElements = ["el_ates"]; s2.mana = 100; const sp = loadoutOptions(cfg, s2).find(o => o.kind === "spell");
+  if (sp) { const m = createScav(cfg, s2, scavSite("koru")!, 62, { kind: "spell", id: sp.id }); m.spell!.cd = 0; m.cards.buyu_cift = 2; expect(m.spell!.max).toBeLessThanOrEqual(5); cs(m); expect(m.spellQ.length).toBe(3);
+    m.raidT = 999; for (let i = 0; i < 40; i++) stepScav(m, 0.05); expect(m.proj.length + m.spellQ.length).toBeGreaterThan(0); }
 });

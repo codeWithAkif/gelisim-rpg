@@ -207,7 +207,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   /* ---------- HUD ---------- */
   const q = (id: string) => el.querySelector<HTMLElement>(id)!;
   function hud() {
-    q("#scMoney").textContent = `◉ ${n.money}`; const rs = Math.max(0, Math.ceil(n.raidT)); const rp = q("#scRaid"); rp.textContent = `BASKIN ${rs}`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`;
+    q("#scMoney").textContent = `◉ ${n.money}`; const rs = Math.max(0, Math.ceil(n.raidT)); const rp = q("#scRaid"); if (n.raidHold > 0) { rp.textContent = `Baskın bitti · ${Math.ceil(n.raidHold)}`; rp.className = "raid-pill calm"; } else { rp.textContent = `BASKIN ${rs}`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`; }
     q("#scDanger").textContent = `Tehlike ${danger(n)}`;
     { const wa = n.weaponId && artUrl("harabe_silah_" + n.weaponId); q("#scAmmo").innerHTML = `${wa ? `<img class="sc-wicon" src="${wa}" alt="">` : ""}${esc(n.weaponName)}${n.bow ? ` · ok ${n.ammo}` : ""}`; } { const ka = artUrl("harabe_anahtar"); q("#scBag").innerHTML = `${n.keys.length ? (ka ? `<img class="sc-wicon" src="${ka}" alt="">×${n.keys.length} ` : `🔑${n.keys.length} `) : ""}Çanta ${bagUsed(n)}/${n.bagCap}`; }
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
