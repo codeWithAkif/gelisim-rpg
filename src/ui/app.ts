@@ -212,7 +212,7 @@ export function startApp(root: HTMLElement) {
         persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist, scheduleNotify); break;
       }
       case "pick": ui.sel = ui.sel === id ? undefined : id; render(); break;
-      case "heal": { const r = useHeal(cfg, s, id); if (!r.ok) { toast(r.reason ?? ""); break; } sfx("good"); toast(`${itemInfo(cfg, id).name}: +${r.healed} can`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); break; }
+      case "heal": { const r = useHeal(cfg, s, id); if (!r.ok) { toast(r.reason ?? ""); break; } sfx("good"); toast(`${itemInfo(cfg, id).name}: +${r.healed} can${r.gains && r.gains.ilk_yardim ? " · ilk yardım gelişti" : ""}`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); break; }
       case "eat": { const it = itemInfo(cfg, id); if (eat(s, id, it.satiety ?? 20)) { toast(`${it.name} yedin. Tokluk +${it.satiety}.`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); } break; }
       case "buy": { const r = buy(cfg, s, id); sfx(r.ok ? "coin" : "bad"); toast(r.ok ? `${itemInfo(cfg, id).name} aldın.` : r.reason ?? ""); persist(); render(); break; }
       case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }

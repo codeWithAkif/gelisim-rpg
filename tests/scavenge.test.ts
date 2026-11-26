@@ -154,3 +154,11 @@ test("sargı bezi ve merhem canı doldurur (envanterde ve harabede)", async () =
   expect(healRun(cfg, s, n, "sargi_bezi").ok).toBe(true); expect(n.hp).toBeGreaterThan(20); expect(n.bag.sargi_bezi).toBeUndefined(); expect(s.inventory.sargi_bezi).toBe(1);
   expect(healRun(cfg, s, n, "sargi_bezi").ok).toBe(true); expect(s.inventory.sargi_bezi).toBeUndefined();
 });
+
+test("ilk yardım becerisi yükseldikçe sargı daha çok can verir ve kullandıkça gelişir", async () => {
+  const { useHeal, aidMul } = await import("../src/engine/healing"); const { maxHp } = await import("../src/engine/combat");
+  const s = fresh(); expect(s.attrs.ilk_yardim).toBeTruthy(); const mh = maxHp(cfg, s);
+  s.hp = 1; s.inventory.sargi_bezi = 3; const a = useHeal(cfg, s, "sargi_bezi"); const lv0 = s.attrs.ilk_yardim.level; expect(lv0).toBeGreaterThan(3);
+  s.attrs.ilk_yardim.level = 50; expect(aidMul(s)).toBeCloseTo(2, 5); s.hp = 1; const b = useHeal(cfg, s, "sargi_bezi");
+  expect(b.healed!).toBeGreaterThan(a.healed!); void mh;
+});

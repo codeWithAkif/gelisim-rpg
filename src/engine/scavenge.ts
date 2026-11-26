@@ -16,7 +16,7 @@ import { spellOptions } from "./magic";
 import { SPELL_KIND, type SpellKind } from "./nobet";
 import { trapsOwned, trapEffect } from "./engineering";
 import { petMul } from "./pet";
-import { healOf } from "./healing";
+import { healOf, aidMul } from "./healing";
 
 export const SW = 700;                 // yapının genişliği (birim): yedi daire, her biri 100
 export const ROOM_W = 100;
@@ -442,6 +442,6 @@ export function healRun(cfg: Config, s: GameState, n: Scav, id: string): { ok: b
   if (n.bag[id] > 0) { n.bag[id]--; if (n.bag[id] <= 0) delete n.bag[id]; }
   else if ((s.inventory[id] ?? 0) > 0) { s.inventory[id]--; if (s.inventory[id] <= 0) delete s.inventory[id]; }
   else return { ok: false };
-  const before = n.hp; n.hp = Math.min(n.maxHp, n.hp + h * 1.4); return { ok: true, healed: Math.round(n.hp - before) };
+  const before = n.hp; n.hp = Math.min(n.maxHp, n.hp + h * 1.4 * aidMul(s)); const g: GainReport = {}; applyGain(cfg, s, "ilk_yardim", 0.3, g); return { ok: true, healed: Math.round(n.hp - before) };
 }
 export const healItemsAvailable = (s: GameState, n: Scav) => ["sargi_bezi", "yara_merhemi"].map(id => ({ id, n: (n.bag[id] ?? 0) + (s.inventory[id] ?? 0) })).filter(x => x.n > 0);

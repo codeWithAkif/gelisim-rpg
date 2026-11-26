@@ -1,5 +1,6 @@
 // Uyku ve dinlenme: nerede uyuduğun önemli. Seni misafir eden birinin evinde güvenle dinlenirsin;
 // çadırda ya da açıkta uyumak tehlikelidir (hırsız, kurt, soğuk, yağmur). Dinlenmek enerji verir ama acıktırır.
+import { restHealBonus } from "./healing";
 import type { Config } from "./config";
 import { type GameState, DAY_MINUTES, minutesLeft, log } from "./state";
 import { sleep, type SleepReport } from "./progression";
@@ -87,7 +88,7 @@ export function sleepAt(cfg: Config, s: GameState, kind: SleepKind): SleepResult
   const hpBefore = s.hp;
   const report = sleep(cfg, s, quality);
   // can: iyi uykuda çok, kötüsünde az toparlanır
-  const m = maxHp(cfg, s); s.hp = Math.min(m, Math.round((s.hp || m) + m * 0.6 * Math.min(1, quality)));
+  const m = maxHp(cfg, s); s.hp = Math.min(m, Math.round((s.hp || m) + m * (0.6 * Math.min(1, quality) + restHealBonus(s))));
   if (event) log(s, event.text, "warn");
   const pet = tickPets(s); const estate = estateNightly(cfg, s);
   return { report, option: opt, event, hpBefore, pet, estate };
