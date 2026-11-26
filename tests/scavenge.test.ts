@@ -92,3 +92,14 @@ test("çıkışta kazanç cebe girer, ölünce çanta gider; çanta dolunca fazl
   c.offer = ["genis_cep"]; const cap = c.bagCap; expect(pickScavCard(c, "genis_cep")).toBe(true); expect(c.bagCap).toBe(cap + 3);
   void ({} as GameState);
 });
+
+test("çanta doluyken bulunan eşya yere düşer; yer açılınca alınır; atılan eşya yerde kalır", async () => {
+  const { dropBag, nearGround, pickGround } = await import("../src/engine/scavenge");
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 21, { kind: "yumruk" }); n.raidT = 999; const sp = n.spots[0];
+  n.bag = { deri: n.bagCap }; sp.stages = [{ kind: "item", item: "ip", n: 2, time: 0.4 }, { kind: "empty", time: 0.2 }, { kind: "empty", time: 0.2 }];
+  walkTo(n, sp.x); beginSearch(n); run(n, 3);
+  expect(n.ground.filter(g => g.item === "ip").length).toBe(2); expect(bagUsed(n)).toBe(n.bagCap);
+  expect(nearGround(n)?.item).toBe("ip"); expect(pickGround(n)).toBe("full");
+  expect(dropBag(n, "deri")).toBe(true); const ipG = n.ground.find(g => g.item === "ip")!; expect(pickGround(n, ipG.id)).toBe("ok"); expect(n.bag.ip).toBe(1); expect(bagUsed(n)).toBe(n.bagCap);
+  walkTo(n, 8); leave(n); const r = finishScav(cfg, s, n); expect(r.items.deri).toBe(n.bagCap - 1); expect(r.items.ip).toBe(1);
+});

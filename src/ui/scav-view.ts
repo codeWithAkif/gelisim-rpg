@@ -3,7 +3,7 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Scav, type Spot, type Loadout, SW, EXIT_X, LADDER_XS, SPOT_STAGES, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, leave, rerollScav, pickScavCard, finishScav, scavSite, canStartScav,
-  SCARDS, bagUsed, dropBag, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
+  SCARDS, bagUsed, dropBag, nearGround, groundNear, pickGround, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
 import { ENEMIES } from "../content/world";
@@ -47,7 +47,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="sc-hud"><span id="scMoney"></span><span id="scRaid"></span><span id="scDanger"></span></div></div>
     <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="scTip"></div>
       <div class="sc-stick" id="scStick"><i id="scKnob"></i></div>
-      <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
+      <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="pick" id="scPick" hidden></button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
     <div class="nb-hp"><div class="gb"><div class="gf" id="scHp" style="background:var(--red)"></div></div><span id="scHpT"></span></div>
     <div class="sc-bar"><span id="scAmmo"></span><button class="btn small" id="scBag" data-c="bag"></button></div>
     <div class="nb-card" id="scCard" hidden></div><div class="nb-card" id="scPause" hidden></div>`;
@@ -129,6 +129,10 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       g.fillStyle = "#EFE6CC"; g.font = `700 ${Math.max(13, sc() * 1.9)}px Caveat, cursive`; g.textAlign = "left"; g.fillText("Çıkış", ex + 22, gyy - 10); }
     const ns = nearSpot(n);
     for (const sp of n.spots) lens(sp, ns?.id === sp.id, now);
+    // yerdeki eşyalar
+    for (const gI of n.ground) { const im = img("esya_" + gI.item); const x = X(gI.x), y = gy(gI.floor) - 6 - Math.abs(Math.sin(now / 400 + gI.id)) * 2; const sz = 7 * sc();
+      g.fillStyle = "rgba(0,0,0,.35)"; g.beginPath(); g.ellipse(x, gy(gI.floor) + 4, sz * 0.4, 3, 0, 0, 7); g.fill();
+      if (im) g.drawImage(im, x - sz / 2, y - sz, sz, sz); else { g.fillStyle = "#C9B27A"; g.strokeStyle = "#1E160E"; g.lineWidth = 1.5; g.beginPath(); g.arc(x, y - sz / 2, sz * 0.3, 0, 7); g.fill(); g.stroke(); } }
     // kurulu tuzaklar
     for (const tr of n.traps) { if (tr.state === "hand") continue; const x = X(tr.x), y = gy(tr.floor) + 4; g.globalAlpha = tr.state === "cool" ? 0.4 : 1; g.strokeStyle = "#1E160E"; g.lineWidth = 2; g.fillStyle = tr.id === "ates_tuzagi" ? "#C4552B" : "#8A6A45";
       g.beginPath(); g.ellipse(x, y, 11, 4.5, 0, 0, 7); g.fill(); g.stroke(); for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + k * 5, y); g.lineTo(x + k * 5, y - 9); g.stroke(); }
@@ -166,6 +170,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     q("#scAmmo").textContent = `${n.weaponName}${n.bow ? ` · ok ${n.ammo}` : ""}`; q("#scBag").textContent = `Çanta ${bagUsed(n)}/${n.bagCap}`;
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
     const ns = nearSpot(n); const sb = q("#scSearch") as HTMLButtonElement; sb.hidden = !ns; sb.textContent = n.searchId ? "Aranıyor…" : "Ara"; sb.classList.toggle("busy", !!n.searchId);
+    const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", bagUsed(n) >= n.bagCap); }
     const tb = q("#scTrap") as HTMLButtonElement; tb.hidden = !n.traps.length; if (n.traps.length) { const hand = trapsInHand(n); const cool = n.traps.filter(x => x.state === "cool").map(x => Math.ceil(x.t)); tb.textContent = hand ? `Tuzak ${hand}` : cool.length ? `Tuzak ${Math.min(...cool)} sn` : "Tuzak 0"; tb.disabled = !hand || n.climbing; }
     const pb = q("#scSpell") as HTMLButtonElement; pb.hidden = !n.spell; if (n.spell) { pb.textContent = n.spell.cd > 0 ? `${n.spell.name} ${Math.ceil(n.spell.cd)}` : n.spell.name; pb.disabled = n.spell.cd > 0; }
   }
@@ -174,7 +179,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       const now = performance.now();
       if (f.k === "loot") { const nm = f.text.replace(/^\+(\d+) ([a-z_]+)$/, (_m, c, id) => `+${c} ${itemInfo(cfg, id).name}`); pops.push({ x: f.x, floor: f.floor, t: now, text: nm, color: "#F4E3A1" }); sfx(f.text === "boş" ? "page" : "coin"); }
       if (f.k === "weapon") { pops.push({ x: f.x, floor: f.floor, t: now, text: `${f.name} buldun!`, color: "#9BD36B" }); sfx("perfect"); buzz("medium"); }
-      if (f.k === "full") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Çanta dolu!", color: "#E36A55" }); sfx("bad"); }
+      if (f.k === "full") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Çanta dolu: yere düştü", color: "#E36A55" }); sfx("bad"); }
       if (f.k === "hit") pops.push({ x: f.x, floor: f.floor, t: now, text: `${f.crit ? "Kritik " : ""}${f.dmg}`, color: f.crit ? "#E36A55" : "#F2E7C9" });
       if (f.k === "hurt") { shake = Math.max(shake, 5); sfx("hurt"); buzz("light"); }
       if (f.k === "raid") { tip.hidden = false; tip.textContent = `Baskın! ${f.n} düşman geliyor`; setTimeout(() => { tip.hidden = true; }, 2200); sfx("beat"); buzz("medium"); }
@@ -217,16 +222,22 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   el.querySelector(".sc-acts")!.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b || b.disabled || n.phase !== "play" || paused) return;
     if (b.dataset.c === "exit") { if (leave(n)) sfx("win"); return; }
+    if (b.dataset.a === "pick") { const r = pickGround(n); if (r === "ok") sfx("coin"); else { sfx("bad"); if (r === "full") { tip.hidden = false; tip.textContent = "Çanta dolu: önce bir şey at"; setTimeout(() => { tip.hidden = true; }, 1500); } } }
     if (b.dataset.a === "search") { if (beginSearch(n)) { sfx("tap"); stickReset(); } else sfx("bad"); }
     if (b.dataset.a === "trap") { if (placeTrap(n)) sfx("thunk"); else sfx("bad"); }
     if (b.dataset.a === "spell") { if (!castSpell(n)) { sfx("bad"); tip.hidden = false; tip.textContent = "Yakında düşman yok"; setTimeout(() => { tip.hidden = true; }, 1200); } }
   });
   const bagEl = el.querySelector<HTMLElement>("#scPause")!;
+  let bagSel = "";
   function showBag() {
     paused = true; bagEl.hidden = false; stickReset(); sfx("page");
-    const ids = Object.keys(n.bag).filter(k => n.bag[k] > 0);
-    bagEl.innerHTML = `<p class="hand" style="margin:0;font-size:26px">Çantan ${bagUsed(n)}/${n.bagCap}</p><p class="tiny muted" style="margin:0">Yer açmak için istemediğini at; silah ve ok çantayı doldurmaz.</p>
-      ${ids.map(id => `<div class="choice bagrow">${itemPic(id, 34)}<b>${esc(itemInfo(cfg, id).name)} ×${n.bag[id]}</b><button class="btn small red" data-drop="${id}">At</button></div>`).join("") || `<p class="muted" style="margin:0">Çantan boş.</p>`}
+    const cells: string[] = []; for (const [id, c] of Object.entries(n.bag)) for (let i = 0; i < c; i++) cells.push(id);
+    const grid = Array.from({ length: n.bagCap }, (_, i) => { const id = cells[i]; return id ? `<button class="cell ${bagSel === id ? "sel" : ""}" data-bag="${id}" aria-label="${esc(itemInfo(cfg, id).name)}">${itemPic(id, 36)}</button>` : `<div class="cell empty"></div>`; }).join("");
+    const sel = bagSel && n.bag[bagSel] ? bagSel : ""; const near = groundNear(n);
+    bagEl.innerHTML = `<p class="hand" style="margin:0;font-size:26px">Çanta <span class="muted">${bagUsed(n)}/${n.bagCap}</span></p>
+      <div class="grid bag-grid">${grid}</div>
+      ${sel ? `<div class="choice bagrow">${itemPic(sel, 40)}<b>${esc(itemInfo(cfg, sel).name)} ×${n.bag[sel]}</b><button class="btn small red" data-drop="${sel}">Yere at</button></div>` : `<p class="tiny muted" style="margin:0">Bir eşyaya dokun; yere atıp yer açabilirsin. Atılan eşya burada durur, çanta boşalınca geri alırsın.</p>`}
+      ${near.length ? `<p class="tiny muted" style="margin:0">Yerde (yanında):</p>` : ""}${near.map(gi => `<div class="choice bagrow">${itemPic(gi.item, 36)}<b>${esc(itemInfo(cfg, gi.item).name)}</b><button class="btn small" data-take="${gi.id}" ${bagUsed(n) >= n.bagCap ? "disabled" : ""}>Al</button></div>`).join("")}
       <button class="choice" data-p="resume"><b>Kapat</b></button>`;
   }
   el.querySelector(".sc-bar")!.addEventListener("click", e => { if ((e.target as HTMLElement).closest("[data-c=bag]") && n.phase === "play" && !paused) showBag(); });
@@ -237,6 +248,8 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       <button class="choice" data-p="resume"><b>Devam</b></button><button class="choice" data-p="quit"><b>Pes et</b><span>Çanta gider, kaçarsın.</span></button>`;
   });
   pauseEl.addEventListener("click", e => {
+    const bg2 = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-bag]"); if (bg2) { bagSel = bg2.dataset.bag!; sfx("tap"); showBag(); return; }
+    const tk = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-take]"); if (tk) { if (pickGround(n, +tk.dataset.take!) === "ok") sfx("coin"); else sfx("bad"); showBag(); return; }
     const dr = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-drop]"); if (dr) { dropBag(n, dr.dataset.drop!); sfx("tap"); showBag(); return; }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-p]"); if (!b) return;
     if (b.dataset.p === "resume") { paused = false; pauseEl.hidden = true; last = performance.now(); } else { paused = false; pauseEl.hidden = true; n.phase = "over"; n.result = "dead"; }

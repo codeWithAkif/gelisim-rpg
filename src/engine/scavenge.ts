@@ -106,6 +106,7 @@ export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
   | { k: "hurt"; dmg: number } | { k: "raid"; n: number } | { k: "card" } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
   | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
+export interface GItem { id: number; item: string; x: number; floor: number }
 export interface TrapSlot { id: string; state: "hand" | "placed" | "cool"; x: number; floor: number; t: number }
 export interface Dog { x: number; floor: number; state: "yanda" | "av" | "don"; t: number; cd: number; moving: boolean; face: 1 | -1; lag: number }
 export interface Scav {
@@ -114,12 +115,20 @@ export interface Scav {
   spots: Spot[]; searchId: number; foes: SFoe[]; nextId: number; wave: number; raidT: number;
   bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
   foundWeapons: string[]; armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[];
-  traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number };
+  ground: GItem[]; gid: number; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number };
 }
 const bagCount = (n: Scav) => Object.values(n.bag).reduce((a, b) => a + b, 0);
 export const bagUsed = bagCount;
-/** Çantadan bir tane at (yer aç). */
-export function dropBag(n: Scav, id: string): boolean { if (!n.bag[id]) return false; n.bag[id]--; if (n.bag[id] <= 0) delete n.bag[id]; return true; }
+/** Çantadan bir tane yere at (yer açar; eşya orada durur). */
+export function dropBag(n: Scav, id: string): boolean { if (!n.bag[id]) return false; n.bag[id]--; if (n.bag[id] <= 0) delete n.bag[id]; n.ground.push({ id: n.gid++, item: id, x: n.px, floor: n.floor }); return true; }
+/** Yakındaki (±8) yerdeki eşyalar, en yakın önce. */
+export const groundNear = (n: Scav): GItem[] => n.climbing ? [] : n.ground.filter(g => g.floor === n.floor && Math.abs(g.x - n.px) <= 8).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px));
+export const nearGround = (n: Scav): GItem | undefined => groundNear(n)[0];
+/** Yerdekini çantaya al (yer varsa); id verilmezse en yakını. */
+export function pickGround(n: Scav, gid?: number): "ok" | "full" | "none" {
+  const g = gid ? groundNear(n).find(q => q.id === gid) : nearGround(n); if (!g) return "none"; if (bagCount(n) >= n.bagCap) return "full";
+  n.ground = n.ground.filter(q => q !== g); n.bag[g.item] = (n.bag[g.item] ?? 0) + 1; return "ok";
+}
 export const speedOf = (n: Scav) => 22 * (1 + (n.cards.hafif_adim ?? 0) * 0.12);
 export const CLIMB_SPEED = 0.5;      // kat/sn
 export const SPOT_STAGES = 3;
@@ -160,7 +169,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
     site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, s.hp || mh), maxHp: mh,
     spots, searchId: 0, foes: [], nextId: 1, wave: 0, raidT: 45, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
     atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
-    traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
+    ground: [], gid: 1, traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
 }
 
@@ -229,7 +238,8 @@ function applyStage(n: Scav, sp: Spot, st: Stage) {
   }
   const c = st.n ?? 1; const id = st.item!;
   if (id === "ok" && n.bow) { n.ammo += c; n.fx.push({ k: "loot", text: `+${c} ok`, ...at }); n.found += c; return; }
-  let got = 0; for (let i = 0; i < c; i++) { if (bagCount(n) >= n.bagCap) { n.fx.push({ k: "full", ...at }); break; } n.bag[id] = (n.bag[id] ?? 0) + 1; got++; }
+  let got = 0; let spilled = 0; for (let i = 0; i < c; i++) { if (bagCount(n) >= n.bagCap) { n.ground.push({ id: n.gid++, item: id, x: sp.x + (spilled * 5 - 3), floor: sp.floor }); spilled++; continue; } n.bag[id] = (n.bag[id] ?? 0) + 1; got++; }
+  if (spilled) n.fx.push({ k: "full", ...at });
   if (got) { n.found += got; n.fx.push({ k: "loot", text: `+${got} ${id}`, ...at }); }
 }
 export const danger = (n: Scav) => 5 + n.wave * 2;
