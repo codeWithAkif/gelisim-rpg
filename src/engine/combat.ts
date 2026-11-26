@@ -17,7 +17,7 @@ export interface Unit {
   uid: string; side: "player" | "enemy" | "ally"; def?: string; name: string;
   x: number; y: number; hp: number; maxHp: number;
   moveLeft: number; acted: boolean; slowed: number; fled?: boolean;
-  blind?: number; scared?: boolean;
+  blind?: number; scared?: boolean; rooted?: number; stunned?: number; // rooted: sarmaşıkla yere bağlı; stunned: sersem, turunu kaçırır
   alert?: boolean;      // düşman: seni fark etti mi
   defending?: boolean;  // oyuncu: savunmada
 }
@@ -572,9 +572,10 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
   if (b.phase === "enemy") { allyTurn(cfg, s, b, rng, out); checkEnd(b); if ((b.phase as Battle["phase"]) === "won") { b.seed = rng.seed; out.forEach(t => b.log.unshift(t)); return out; } }
   for (const e of b.phase === "enemy" ? enemies(b) : []) {
     const d = ENEMIES[e.def!];
+    if ((e.stunned ?? 0) > 0) { e.stunned!--; if (e.rooted) e.rooted--; out.push(`${e.name} sersem; kendine gelemedi.`); continue; }
     // habersiz kurtlar sürüye doğru sinsice ilerler
     const goal: XY = e.alert ? [p.x, p.y] : b.flock;
-    const budget = e.alert ? moveRange(cfg, s, b, e) : 2;
+    const budget = (e.rooted ?? 0) > 0 ? 0 : e.alert ? moveRange(cfg, s, b, e) : 2;
     if (dist(e.x, e.y, p.x, p.y) > 1 || !e.alert) {
       const r = reachable(b, e, budget);
       let best: XY | null = null, bestScore = e.alert ? Infinity : dist(e.x, e.y, goal[0], goal[1]) * 10;
@@ -604,6 +605,7 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
       detect(b, false);
     }
     if (e.slowed > 0) e.slowed--;
+    if ((e.rooted ?? 0) > 0) e.rooted!--;
     const blind = (e.blind ?? 0) > 0; if (blind) e.blind!--;
     if (e.alert && dist(e.x, e.y, p.x, p.y) === 1) {
       const ctx = ctxAt(cfg, s, b, p, d.species);

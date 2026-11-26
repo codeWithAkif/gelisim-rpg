@@ -4,7 +4,7 @@ import { type GameState, DAY_MINUTES, addRep, log, minutesLeft, hourOf } from ".
 import { applyGain, type GainReport } from "./progression";
 import { addItem, removeItem } from "./inventory";
 import { Rng } from "./rng";
-import { COLLECTIBLES, FINDS, FINDS_PER_DAY, SEARCH_MINUTES, REQUESTS, REQUESTS_PER_DAY, type Collectible, type RequestDef } from "../content/explore";
+import { COLLECTIBLES, FINDS, FINDS_PER_DAY, RELIC_FINDS, SEARCH_MINUTES, REQUESTS, REQUESTS_PER_DAY, type Collectible, type RequestDef } from "../content/explore";
 import { PLACES, ROADS, NPC_PLACE } from "../content/map";
 import { QUESTS, NPCS } from "../content/world";
 import { grantRelic, hasRelic } from "./relics";
@@ -84,6 +84,14 @@ export function searchHere(cfg: Config, s: GameState): SearchResult {
   if (!hasRelic(s, "olcer_pusulasi") && ["dere", "yayla"].includes(s.location) && collected(s).size >= 6 && rng.chance(30)) {
     const relic = grantRelic(cfg, s, "olcer_pusulasi", gains)!;
     return { ok: true, gains, relic, text: "Ayağın çamurda sert bir şeye takıldı. Pirinçten bir pusula; kapağında annenin işareti." };
+  }
+  // kadim çağrılar: bazı yerlerde, bir kez, nadiren bir büyü öğreten eşya çıkar
+  for (const rf of RELIC_FINDS) {
+    if (hasRelic(s, rf.relic) || !rf.places.includes(s.location) || collected(s).size < rf.minCollected) continue;
+    if (rf.night !== undefined && rf.night !== night) continue;
+    if (!rng.chance(rf.chance)) continue;
+    const relic = grantRelic(cfg, s, rf.relic, gains)!;
+    return { ok: true, gains, relic, text: rf.text };
   }
   const c = collectible(pick.id)!;
   t.found[s.location] = (t.found[s.location] ?? 0) + 1;

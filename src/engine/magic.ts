@@ -7,9 +7,11 @@ import { effectiveAttr, envPct } from "./derived";
 import { type Battle, type Unit, type XY, player, enemies, dist, neighbors, unitAt, ctxAt, moraleCheck, detect } from "./combat";
 import { Rng } from "./rng";
 import { ENEMIES, TERRAIN, type Terrain } from "../content/world";
+import { RELIC_SPELLS } from "../content/spells";
+import { hasRelic } from "./relics";
 
 /** Büyülerin fiziksel sonuçları (config'deki "Fiziksel etki" metninin oyun karşılığı). */
-export const SPELL_FX: Record<string, { ignite?: boolean; wall?: number; slow?: number; blind?: number; chain?: boolean; mud?: boolean }> = {
+export const SPELL_FX: Record<string, { ignite?: boolean; wall?: number; slow?: number; blind?: number; chain?: boolean; mud?: boolean; root?: number; stun?: number }> = {
   ates_topu: { ignite: true },
   magma_akintisi: { ignite: true, slow: 2 },
   buz_duvari: { wall: 4 },
@@ -19,6 +21,9 @@ export const SPELL_FX: Record<string, { ignite?: boolean; wall?: number; slow?: 
   elektrik_golu: { chain: true, slow: 1 },
   camur_tuzagi: { mud: true, slow: 3 },
   yildirim_firtinasi: { chain: true },
+  sarmasik: { root: 2 },
+  karga_surusu: { blind: 2 },
+  yer_kiliclari: { stun: 1 },
 };
 const IGNITE: Partial<Record<Terrain, number>> = { uzun_ot: 90, agac: 80, cayir: 45 };
 
@@ -38,8 +43,9 @@ export interface SpellOption { spell: Spell; known: boolean; ok: boolean; reason
 export function spellOptions(cfg: Config, s: GameState): SpellOption[] {
   return cfg.data.spells.map(sp => {
     const els = sp.sources.flatMap(src => baseElements(cfg, src.id));
-    const known = els.length > 0 && els.every(e => s.knownElements.includes(e));
-    if (!known) return { spell: sp, known, ok: false, reason: "Defterinde gereken sayfa yok" };
+    const relic = RELIC_SPELLS[sp.id];
+    const known = relic ? hasRelic(s, relic) : els.length > 0 && els.every(e => s.knownElements.includes(e));
+    if (!known) return { spell: sp, known, ok: false, reason: relic ? "Kadim eşyası bulunmadı" : "Defterinde gereken sayfa yok" };
     const m = mastery(cfg, s, sp), need = sp.minMastery ?? 0;
     if (m < need) return { spell: sp, known, ok: false, reason: `${cfg.attr.get(sp.mastery ?? "")?.name ?? "Ustalık"} ${m.toFixed(1)}/${need}` };
     if (s.mana < (sp.manaCost ?? 0)) return { spell: sp, known, ok: false, reason: `Mana yetmiyor (${Math.floor(s.mana)}/${sp.manaCost})` };
@@ -114,6 +120,8 @@ export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string,
       if (dmg > 0) { e.hp = Math.max(0, e.hp - dmg); parts.push(`${e.name} ${dmg} hasar aldı.`); hits.push({ uid: e.uid, dmg }); }
       if (fx.slow) e.slowed = Math.max(e.slowed, fx.slow);
       if (fx.blind) e.blind = Math.max(e.blind ?? 0, fx.blind);
+      if (fx.root) { e.rooted = Math.max(e.rooted ?? 0, fx.root); parts.push(`${e.name} sarmaşıklara dolandı.`); }
+      if (fx.stun && e.hp > 0) { e.stunned = Math.max(e.stunned ?? 0, fx.stun); parts.push(`${e.name} havaya savruldu, sersemledi.`); }
       if (fx.ignite && b.weather !== "yagmur" && ENEMIES[e.def!]?.species === "hayvan") e.scared = true; // kurtlar ateşten korkar; yağmurda alev cılız
       if (fx.chain) {
         const wet = b.weather === "yagmur" || ["su", "camur"].includes(b.tiles[e.y][e.x]);

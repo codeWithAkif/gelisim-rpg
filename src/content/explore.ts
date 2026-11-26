@@ -38,6 +38,13 @@ export const FINDS: Record<string, Find[]> = {
   koru: [{ id: "mantar", w: 4, sense: "koku" }, { id: "yaban_mersini", w: 4, sense: "gorus" }, { id: "tilki", w: 2, sense: "isitme" }, { id: "karaca", w: 1, sense: "isitme" }],
 };
 /** Bir yerde günde en çok kaç kez bir şey bulunur (bitkiler tükenir, hayvanlar kaçar). */
+/** Kadim çağrıları öğreten eşyalar: yalnız bu yerlerde, vadiyi biraz tanıyınca, nadiren çıkar. */
+export interface RelicFind { relic: string; places: string[]; minCollected: number; chance: number; night?: boolean; text: string }
+export const RELIC_FINDS: RelicFind[] = [
+  { relic: "ardic_koku", places: ["koru"], minCollected: 2, chance: 22, text: "Devrilmiş yaşlı bir ardıcın kökü avucuna dolandı; bırakmadı. Kökün üstünde annenin defterindeki işaret oyulmuş." },
+  { relic: "kara_tuy", places: ["yayla", "dere"], minCollected: 3, chance: 22, text: "Bir karga tepende üç kez döndü, önüne kapkara bir tüy bıraktı. Tüy rüzgârsız havada titriyor." },
+  { relic: "pasli_kabza", places: ["koy_meydani", "dere"], minCollected: 4, chance: 20, text: "Toprağın içinden paslı bir kılıç kabzası çıktı. Tutunca ayağının altındaki toprak titredi." },
+];
 export const FINDS_PER_DAY = 3;
 export const SEARCH_MINUTES = 20;
 

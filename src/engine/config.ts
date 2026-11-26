@@ -1,5 +1,6 @@
 // Config editöründen gelen oyun config'inin tipleri ve hızlı erişim indeksleri.
 import raw from "../config/oyun-config.json";
+import { EXTRA_SPELLS } from "../content/spells";
 
 export interface Link { w: number }
 export interface Attribute {
@@ -70,4 +71,6 @@ export class Config {
   importance(id: string) { return this.data.reputation.questImportance.find(i => i.id === id); }
 }
 
-export const config = new Config(raw as unknown as GameConfig);
+// editörde olmayan kadim çağrılar (src/content/spells.ts) config'e eklenir
+const merged = raw as unknown as GameConfig;
+export const config = new Config({ ...merged, spells: [...merged.spells, ...EXTRA_SPELLS.filter(x => !merged.spells.some(y => y.id === x.id))] });

@@ -12,6 +12,7 @@ import { maxHp } from "./combat";
 import { Rng } from "./rng";
 import { ENEMIES } from "../content/world";
 import { addItem } from "./inventory";
+import { hasRelic } from "./relics";
 
 export const NFIELD = { w: 100, h: 130 };
 export const TOWER = { x: 50, y: 65, r: 7 };
@@ -64,26 +65,30 @@ export const CARDS: Card[] = [
   { id: "zincir", name: "Zincir şimşek", desc: "Her beşinci atış yakındaki üç düşmana sıçrar.", max: 3 },
   { id: "buz", name: "Ayaz halkası", desc: "Kuleye yakın düşmanlar yavaşlar.", max: 3 },
   { id: "kazik", name: "Kazık halkası", desc: "Kuleye dayanan düşman her saniye hasar alır.", max: 3 },
-  { id: "kopek", name: "Karabaş", desc: "Köpeğin kulenin dibinde gezer, yaklaşanı ısırır.", max: 3, need: s => !!s.pet },
+  { id: "kopek", name: "Karabaş", desc: "Karabaş daha sert ısırır, daha uzağı kollar.", max: 3, need: s => !!s.pet },
+  { id: "b_sarmasik", name: "Sarmaşık bağı", desc: "Yeni büyü: kalabalığı yere bağlar.", max: 1 },
+  { id: "b_karga", name: "Karga sürüsü", desc: "Yeni büyü: kargalar gözlerini gagalar; saldıramazlar.", max: 1 },
+  { id: "b_kilic", name: "Yerden kılıçlar", desc: "Yeni büyü: bir hat boyunca kılıçlar yükselir, sersemletir.", max: 1 },
   { id: "kritik", name: "Zayıf nokta", desc: "Kritik şansı +%8, kritik hasarı artar.", max: 3 },
   { id: "kan", name: "Kurt postu", desc: "Her öldürdüğün düşman bir parça can verir.", max: 3 },
   { id: "kese", name: "Dolu kese", desc: "Düşenlerden %30 daha çok kırıntı.", max: 3 },
   { id: "diken", name: "Dikenli sur", desc: "Sura vuran, vurduğunun yarısını geri yer.", max: 2 },
-  { id: "nefes", name: "Derin nefes", desc: "Şimşek düğmesi %25 daha çabuk dolar.", max: 3 },
+  { id: "nefes", name: "Derin nefes", desc: "Bütün büyüler %20 daha çabuk dolar.", max: 3 },
 ];
 
 /* ---------- durum ---------- */
-export interface NFoe { id: number; def: string; x: number; y: number; hp: number; max: number; speed: number; dmg: number; cd: number; r: number; boss: boolean; burn: number; slow: number; human: boolean; reward: number }
+export interface NFoe { id: number; def: string; x: number; y: number; hp: number; max: number; speed: number; dmg: number; cd: number; r: number; boss: boolean; burn: number; slow: number; root: number; stun: number; peck: number; human: boolean; reward: number }
 export interface Shot { x: number; y: number; tx: number; ty: number; target: number; dmg: number; crit: boolean; pierce: number; burn: boolean; hit: number[] }
 export type NFx =
   | { k: "hit"; x: number; y: number; dmg: number; crit: boolean } | { k: "die"; x: number; y: number; coins: number; boss: boolean }
-  | { k: "hurt"; dmg: number } | { k: "zap"; pts: [number, number][] } | { k: "wave"; n: number; boss: boolean } | { k: "card" } | { k: "reward"; wave: number; loot: Loot } | { k: "skill"; x: number; y: number; r: number };
+  | { k: "hurt"; dmg: number } | { k: "zap"; pts: [number, number][] } | { k: "wave"; n: number; boss: boolean } | { k: "card" } | { k: "reward"; wave: number; loot: Loot } | { k: "spell"; id: SpellId; x: number; y: number; r: number; x2?: number; y2?: number; hits: number[] } | { k: "bite"; x: number; y: number };
 export interface Nobet {
   site: NobetSite; phase: "play" | "card" | "over"; time: number; wave: number; waveLeft: number; spawnT: number; breakT: number;
   hp: number; maxHp: number; regen: number; dmg: number; rate: number; range: number; crit: number;
   lv: Record<StatId, number>; coins: number; cards: Record<string, number>; offer: string[];
   page: number; pageNeed: number; fireCd: number; shotsFired: number;
-  skillCd: number; skillMax: number; pet?: { a: number; cd: number };
+  spells: Partial<Record<SpellId, { cd: number; max: number }>>;
+  pet?: { x: number; y: number; hx: number; hy: number; cd: number; lv: number };
   loot: Loot; rewarded: number; foes: NFoe[]; shots: Shot[]; fx: NFx[]; nextId: number; seed: number; rng: Rng;
   stats: { kills: number; shots: number; bosses: number; dmgTaken: number; coins: number; cards: number; skills: number };
 }
@@ -98,7 +103,8 @@ export function createNobet(cfg: Config, s: GameState, site: NobetSite, seed: nu
     site, phase: "play", time: 0, wave: 0, waveLeft: 0, spawnT: 0, breakT: 1.5,
     hp, maxHp: hp, regen: 0.3, dmg, rate: (0.9 + lvA(s, "refleks") / 80) * (1 + pm("cabuk") * 0.05), range: 30 + lvA(s, "gorus") / 8, crit: 0.05 + lvA(s, "okculuk") / 400 + pm("keskin") * 0.02,
     lv: { dmg: 0, rate: 0, hp: 0, regen: 0, range: 0 }, coins: 8 + pm("miras") * 6, cards: {}, offer: [],
-    page: 0, pageNeed: 6, fireCd: 0, shotsFired: 0, skillCd: 4, skillMax: 18,
+    page: 0, pageNeed: 6, fireCd: 0, shotsFired: 0,
+    spells: startSpells(s), pet: s.pet ? { x: TOWER.x, y: TOWER.y + 16, hx: TOWER.x, hy: TOWER.y + 16, cd: 0, lv: 1 } : undefined,
     loot: { money: 0, items: {} }, rewarded: 0, foes: [], shots: [], fx: [], nextId: 1, seed, rng,
     stats: { kills: 0, shots: 0, bosses: 0, dmgTaken: 0, coins: 0, cards: 0, skills: 0 },
   };
@@ -127,20 +133,69 @@ export function pickCard(s: GameState, n: Nobet, id: string): boolean {
   if (n.phase !== "card" || !n.offer.includes(id)) return false;
   n.cards[id] = (n.cards[id] ?? 0) + 1; n.offer = []; n.phase = "play"; n.stats.cards++;
   if (id === "kritik") n.crit += 0.08;
-  if (id === "nefes") n.skillMax *= 0.75;
-  if (id === "kopek" && !n.pet) n.pet = { a: 0, cd: 0 };
+  if (id === "nefes") for (const sp of Object.values(n.spells)) sp!.max *= 0.8;
+  if (id === "kopek" && n.pet) n.pet.lv++;
+  const learn: Record<string, SpellId> = { b_sarmasik: "sarmasik", b_karga: "karga", b_kilic: "kilic" };
+  if (learn[id] && !n.spells[learn[id]]) n.spells[learn[id]] = { cd: 0, max: SPELL_CD[learn[id]] * Math.pow(0.8, n.cards.nefes ?? 0) };
   return true;
 }
-/** Şimşek: kalabalığın ortasına düşer, çevresindekileri vurur ve sersemletir. */
-export function useSkill(n: Nobet): boolean {
-  if (n.skillCd > 0 || n.phase !== "play" || !n.foes.length) return false;
+/** Karabaş'ın bekleyeceği yer: kuleden çok uzağa gidemez. */
+export function placePet(n: Nobet, x: number, y: number): boolean {
+  if (!n.pet) return false;
+  const dx = x - TOWER.x, dy = y - TOWER.y, d = Math.hypot(dx, dy) || 1; const k = Math.min(1, 34 / d);
+  n.pet.hx = TOWER.x + dx * k; n.pet.hy = TOWER.y + dy * k; return true;
+}
+export const petGuard = (n: Nobet) => 16 + (n.pet?.lv ?? 1) * 3;
+/* ---------- büyüler ---------- */
+export type SpellId = "simsek" | "sarmasik" | "karga" | "kilic";
+export const SPELL_CD: Record<SpellId, number> = { simsek: 18, sarmasik: 14, karga: 20, kilic: 16 };
+export const SPELL_NAMES: Record<SpellId, string> = { simsek: "Şimşek", sarmasik: "Sarmaşık", karga: "Karga sürüsü", kilic: "Yerden kılıçlar" };
+/** Nöbete hangi büyülerle başlanır: şimşek hep; kadim eşyası bulunan çağrılar da. */
+function startSpells(s: GameState): Nobet["spells"] {
+  const out: Nobet["spells"] = { simsek: { cd: 4, max: SPELL_CD.simsek } };
+  if (hasRelic(s, "ardic_koku")) out.sarmasik = { cd: 0, max: SPELL_CD.sarmasik };
+  if (hasRelic(s, "kara_tuy")) out.karga = { cd: 0, max: SPELL_CD.karga };
+  if (hasRelic(s, "pasli_kabza")) out.kilic = { cd: 0, max: SPELL_CD.kilic };
+  return out;
+}
+function crowdCenter(n: Nobet, r: number) {
   let best = n.foes[0], bc = -1;
-  for (const f of n.foes) { const c = n.foes.filter(g => Math.hypot(g.x - f.x, g.y - f.y) < 14).length; if (c > bc) { bc = c; best = f; } }
-  const R = 14; n.fx.push({ k: "skill", x: best.x, y: best.y, r: R });
-  for (const f of [...n.foes]) if (Math.hypot(f.x - best.x, f.y - best.y) < R) { f.slow = Math.max(f.slow, 1.5); hurt(n, f, n.dmg * 3.5, false); }
-  n.skillCd = n.skillMax; n.stats.skills++;
+  for (const f of n.foes) { const c = n.foes.filter(g => Math.hypot(g.x - f.x, g.y - f.y) < r).length + (f.boss ? 1 : 0); if (c > bc) { bc = c; best = f; } }
+  return best;
+}
+/** Büyü yapar: kalabalığın ortasını kendisi bulur. */
+export function useSpell(n: Nobet, id: SpellId): boolean {
+  const sp = n.spells[id]; if (!sp || sp.cd > 0 || n.phase !== "play" || !n.foes.length) return false;
+  const c = crowdCenter(n, 14); const hits: number[] = [];
+  if (id === "simsek") {
+    const R = 14;
+    for (const f of [...n.foes]) if (Math.hypot(f.x - c.x, f.y - c.y) < R) { hits.push(f.id); f.slow = Math.max(f.slow, 1.5); hurt(n, f, n.dmg * 3.5, false); }
+    n.fx.push({ k: "spell", id, x: c.x, y: c.y, r: R, hits });
+  } else if (id === "sarmasik") {
+    // sarmaşık: geniş alanda herkes yere bağlanır; liderler daha kısa
+    const R = 18;
+    for (const f of n.foes) if (Math.hypot(f.x - c.x, f.y - c.y) < R) { hits.push(f.id); f.root = Math.max(f.root, f.boss ? 1.5 : 3.5); hurt(n, f, n.dmg * 0.6, false); }
+    n.fx.push({ k: "spell", id, x: c.x, y: c.y, r: R, hits });
+  } else if (id === "karga") {
+    // kargalar: en çok altı düşmana saldırır; gagalanan saldıramaz ve yavaş yavaş can kaybeder
+    const R = 26; const ts = n.foes.filter(f => Math.hypot(f.x - c.x, f.y - c.y) < R).slice(0, 6);
+    for (const f of ts) { hits.push(f.id); f.peck = Math.max(f.peck, 4); }
+    n.fx.push({ k: "spell", id, x: c.x, y: c.y, r: R, hits });
+  } else {
+    // yerden kılıçlar: kuleden kalabalığa doğru bir hat; üstündeki her şey havaya fırlar
+    const a = Math.atan2(c.y - TOWER.y, c.x - TOWER.x); const L = 48;
+    const x1 = TOWER.x + Math.cos(a) * 8, y1 = TOWER.y + Math.sin(a) * 8, x2 = TOWER.x + Math.cos(a) * L, y2 = TOWER.y + Math.sin(a) * L;
+    for (const f of [...n.foes]) {
+      const vx = x2 - x1, vy = y2 - y1; const u = Math.max(0, Math.min(1, ((f.x - x1) * vx + (f.y - y1) * vy) / (vx * vx + vy * vy)));
+      if (Math.hypot(f.x - (x1 + vx * u), f.y - (y1 + vy * u)) < 5 + f.r) { hits.push(f.id); f.stun = Math.max(f.stun, 1.4); hurt(n, f, n.dmg * 4, true); }
+    }
+    n.fx.push({ k: "spell", id, x: x1, y: y1, x2, y2, r: 5, hits });
+  }
+  sp.cd = sp.max; n.stats.skills++;
   return true;
 }
+/** Eski adı: şimşek. */
+export const useSkill = (n: Nobet) => useSpell(n, "simsek");
 
 /* ---------- dalgalar ---------- */
 export const isBossWave = (w: number) => w % 5 === 0;
@@ -167,7 +222,7 @@ function spawn(n: Nobet) {
   const hp = d.hp * 0.55 * k * (boss ? 4 : 1);
   n.foes.push({ id: n.nextId++, def, x: TOWER.x + Math.cos(a) * R, y: TOWER.y + Math.sin(a) * R, hp, max: hp,
     speed: (human ? 5 : 7.5) * (d.move / (human ? 3 : 4)) * (boss ? 0.75 : 1) * spM,
-    dmg: ((d.damage[0] + d.damage[1]) / 2) * 0.35 * power * (boss ? 1.8 : 1), cd: 0.5, r: boss ? 4.5 : human ? 3.2 : 3, boss, burn: 0, slow: 0, human,
+    dmg: ((d.damage[0] + d.damage[1]) / 2) * 0.35 * power * (boss ? 1.8 : 1), cd: 0.5, r: boss ? 4.5 : human ? 3.2 : 3, boss, burn: 0, slow: 0, root: 0, stun: 0, peck: 0, human,
     reward: Math.round((1 + w * 0.25) * (boss ? 12 : 1) * (human ? 1.3 : 1)) });
   n.waveLeft--;
 }
@@ -188,7 +243,7 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
   if (n.phase !== "play") return;
   dt = Math.min(dt, 0.05); n.time += dt;
   n.hp = Math.min(n.maxHp, n.hp + n.regen * dt);
-  n.skillCd = Math.max(0, n.skillCd - dt);
+  for (const sp of Object.values(n.spells)) sp!.cd = Math.max(0, sp!.cd - dt);
   // dalga
   if (n.waveLeft <= 0 && !n.foes.length) {
     if (n.wave > 0 && isBossWave(n.wave) && n.rewarded < n.wave) {
@@ -202,11 +257,14 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
   const ice = n.cards.buz ?? 0, stake = n.cards.kazik ?? 0;
   for (const f of [...n.foes]) {
     if (f.burn > 0) { f.burn -= dt; hurt(n, f, n.dmg * 0.25 * (n.cards.ates ?? 1) * dt, false, true); if (f.hp <= 0) continue; }
-    f.slow = Math.max(0, f.slow - dt);
+    f.slow = Math.max(0, f.slow - dt); f.root = Math.max(0, f.root - dt);
+    if (f.peck > 0) { f.peck -= dt; hurt(n, f, n.dmg * 0.5 * dt, false, true); if (f.hp <= 0) continue; }
+    if (f.stun > 0) { f.stun -= dt; continue; }
     const dx = TOWER.x - f.x, dy = TOWER.y - f.y, d = Math.hypot(dx, dy);
     let sp = f.speed * (f.slow > 0 ? 0.35 : 1);
     if (ice && d < 22) sp *= 1 - 0.18 * ice;
-    if (d > TOWER.r + f.r) { f.x += dx / d * sp * dt; f.y += dy / d * sp * dt; continue; }
+    if (d > TOWER.r + f.r) { if (f.root <= 0) { f.x += dx / d * sp * dt; f.y += dy / d * sp * dt; } continue; }
+    if (f.peck > 0) continue; // kargalar gözünü oyarken saldıramaz
     if (stake) { hurt(n, f, n.dmg * 0.35 * stake * dt, false, true); if (f.hp <= 0) continue; }
     if ((f.cd -= dt) <= 0) {
       f.cd = f.human ? 1.4 : 1.1; n.hp -= f.dmg; n.stats.dmgTaken += f.dmg; n.fx.push({ k: "hurt", dmg: Math.round(f.dmg) });
@@ -214,12 +272,18 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
       if (n.hp <= 0) { n.hp = 0; n.phase = "over"; return; }
     }
   }
-  // köpek: kulenin çevresinde döner, en yakını ısırır
+  // köpek: yerinde bekler; kolladığı alana bir düşman girerse koşup ısırır, sonra yerine döner
   if (n.pet) {
-    n.pet.a += dt * 1.2; n.pet.cd -= dt;
-    const px = TOWER.x + Math.cos(n.pet.a) * 13, py = TOWER.y + Math.sin(n.pet.a) * 13;
-    const t = n.foes.find(f => Math.hypot(f.x - px, f.y - py) < 9);
-    if (t && n.pet.cd <= 0) { n.pet.cd = 1.1 - (n.cards.kopek ?? 1) * 0.15; hurt(n, t, n.dmg * (0.5 + (n.cards.kopek ?? 1) * 0.3), false); t.slow = Math.max(t.slow, 0.6); }
+    const pt = n.pet; pt.cd -= dt; const G = petGuard(n);
+    const t = n.foes.filter(f => Math.hypot(f.x - pt.hx, f.y - pt.hy) < G).sort((a, b) => Math.hypot(a.x - pt.x, a.y - pt.y) - Math.hypot(b.x - pt.x, b.y - pt.y))[0];
+    const [gx, gy] = t ? [t.x, t.y] : [pt.hx, pt.hy];
+    const dx = gx - pt.x, dy = gy - pt.y, d = Math.hypot(dx, dy);
+    const reach = t ? t.r + 2 : 0.5;
+    if (d > reach) { const k = Math.min(d - reach, 20 * dt) / d; pt.x += dx * k; pt.y += dy * k; }
+    else if (t && pt.cd <= 0) {
+      pt.cd = 1.1 - pt.lv * 0.12; hurt(n, t, n.dmg * (0.45 + pt.lv * 0.3), false); t.slow = Math.max(t.slow, 0.8);
+      n.fx.push({ k: "bite", x: t.x, y: t.y });
+    }
   }
   // atış
   n.fireCd -= dt;

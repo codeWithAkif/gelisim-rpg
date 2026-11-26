@@ -455,3 +455,14 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .perm-list { display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto; }
 .perm { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--pencil); padding-bottom: 5px; }
 .nb-card[hidden] { display: none; }
+.nb-spells { display: flex; justify-content: center; gap: 14px; padding: 6px 12px; border-top: 1.5px solid var(--ink); }
+.nb-spells:empty { display: none; }
+.nb-spells .nb-skill { position: relative; left: auto; bottom: auto; transform: none; width: 70px; height: 60px; border-radius: 14px 18px 12px 16px; overflow: hidden; align-content: center; gap: 1px; display: grid; place-items: center; font-size: 0; }
+.nb-skill .ic { position: relative; color: var(--blue); }
+.nb-skill[data-spell="sarmasik"] .ic { color: #3F6B2A; }
+.nb-skill[data-spell="karga"] .ic { color: #1E1C1A; }
+.nb-skill[data-spell="kilic"] .ic { color: #5B6068; }
+.nb-skill small { position: relative; font-size: 10px; line-height: 1.1; color: var(--ink); text-align: center; }
+.nb-tip { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--paper); border: 1.5px solid var(--ink); border-radius: 8px; padding: 4px 10px; font-family: var(--f-hand); font-size: 17px; pointer-events: none; white-space: nowrap; }
+.here-act .act-ic { flex: none; }
+.here-act > .grow { flex: 1; }

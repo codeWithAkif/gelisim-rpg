@@ -148,6 +148,8 @@ export function cast(cfg: Config, s: GameState, sg: Siege, id: string, x: number
     damage(sg, f, sp.dmg, "buyu");
     if (fx.slow) f.slowT = Math.max(f.slowT, fx.slow * 1.2);
     if (fx.blind) f.stunT = Math.max(f.stunT, fx.blind * 0.8);
+    if (fx.root) f.stunT = Math.max(f.stunT, fx.root * 1.4);   // sarmaşık: yerinden kıpırdayamaz
+    if (fx.stun) f.stunT = Math.max(f.stunT, fx.stun * 1.2);
     if (fx.ignite) f.burnT = 3;
     if (fx.ignite && !f.human) f.flee = f.hp < f.max * 0.5;   // hayvanlar ateşten kaçar
   }

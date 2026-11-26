@@ -19,5 +19,20 @@ export const RELICS: Record<string, Relic> = {
     desc: "Çamurun içinde pirinç bir pusula. İğnesi kuzeyi değil, ısının çekildiği yeri gösteriyor. Kapağının içinde annenin işareti.",
     boosts: { mekansal: 4, gorus: 2, odak: 1 },
   },
+  ardic_koku: {
+    id: "ardic_koku", name: "Yaşlı ardıç kökü", source: "Koru",
+    desc: "Kendiliğinden kıvrılan bir kök. Toprağa dokundurunca sarmaşıklar uyanıyor. Yeni büyü: Sarmaşık bağı.",
+    boosts: { toprak_buyu: 3, cevresel: 1 },
+  },
+  kara_tuy: {
+    id: "kara_tuy", name: "Kara tüy", source: "Keşif",
+    desc: "Bir karganın bıraktığı tüy. Islık çalınca uzaklardan kanat sesleri geliyor. Yeni büyü: Karga sürüsü.",
+    boosts: { hava_buyu: 3, isitme: 1 },
+  },
+  pasli_kabza: {
+    id: "pasli_kabza", name: "Paslı kabza", source: "Keşif",
+    desc: "Eski bir savaştan kalma kabza. Yere vurunca toprak kılıç gibi sivriliyor. Yeni büyü: Yerden yükselen kılıçlar.",
+    boosts: { toprak_buyu: 2, kilic: 1, ust_govde: 1 },
+  },
 };
 Object.assign(RELICS, CHAPTER_RELICS);

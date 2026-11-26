@@ -5,7 +5,7 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Nobet, type StatId, type NobetResult, NFIELD, TOWER, STAT_NAMES, CARDS, PERMS, createNobet, stepNobet, buyUpgrade, upgradeCost, statValue,
-  pickCard, useSkill, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave, waveScale, type Loot,
+  pickCard, useSpell, placePet, petGuard, SPELL_NAMES, type SpellId, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave, waveScale, type Loot,
 } from "../engine/nobet";
 import { ENEMIES } from "../content/world";
 import { artUrl } from "./art";
@@ -49,7 +49,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   s.energy = Math.max(0, s.energy - 10); persist();
   const el = document.createElement("div"); el.className = "siege nobet"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Nöbet");
   el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="nb-waves" id="nbWaves"></div><button class="btn small" data-c="speed">1x</button></div>
-    <div class="siege-stage"><canvas></canvas><button class="nb-skill" data-c="skill" aria-label="Şimşek"><span class="cdf" id="nbSkillCd"></span>ϟ</button></div>
+    <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="nbTip"></div></div><div class="nb-spells" id="nbSpells"></div>
     <div class="nb-hp"><div class="gb"><div class="gf" id="nbHp" style="background:var(--red)"></div></div><span id="nbHpT"></span></div>
     <div class="nb-bar"><div class="nb-page" title="Defter sayfası"><div class="gf" id="nbPage"></div></div><span class="nb-coins" id="nbCoins"></span></div>
     <div class="nb-ups" id="nbUps"></div><div class="nb-card" id="nbCard" hidden></div><div class="nb-card" id="nbPause" hidden></div>`;
@@ -66,7 +66,8 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   const X = (x: number) => ox + x * scale, Y = (y: number) => oy + y * scale;
   const cs = getComputedStyle(document.documentElement); const C = (v: string) => cs.getPropertyValue(v).trim();
   const pops: { x: number; y: number; t: number; text: string; color: string; big?: boolean; dur?: number }[] = [];
-  const zaps: { pts: [number, number][]; t: number }[] = []; const blasts: { x: number; y: number; r: number; t: number }[] = [];
+  const zaps: { pts: [number, number][]; t: number }[] = []; const blades: { x: number; y: number; x2: number; y2: number; t: number }[] = [];
+  const vines: { x: number; y: number; r: number; t: number }[] = []; const flocks: { x: number; y: number; r: number; t: number }[] = []; const blasts: { x: number; y: number; r: number; t: number }[] = [];
   let shake = 0, flash = 0;
 
   const STATS: StatId[] = ["dmg", "rate", "hp", "regen", "range"];
@@ -102,7 +103,32 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-p]"); if (!b) return;
     pauseEl.hidden = true; paused = false; if (b.dataset.p === "quit") { n.phase = "over"; }
   });
-  el.querySelector("[data-c=skill]")!.addEventListener("click", () => { if (useSkill(n)) { sfx("spark"); sfx("crit"); buzz("heavy"); shake = 10; } else sfx("bad"); });
+  const sv = (d: string) => `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const SPELL_ICON: Record<SpellId, string> = {
+    simsek: sv('<path d="M13 2 5 14h6l-2 8 9-13h-6z" fill="currentColor" fill-opacity=".25"/>'),
+    sarmasik: sv('<path d="M12 22c0-6-1-9-5-12M12 22c0-5 2-8 6-10"/><path d="M7 10c-3 0-4-2-4-4 3 0 4 2 4 4zM18 12c3-1 3-3 3-5-3 0-4 2-3 5zM12 15c-2-2-2-4 0-6 2 2 2 4 0 6z" fill="currentColor" fill-opacity=".3"/>'),
+    karga: sv('<path d="M2 9c3-1 5 0 6 2 1-3 3-4 6-4M10 16c2-1 4 0 5 2 1-2 3-3 5-3"/><path d="M14 7c2-1 4-1 6 0"/>'),
+    kilic: sv('<path d="M5 21 9 9l2 12M11 21l3-14 3 14M17 21l2-9 2 9"/><path d="M2 21h20"/>'),
+  };
+  const spellBar = el.querySelector<HTMLElement>("#nbSpells")!; let barKey = "";
+  function renderSpells() {
+    const ids = Object.keys(n.spells) as SpellId[]; const k = ids.join(); if (k === barKey) return; barKey = k;
+    spellBar.innerHTML = ids.map(id => `<button class="nb-skill" data-spell="${id}" aria-label="${SPELL_NAMES[id]}"><span class="cdf"></span><span class="ic">${SPELL_ICON[id]}</span><small>${SPELL_NAMES[id]}</small></button>`).join("");
+  }
+  spellBar.addEventListener("click", e => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-spell]"); if (!b) return;
+    const id = b.dataset.spell as SpellId;
+    if (useSpell(n, id)) { sfx(id === "simsek" ? "spark" : id === "kilic" ? "clang" : id === "karga" ? "whoosh" : "thunk"); if (id !== "karga") sfx("crit"); buzz("heavy"); shake = id === "sarmasik" ? 4 : 10; } else sfx("bad");
+  });
+  // köpeğin bekleyeceği yer: araziye dokun
+  const tip = el.querySelector<HTMLElement>("#nbTip")!;
+  if (n.pet) { tip.textContent = `${s.pet!.name}'ın bekleyeceği yere dokun`; setTimeout(() => tip.remove(), 6000); } else tip.remove();
+  cv.addEventListener("pointerdown", e => {
+    if (!n.pet || n.phase !== "play") return;
+    const r = cv.getBoundingClientRect(); const x = (e.clientX - r.left - ox) / scale, y = (e.clientY - r.top - oy) / scale;
+    if (placePet(n, x, y)) { sfx("tap"); petMark = performance.now(); }
+  });
+  let petMark = 0;
 
   /* ---------- çizim ---------- */
   const ground = site.ground === "kar" ? ["#EEF1F3", "#C9D3DC"] : site.ground === "tas" ? ["#D8D0BE", "#A9A08C"] : ["#D9D6A6", "#A8A86E"];
@@ -145,19 +171,35 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       const filt = artUrl("dusman_" + f.def) && f.human ? "none" : d.tint ?? "none";
       if (!figure(key, f.x, f.y, h, right, filt)) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(f.x), Y(f.y), f.r * scale, 0, 7); g.fill(); }
       if (f.burn > 0) { g.fillStyle = `rgba(240,140,40,${0.45 + Math.sin(now / 60) * 0.25})`; g.beginPath(); g.ellipse(X(f.x), Y(f.y) - h * scale * 0.45, scale * 1.2, scale * 2.2, 0, 0, 7); g.fill(); }
+      if (f.root > 0) { g.strokeStyle = "#3F6B2A"; g.lineWidth = 2; for (let v = 0; v < 4; v++) { const a = v * 1.6 + f.id; g.beginPath(); g.moveTo(X(f.x + Math.cos(a) * 3), Y(f.y + 1)); g.quadraticCurveTo(X(f.x + Math.cos(a + 1) * 2), Y(f.y - h * 0.3), X(f.x + Math.cos(a) * 0.8), Y(f.y - h * 0.55)); g.stroke(); } g.fillStyle = "#5E8A3A"; g.beginPath(); g.ellipse(X(f.x), Y(f.y) + 2, scale * 3.2, scale * 1.2, 0, 0, 7); g.globalAlpha = 0.5; g.fill(); g.globalAlpha = 1; }
+      if (f.peck > 0) { g.strokeStyle = "#1E1C1A"; g.lineWidth = 2; for (let v = 0; v < 3; v++) { const a = now / 180 + v * 2.1 + f.id; const cx = X(f.x + Math.cos(a) * 4), cy = Y(f.y - h * 0.6 + Math.sin(a) * 2); g.beginPath(); g.moveTo(cx - 5, cy - 3); g.lineTo(cx, cy); g.lineTo(cx + 5, cy - 3); g.stroke(); } }
+      if (f.stun > 0) { g.fillStyle = C("--blue"); g.font = `${scale * 3}px serif`; g.textAlign = "center"; g.fillText("✦", X(f.x), Y(f.y) - h * scale * 1.05); }
       if (f.slow > 0) { g.fillStyle = "rgba(159,211,232,.6)"; g.beginPath(); g.arc(X(f.x), Y(f.y), scale * 2, 0, 7); g.fill(); }
       if (f.hp < f.max || f.boss) { const w = f.boss ? 40 : 20; g.fillStyle = "rgba(234,224,200,.9)"; g.fillRect(X(f.x) - w / 2, Y(f.y) - h * scale * 0.95, w, 4); g.fillStyle = C("--red"); g.fillRect(X(f.x) - w / 2, Y(f.y) - h * scale * 0.95, w * Math.max(0, f.hp / f.max), 4); }
     }
     // kule ve sen
     tower();
     if (!figure(n.fireCd > 1 / n.rate - 0.12 ? "poz_kahraman_vurus" : "poz_kahraman_durus", TOWER.x, TOWER.y - 1.5, 13, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y - 4), 2.5 * scale, 0, 7); g.fill(); }
-    if (n.pet) { const px = TOWER.x + Math.cos(n.pet.a) * 13, py = TOWER.y + Math.sin(n.pet.a) * 13; figure("dusman_kurt", px, py, 6, Math.sin(n.pet.a) > 0, ENEMIES.kopek.tint ?? "none"); }
+    if (n.pet) {
+      const pt = n.pet; const G = petGuard(n);
+      g.setLineDash([3, 5]); g.strokeStyle = `rgba(46,76,122,${now - petMark < 1500 ? 0.7 : 0.3})`; g.lineWidth = 1.5; g.beginPath(); g.arc(X(pt.hx), Y(pt.hy), G * scale, 0, 7); g.stroke(); g.setLineDash([]);
+      const moving = Math.hypot(pt.x - pt.hx, pt.y - pt.hy) > 1;
+      figure(moving && pt.cd > 0.6 ? "poz_kurt_atilma" : "dusman_kurt", pt.x, pt.y, 6, pt.x < TOWER.x, ENEMIES.kopek.tint ?? "none");
+    }
     // oklar
     g.strokeStyle = "#4A3826"; g.lineWidth = 2;
     for (const sh of n.shots) { const dx = sh.tx - sh.x, dy = sh.ty - sh.y, L = Math.hypot(dx, dy) || 1; g.strokeStyle = sh.burn ? "#D9682A" : "#4A3826"; g.beginPath(); g.moveTo(X(sh.x), Y(sh.y)); g.lineTo(X(sh.x - dx / L * 3.5), Y(sh.y - dy / L * 3.5)); g.stroke(); }
     // şimşek ve patlamalar
     for (let i = zaps.length - 1; i >= 0; i--) { const z = zaps[i]; const k = (now - z.t) / 260; if (k > 1) { zaps.splice(i, 1); continue; }
       g.strokeStyle = `rgba(120,170,255,${1 - k})`; g.lineWidth = 3; g.beginPath(); z.pts.forEach(([x, y], j) => { const jx = j ? (Math.random() - 0.5) * 3 : 0; j ? g.lineTo(X(x + jx), Y(y + jx)) : g.moveTo(X(x), Y(y)); }); g.stroke(); }
+    for (let i = blades.length - 1; i >= 0; i--) { const bl = blades[i]; const k = (now - bl.t) / 700; if (k > 1) { blades.splice(i, 1); continue; }
+      const up = k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75; const n2 = 9;
+      for (let j = 0; j < n2; j++) { const u = (j + 0.5) / n2; const x = bl.x + (bl.x2 - bl.x) * u, y = bl.y + (bl.y2 - bl.y) * u; const hgt = (4 + (j % 3)) * scale * up;
+        g.fillStyle = "#B8BCC2"; g.strokeStyle = C("--ink"); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(x) - scale * 0.9, Y(y)); g.lineTo(X(x), Y(y) - hgt); g.lineTo(X(x) + scale * 0.9, Y(y)); g.closePath(); g.fill(); g.stroke(); } }
+    for (let i = vines.length - 1; i >= 0; i--) { const v = vines[i]; const k = (now - v.t) / 600; if (k > 1) { vines.splice(i, 1); continue; } g.strokeStyle = `rgba(63,107,42,${1 - k})`; g.lineWidth = 3; g.beginPath(); g.arc(X(v.x), Y(v.y), v.r * scale * (0.4 + k * 0.6), 0, 7); g.stroke(); }
+    for (let i = flocks.length - 1; i >= 0; i--) { const fl = flocks[i]; const k = (now - fl.t) / 900; if (k > 1) { flocks.splice(i, 1); continue; }
+      g.strokeStyle = `rgba(30,28,26,${1 - k * 0.6})`; g.lineWidth = 2;
+      for (let j = 0; j < 14; j++) { const a = j * 0.45 + k * 4; const rr = fl.r * (1.4 - k) * (0.4 + (j % 4) * 0.2); const cx = X(fl.x + Math.cos(a) * rr), cy = Y(fl.y + Math.sin(a) * rr * 0.7) - (1 - k) * 60; g.beginPath(); g.moveTo(cx - 6, cy - 4); g.lineTo(cx, cy); g.lineTo(cx + 6, cy - 4); g.stroke(); } }
     for (let i = blasts.length - 1; i >= 0; i--) { const b = blasts[i]; const k = (now - b.t) / 500; if (k > 1) { blasts.splice(i, 1); continue; }
       g.fillStyle = `rgba(160,190,255,${0.5 * (1 - k)})`; g.beginPath(); g.arc(X(b.x), Y(b.y), b.r * scale * (0.6 + k * 0.5), 0, 7); g.fill();
       g.strokeStyle = `rgba(255,255,255,${1 - k})`; g.lineWidth = 3; g.beginPath(); g.moveTo(X(b.x), 0); g.lineTo(X(b.x + 2), Y(b.y) * 0.5); g.lineTo(X(b.x - 2), Y(b.y) * 0.7); g.lineTo(X(b.x), Y(b.y)); g.stroke(); }
@@ -171,8 +213,9 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     const need = n.pageNeed * (1 - permLevel(s, "deste") * 0.08);
     (el.querySelector("#nbPage") as HTMLElement).style.width = `${Math.min(100, (n.page / need) * 100)}%`;
     el.querySelector("#nbCoins")!.textContent = `◉ ${n.coins} kırıntı`;
-    (el.querySelector("#nbSkillCd") as HTMLElement).style.height = `${(n.skillCd / n.skillMax) * 100}%`;
-    el.querySelector<HTMLButtonElement>("[data-c=skill]")!.classList.toggle("ready", n.skillCd <= 0);
+    renderSpells();
+    for (const [id, sp] of Object.entries(n.spells)) { const b = spellBar.querySelector<HTMLElement>(`[data-spell="${id}"]`); if (!b) continue;
+      (b.querySelector(".cdf") as HTMLElement).style.height = `${(sp!.cd / sp!.max) * 100}%`; b.classList.toggle("ready", sp!.cd <= 0); }
     const w = Math.max(1, n.wave); const marks = [0, 1, 2, 3].map(i => w + i);
     el.querySelector("#nbWaves")!.innerHTML = marks.map((m, i) => `<span class="${i === 0 ? "now" : ""} ${isBossWave(m) ? "boss" : ""}">${isBossWave(m) ? "☠" : m}</span>`).join("<i></i>");
   }
@@ -187,7 +230,14 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       if (f.k === "die") { pops.push({ x: f.x, y: f.y - 3, t: now, text: `+${f.coins} ◉`, color: "#B07A1E", big: f.boss }); if (speed === 1 || f.boss) sfx(f.boss ? "win" : "coin"); }
       if (f.k === "hurt") { shake = Math.max(shake, 4); flash = 0.7; if (speed === 1) sfx("hurt"); buzz("light"); }
       if (f.k === "zap") { zaps.push({ pts: f.pts, t: now }); sfx("spark"); }
-      if (f.k === "skill") blasts.push({ x: f.x, y: f.y, r: f.r, t: now });
+      if (f.k === "spell") {
+        if (f.id === "simsek") blasts.push({ x: f.x, y: f.y, r: f.r, t: now });
+        else if (f.id === "kilic") blades.push({ x: f.x, y: f.y, x2: f.x2!, y2: f.y2!, t: now });
+        else if (f.id === "sarmasik") vines.push({ x: f.x, y: f.y, r: f.r, t: now });
+        else flocks.push({ x: f.x, y: f.y, r: f.r, t: now });
+        pops.push({ x: f.x, y: f.y - 10, t: now, text: SPELL_NAMES[f.id], color: C("--blue"), dur: 1000 });
+      }
+      if (f.k === "bite" && speed === 1) sfx("hit");
       if (f.k === "wave") { const sc = waveScale(f.n); pops.push({ x: TOWER.x, y: TOWER.y - 22, t: now, text: f.boss ? `${f.n}. dalga: lider geliyor!` : `${f.n}. dalga`, color: C("--red"), big: true, dur: 1400 });
         if (f.n > 1) pops.push({ x: TOWER.x, y: TOWER.y - 14, t: now + 150, text: `hız +%${Math.round((sc.speed - 1) * 100)} · güç +%${Math.round((sc.power - 1) * 100)}`, color: C("--ink-soft"), dur: 1600 }); sfx("beat"); if (f.boss) buzz("medium"); }
       if (f.k === "card") showCards();

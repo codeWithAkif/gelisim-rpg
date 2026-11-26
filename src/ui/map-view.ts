@@ -4,7 +4,7 @@ import type { GameState } from "../engine/state";
 import { PLACES, ROADS, type Place } from "../content/map";
 import { NPCS, QUESTS } from "../content/world";
 import { place, planTravel, peopleAt, isOpen } from "../engine/travel";
-import { esc, roughPath } from "./sketch";
+import { esc, roughPath, ACT_ICONS } from "./sketch";
 import { personPic, placePic, artUrl } from "./art";
 import { animScale } from "./settings";
 import { journeyPoint, journeyProgress, journeyLeftMs } from "../engine/journey";
@@ -193,8 +193,8 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
       return `<p class="hand blue" style="margin:0">Burada şu an yapacak bir şey yok.</p>${n ? `<div class="here-act next"><div><b>${esc(n.label)}</b>${n.sub ? `<div class="tiny muted">${esc(n.sub)}</div>` : ""}</div>${n.id ? `<button class="btn small blue" data-sel="${n.id}">Haritada göster</button>` : ""}</div>` : ""}`;
     }
     const n = acts.some(x => x.primary) ? null : nextHint(s);
-    const nextRow = n && n.id ? `<div class="here-act next"><div><b>${esc(n.label)}</b>${n.sub ? `<div class="tiny muted">${esc(n.sub)}</div>` : ""}</div><button class="btn small blue" data-sel="${n.id}">Göster</button></div>` : "";
-    return `<div class="here-acts">${nextRow}${acts.map(x => `<div class="here-act${x.primary ? " main" : ""}"><div><b>${esc(x.label)}</b>${x.sub ? `<div class="tiny muted">${esc(x.sub)}</div>` : ""}${x.disabled ? `<div class="tiny red">${esc(x.disabled)}</div>` : ""}</div>
+    const nextRow = n && n.id ? `<div class="here-act next">${ACT_ICONS["show-place"]}<div class="grow"><b>${esc(n.label)}</b>${n.sub ? `<div class="tiny muted">${esc(n.sub)}</div>` : ""}</div><button class="btn small blue" data-sel="${n.id}">Göster</button></div>` : "";
+    return `<div class="here-acts">${nextRow}${acts.map(x => `<div class="here-act${x.primary ? " main" : ""}">${ACT_ICONS[x.act] ?? ""}<div class="grow"><b>${esc(x.label)}</b>${x.sub ? `<div class="tiny muted">${esc(x.sub)}</div>` : ""}${x.disabled ? `<div class="tiny red">${esc(x.disabled)}</div>` : ""}</div>
       <button class="btn small ${x.primary ? "red" : x.act === "accept" ? "primary" : ""}" data-act="${x.act}" data-id="${esc(x.id)}" ${x.disabled ? "disabled" : ""}>${x.act === "accept" ? "Üstlen" : x.act === "fight" ? "Hazırlan" : x.act === "walk" ? "Yap" : x.act === "deliver" ? "Ver" : x.act === "search" ? "Ara" : x.act === "market" ? "Aç" : x.act === "partner" ? "Görüş" : x.act === "sleep" ? "Seç" : "Başla"}</button></div>`).join("")}</div>`;
   }
   function renderCard() {

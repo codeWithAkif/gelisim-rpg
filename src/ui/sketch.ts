@@ -205,3 +205,28 @@ export const VITAL_ICONS = {
   food: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14c1-5 5-8 8-8s7 3 8 8c-1 3-4 4-8 4s-7-1-8-4z" fill="#C98F4A" stroke="var(--ink)" stroke-width="1.3"/><path d="M9 9l1 4M13 8l1 5M17 10l0 4" stroke="var(--ink)" stroke-width="1" fill="none"/></svg>`,
   mana: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c3 5 6 8 6 12a6 6 0 0 1-12 0c0-4 3-7 6-12z" fill="#5A7FB8" stroke="var(--ink)" stroke-width="1.3"/></svg>`,
 };
+
+/** Yer kartındaki her satırın türünü gösteren küçük mürekkep simgeleri. */
+const ai = (d: string, color = "var(--ink)") => `<svg class="act-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+export const ACT_ICONS: Record<string, string> = {
+  // kılıç ve kalkan
+  fight: ai('<path d="M3 3l10 10M3 3h3.5L14 10.5M3 3v3.5L10.5 14"/><path d="M8.5 15.5l-2 2M15.5 8.5l2-2"/><path d="M21 3l-6 6"/><path d="M13 14c0 3.2 2 5.5 5 7 3-1.5 5-3.8 5-7v-4c-1.8.6-3.4.4-5-1-1.6 1.4-3.2 1.6-5 1z" fill="rgba(158,52,35,.15)" transform="translate(-1.5 0) scale(.95)"/>', "var(--red)"),
+  // görev kâğıdı
+  accept: ai('<path d="M7 3h10l2 3v15H5V6z" fill="rgba(46,76,122,.08)"/><path d="M8 9h8M8 12h8M8 15h5"/><path d="M15 17l1.5 1.5L20 15"/>', "var(--blue)"),
+  walk: ai('<path d="M7 3h10l2 3v15H5V6z" fill="rgba(46,76,122,.08)"/><path d="M8 9h8M8 12h8M8 15h5"/>'),
+  // el ve sepet
+  deliver: ai('<path d="M4 14h4l3 2h4a1.5 1.5 0 0 1 0 3H9"/><path d="M4 12v8"/><path d="M12 5h7l-1 6h-5z" fill="rgba(42,39,34,.08)"/><path d="M14 5l1-2M17 5l-1-2"/>'),
+  // büyüteç
+  search: ai('<circle cx="10" cy="10" r="6" fill="rgba(255,255,255,.3)"/><path d="M14.5 14.5 20 20"/><path d="M7.5 9a3 3 0 0 1 3-2.5"/>'),
+  // terazi
+  market: ai('<path d="M12 4v16M8 20h8M5 7h14"/><path d="M5 7l-3 6h6zM19 7l-3 6h6z"/><path d="M2 13a3 2 0 0 0 6 0M16 13a3 2 0 0 0 6 0"/>'),
+  // sikke yığını
+  partner: ai('<ellipse cx="12" cy="7" rx="7" ry="3" fill="rgba(200,150,60,.25)"/><path d="M5 7v4c0 1.7 3.1 3 7 3s7-1.3 7-3V7"/><path d="M5 11v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4"/>', "#8A5A10"),
+  // hilal
+  sleep: ai('<path d="M15 3a8 8 0 1 0 6 12A7 7 0 0 1 15 3z" fill="rgba(46,76,122,.1)"/><path d="M6 5v2M5 6h2"/>'),
+  // gözetleme kulesi
+  nobet: ai('<path d="M6 21l2-11h8l2 11"/><path d="M5 10h14l-1-4H6z" fill="rgba(42,39,34,.1)"/><path d="M9 6V3M15 6V3M12 6V2M7 21l9-7M17 21l-9-7"/>'),
+  // açık kitap
+  "session-pick": ai('<path d="M12 6c-2-1.5-5-2-8-1.5V19c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V4.5c-3-.5-6 0-8 1.5z"/><path d="M12 6v14.5"/>'),
+  "show-place": ai('<path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/>', "var(--blue)"),
+};
