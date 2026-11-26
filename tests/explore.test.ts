@@ -66,3 +66,13 @@ test("harita gezdikçe açılır", () => {
   finishJourney(cfg, t, 10_000_000);
   expect(t.location).toBe("koru"); expect(isSeen(t, "demirhane")).toBe(true);
 });
+
+test("etrafa bak oyunu: saklı şeyler seçilir, zaman harcanır; bulunanlar çantaya/deftere işlenir", async () => {
+  const { beginSearch, collectFind } = await import("../src/engine/explore");
+  const s = newGame(cfg, 3); s.location = "dere"; s.energy = 90; const m0 = s.minute;
+  const b = beginSearch(s); expect(b.ok).toBe(true); expect(b.targets.length).toBeGreaterThan(0); expect(b.targets.length).toBeLessThanOrEqual(3);
+  expect(s.minute).toBeGreaterThan(m0);
+  const r = collectFind(cfg, s, b.targets[0].id); expect(r.ok).toBe(true);
+  expect(Object.keys(s.collection ?? {}).length + (r.relic ? 1 : 0)).toBeGreaterThan(0);
+  s.location = "mera_yok"; expect(beginSearch(s).ok).toBe(false);
+});

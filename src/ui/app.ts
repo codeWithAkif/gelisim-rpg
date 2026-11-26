@@ -1,7 +1,7 @@
 // Uygulama kabuğu: üst şerit, ekranlar, alt sekmeler, eylemler, kayıt.
 import { config as cfg } from "../engine/config";
 import type { GameState } from "../engine/state";
-import { sleep, eat } from "../engine/progression";
+import { sleep, eat, type GainReport } from "../engine/progression";
 import { acceptQuest, walkQuest, completeQuest, itemName, type RewardReport } from "../engine/quests";
 import { maxHp } from "../engine/combat";
 import { load, save, reset } from "../engine/save";
@@ -15,7 +15,7 @@ import type { GearSlot } from "../engine/gear";
 import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
 import { openSessionSheet, openSessionRun } from "./session-view";
 import { mountMap } from "./map-view";
-import { place } from "../engine/travel";
+import { place, here } from "../engine/travel";
 import { startJourney, dueEvent, pauseJourney, resumeJourney, resolveEvent, finishJourney, turnBack, canUseChoice } from "../engine/journey";
 import { makeScenario, DEFAULT_PLAN, foeWords, cap } from "../engine/combat";
 import { AMBUSH_MAP } from "../content/world";
@@ -39,7 +39,8 @@ import { showTitle } from "./title";
 import { applySettings } from "./settings";
 import { sfx, buzz, ambience, unlockAudio } from "./feel";
 import { darkness } from "./daylight";
-import { searchHere, deliverRequest } from "../engine/explore";
+import { beginSearch, collectFind, deliverRequest } from "../engine/explore";
+import { openSeek } from "./seek-view";
 import { sell, partner, stake, invest, withdraw, nightlyFinance } from "../engine/finance";
 import { sleepOptions, sleepAt, rest, type SleepKind } from "../engine/rest";
 import { minutesLeft } from "../engine/state";
@@ -273,8 +274,8 @@ export function startApp(root: HTMLElement) {
       }
       case "partner": openPartner(id); break;
       case "nobet": doNobet(id); break;
-      case "market": tab = "isler"; render(false); setTimeout(() => main.querySelector(".shop-item")?.closest("section")?.scrollIntoView({ behavior: "smooth" }), 50); break;
-      case "toggle-done": ui.showDone = !ui.showDone; render(); break;
+      case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;
+      case "jobtab": ui.jobTab = id as UiState["jobTab"]; sfx("page"); render(false); break;
       case "deliver": {
         const r = deliverRequest(cfg, s, id);
         if (!r.ok) { toast(r.reason ?? ""); break; }
@@ -343,20 +344,22 @@ export function startApp(root: HTMLElement) {
   }
   /** Etrafı aramak: kısa bir arama anı, sonra ne bulunduğu. */
   function doSearch() {
-    const bg = document.createElement("div"); bg.className = "modal-bg";
-    bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><div class="searching"><span class="lens">⌕ ara…</span><p class="muted" style="margin:0">Otların arasına, taşların altına bakıyorsun.</p></div></div>`;
-    document.body.appendChild(bg); sfx("page"); setTimeout(() => sfx("step"), 400); setTimeout(() => sfx("step"), 800);
-    setTimeout(() => {
-      bg.remove();
-      const r = searchHere(cfg, s); persist(); render();
-      if (!r.ok) { toast(r.reason ?? ""); return; }
-      if (r.relic) { sfx("perfect"); buzz("heavy"); modal(`<p class="hand red" style="margin:0">Kadim eşya</p><h2>${esc(r.relic.name)}</h2><div class="relic-card"><div class="relic-glow"></div><p style="margin:0">${esc(r.text)} ${esc(r.relic.desc)}</p></div><h3>Güç sıçraması</h3>${gainList(cfg, r.gains, 6)}`, [{ label: "Deftere işle", cls: "primary", fn: () => {} }]); return; }
-      if (r.found) { sfx(r.first ? "perfect" : "good"); buzz(r.first ? "medium" : "light"); } else sfx("page");
-      const pic = r.found ? (r.found.item ? itemPic(r.found.item, 72) : "") : "";
-      modal(`<p class="hand muted" style="margin:0">${r.found ? (r.first ? "Deftere yeni sayfa!" : "Buldun") : "Bir şey yok"}</p><h2>${esc(r.found?.name ?? "Boş el")}</h2>
-        ${pic ? `<div class="found-pic">${pic}</div>` : ""}<p style="margin:0">${esc(r.text)}</p>${r.found && r.first ? `<p class="hand blue" style="margin:0">${esc(r.found.note)}</p>` : ""}${gainList(cfg, r.gains, 3)}`,
-        [{ label: "Tamam", cls: "primary", fn: () => {} }]);
-    }, 1300);
+    const b = beginSearch(s);
+    if (!b.ok) { toast(b.reason ?? ""); return; }
+    persist(); render();
+    sfx("page");
+    openSeek(cfg, s, s.location, here(s).name, b.targets, ids => {
+      const rs = ids.map(id => collectFind(cfg, s, id)); persist(); render();
+      if (!rs.length) { sfx("page"); modal(`<p class="hand muted" style="margin:0">Bir şey yok</p><h2>Eli boş döndün</h2><p style="margin:0">Uzun uzun baktın ama saklı şeyleri bulamadın.</p>`, [{ label: "Tamam", cls: "primary", fn: () => {} }]); return; }
+      const gains: GainReport = {}; for (const r of rs) for (const [k, v] of Object.entries(r.gains)) gains[k] = (gains[k] ?? 0) + v;
+      const relic = rs.find(r => r.relic);
+      sfx(rs.some(r => r.first) ? "perfect" : "good"); buzz("medium");
+      const rows = rs.map(r => `<div class="entry"><div class="entry-head"><span class="entry-title" style="font-size:20px">${esc(r.found?.name ?? r.relic?.name ?? "")}</span>${r.first ? `<span class="entry-meta">deftere yeni sayfa</span>` : ""}</div>
+        <div class="found-pic">${r.found?.item ? itemPic(r.found.item, 56) : ""}</div><p style="margin:0">${esc(r.text)}</p>${r.found && r.first ? `<p class="hand blue" style="margin:0">${esc(r.found.note)}</p>` : ""}</div>`).join("");
+      modal(`<p class="hand muted" style="margin:0">Etrafa baktın</p><h2>${rs.length} şey buldun</h2>${rows}${gainList(cfg, gains, 3)}`, [{ label: "Tamam", cls: "primary", fn: () => {
+        if (relic?.relic) { sfx("perfect"); buzz("heavy"); modal(`<p class="hand red" style="margin:0">Kadim eşya</p><h2>${esc(relic.relic.name)}</h2><div class="relic-card"><div class="relic-glow"></div><p style="margin:0">${esc(relic.text)} ${esc(relic.relic.desc)}</p></div>`, [{ label: "Tamam", cls: "primary", fn: () => {} }]); }
+      } }]);
+    });
   }
   /** Görev ödülü: eşya, para, öğrenilen, kadim eşya ve hikâyenin devamı. */
   function rewardHtml(r: RewardReport): string {

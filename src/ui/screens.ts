@@ -25,7 +25,7 @@ import { phase, PHASE_ICONS } from "./daylight";
 import { here, place, activityPlace } from "../engine/travel";
 import { NPC_PLACE, SHOP_PLACE, PLACES } from "../content/map";
 
-export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number; invTab?: InvTab; bagPage?: "envanter" | "techizat" | "elisi"; bodyTab?: string; diyarTab?: string }
+export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number; invTab?: InvTab; bagPage?: "envanter" | "techizat" | "elisi" | "pazar"; jobTab?: "acik" | "biten" | "sonraki"; bodyTab?: string; diyarTab?: string }
 
 const fmt = (v: number) => (Math.abs(v) < 0.01 ? v.toFixed(3) : Math.abs(v) < 0.1 ? v.toFixed(2) : v.toFixed(1));
 const catColor = (cfg: Config, id?: string) => cfg.cat.get(id ?? "")?.color ?? "var(--pencil)";
@@ -77,6 +77,8 @@ export function statusBar(cfg: Config, s: GameState): string {
   return `<header class="status">
     <div class="day">Gün ${s.day}<small>${clock(s)}${late ? " · gün bitti" : ""}</small><span class="phase" title="${phase(s.minute).name}">${PHASE_ICONS[phase(s.minute).icon]}<i>${phase(s.minute).name}</i></span></div>
     <div class="money"><span class="coin">${VITAL_ICONS.coin}</span>${s.money} bakır<button class="sleepbtn ${isNight(s) || s.energy < 25 ? "hot" : ""}" data-act="sleep" aria-label="Uyu ya da dinlen" title="Uyu ya da dinlen">${ICONS.uyku}</button></div>
+    <div class="darkleft">${(() => { const dark = minutesToDark(s); const hm = (m: number) => `${Math.floor(m / 60)} sa ${Math.round(m % 60)} dk`; const lf = Math.floor(minutesLeft(s));
+      return dark > 0 ? `Kararmaya <b>${hm(dark)}</b>` : lf > 0 ? `<b class="red">Gece</b> · sınıra <b>${hm(lf)}</b>` : `<span class="red">Gün bitti</span>`; })()}</div>
     <button class="where" data-act="show-place" data-id="${esc(s.journey ? s.journey.to : s.location)}">⌖ ${s.journey ? `Yolda → ${esc(place(s.journey.to)?.name ?? "")}` : esc(here(s).name)}</button>
     <div class="vitals">${g}</div>
     ${al.length ? `<div class="alert-strip ${al[0].level}" role="status"><b>!</b><span>${esc(al[0].text)}${al.length > 1 ? ` <i>(+${al.length - 1})</i>` : ""}</span></div>` : ""}
@@ -247,7 +249,7 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
       ${chk.ok ? `<div class="row" style="margin-top:6px"><button class="btn small" data-act="craft" data-id="${esc(c.id)}">Başla</button></div>` : `<div class="lock">${esc(chk.reason ?? "")}</div>`}</div></div></div>`;
   }).join("");
   const bp = ui.bagPage ?? "envanter";
-  const seg = `<div class="seg" role="tablist">${([["envanter", "Envanter"], ["techizat", "Teçhizat"], ["elisi", "El işi"]] as const).map(([id, n]) => `<button role="tab" class="${bp === id ? "on" : ""}" data-act="bagpage" data-id="${id}" aria-selected="${bp === id}">${n}</button>`).join("")}</div>`;
+  const seg = `<div class="seg" role="tablist">${([["envanter", "Envanter"], ["techizat", "Teçhizat"], ["elisi", "El işi"], ["pazar", "Pazar"]] as const).map(([id, n]) => `<button role="tab" class="${bp === id ? "on" : ""}" data-act="bagpage" data-id="${id}" aria-selected="${bp === id}">${n}</button>`).join("")}</div>`;
   const header = (title: string, right: string) => `<section class="sec"><div class="entry-head"><h1>${title}</h1><span class="hand">${right}</span></div>
       <div class="purse"><span class="coin">${VITAL_ICONS.coin}</span><span>Kese: <b>${s.money} bakır</b></span></div></section>`;
   if (bp === "techizat") return `<div class="page">${seg}<section class="sec"><div class="entry-head"><h1>Teçhizat</h1><span class="hand">${st.length}/${cap} göz</span></div>
@@ -258,6 +260,7 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
       <h3 class="eq-h">Çanta</h3><div class="eq-row">${slot("Çanta", bagOf(s), "bag")}${Array.from({ length: MAX_POUCHES }, (_, i) => slot(`Ek ${i + 1}`, pouchesOf(s)[i], "pouch" + i)).join("")}</div>
       <p class="muted tiny" style="margin:0">${esc(itemInfo(cfg, bagOf(s)).name)} ${itemInfo(cfg, bagOf(s)).capacity} göz${pouchesOf(s).map(p => ` + ${esc(itemInfo(cfg, p).name)} ${pouchSlots(cfg, p)}`).join("")} = <b>${cap} göz</b>. Boştaki bir çantayı ana çantaya dikersen kendi gözünün ancak %${Math.round(POUCH_SHARE * 100)}'ını katar.</p></section>
     <section class="sec">${detail}</section></div>`;
+  if (bp === "pazar") return `<div class="page">${seg}${pazarSection(cfg, s)}</div>`;
   if (bp === "elisi") return `<div class="page">${seg}${header("El işi", "")}
     ${craftingSection(cfg, s, crafts)}</div>`;
   return `<div class="page">${seg}${header("Envanter", `${st.length}/${cap} göz`)}
@@ -332,40 +335,38 @@ function sellList(cfg: Config, s: GameState): string {
   return `<h3>Sat</h3><p class="muted tiny" style="margin:0">Fiyatlar her gün değişir; aynı maldan çok satarsan düşer. Şehir otu ve kürkü köyden iyi alır.</p>${rows || `<p class="muted" style="margin:0">Satacak bir şeyin yok.</p>`}`;
 }
 
-/** İşler'in üstü: bulunduğun yerde etrafa bakmak ve köylülerin günlük istekleri. */
-function exploreCards(cfg: Config, s: GameState): string {
-  let out = "";
-  if (!s.journey && FINDS[s.location]) {
-    const inf = searchInfo(s); const can = canSearch(s); const got = collected(s);
-    const known = FINDS[s.location].filter(f => got.has(f.id)).length;
-    out += `<section class="sec card"><div class="entry-head"><h2>Etrafa bak</h2><span class="entry-meta">${inf.left > 0 ? `bugün ${inf.left} bulgu daha` : "bugünlük bitti"}</span></div>
-      <p style="margin:0">${esc(here(s).name)} çevresinde ${known < inf.finds ? `henüz deftere geçmemiş şeyler var (${known}/${inf.finds}).` : "bildiğin her şey burada; yine de toplanacak ot ve iz var."} Keskin göz, burun ve kulak daha çok bulur.</p>
-      <div class="row"><button class="btn" data-act="search" ${can.ok ? "" : "disabled"}>Etrafı ara (${SEARCH_MINUTES} dk)</button>${can.ok ? "" : `<span class="lock">${esc(can.reason ?? "")}</span>`}</div></section>`;
-  }
+/** Günlük küçük istekler (köylülerden). */
+function dailyCards(cfg: Config, s: GameState): string {
   const reqs = dailyRequests(s);
-  if (reqs.length) {
-    out += `<section class="sec"><h2>Bugünün küçük istekleri</h2>${reqs.map(r => {
-      const want = Object.entries(r.def.want).map(([k, n]) => `${itemPic(k, 22)} ${esc(itemInfo(cfg, k).name)} <b>${Math.min(n, s.inventory[k] ?? 0)}/${n}</b>`).join(" · ");
-      const act = r.done ? `<span class="hand" style="color:var(--green)">Getirdin ✓</span>`
-        : r.here && r.have ? `<button class="btn small primary" data-act="deliver" data-id="${r.def.id}">Ver</button>`
-        : r.here ? `<span class="muted tiny">Çantanda yeterince yok.</span>`
-        : `<button class="btn small blue" data-act="show-place" data-id="${r.place}">${esc(place(r.place)?.name ?? "")} · haritada göster</button>`;
-      return `<div class="entry${r.done ? " done" : ""}"><div class="person">${personPic({ id: r.def.npc, name: r.npcName }, 36)}<div><div class="nm" style="font-size:19px">${esc(r.npcName)}</div><div class="rl">${r.def.money} bakır${r.def.gift ? " ve hediye" : ""} · güven</div></div></div>
-        <p style="margin:0">"${esc(r.def.text)}"</p><div class="want">${want}</div><div class="row">${act}</div></div>`;
-    }).join("")}<p class="muted tiny" style="margin:0">İstekler her sabah yenilenir.</p></section>`;
-  }
-  return out;
+  if (!reqs.length) return "";
+  return `<section class="sec"><h2>Bugünün küçük istekleri</h2>${reqs.map(r => {
+    const want = Object.entries(r.def.want).map(([k, n]) => `${itemPic(k, 22)} ${esc(itemInfo(cfg, k).name)} <b>${Math.min(n, s.inventory[k] ?? 0)}/${n}</b>`).join(" · ");
+    const act = r.done ? `<span class="hand" style="color:var(--green)">Getirdin ✓</span>`
+      : r.here && r.have ? `<button class="btn small primary" data-act="deliver" data-id="${r.def.id}">Ver</button>`
+      : r.here ? `<span class="muted tiny">Çantanda yeterince yok.</span>`
+      : `<button class="btn small blue" data-act="show-place" data-id="${r.place}">${esc(place(r.place)?.name ?? "")} · haritada göster</button>`;
+    return `<div class="entry${r.done ? " done" : ""}"><div class="entry-head"><span class="entry-title" style="font-size:19px">${esc(r.npcName)}</span><span class="kind-chip k-gunluk">Günlük</span></div>
+      <p style="margin:0">"${esc(r.def.text)}"</p><div class="want">${want}</div><div class="row"><span class="rl">${r.def.money} bakır${r.def.gift ? " ve hediye" : ""} · güven</span>${act}</div></div>`;
+  }).join("")}<p class="muted tiny" style="margin:0">İstekler her sabah yenilenir.</p></section>`;
 }
+
+/** Görevin türü: neyi takip edeceğin anlaşılsın. */
+export type QuestKind = "ana" | "hikaye" | "yan";
+export const questKind = (def: { importance: string; repeatable?: boolean }): QuestKind => def.importance === "hayati" ? "ana" : def.repeatable || def.importance === "basit" ? "yan" : "hikaye";
+export const KIND_NAMES: Record<QuestKind, string> = { ana: "Ana görev", hikaye: "Hikâye görevi", yan: "Yan görev" };
+const kindChip = (k: QuestKind) => `<span class="kind-chip k-${k}">${KIND_NAMES[k]}</span>`;
 
 export function islerScreen(cfg: Config, s: GameState, ui: UiState = {}): string {
   const left = Math.floor(minutesLeft(s));
-  const order = { aktif: 0, yeni: 1, kilitli: 2, bitti: 3 } as const;
+  const kindOrder = { ana: 0, hikaye: 1, yan: 2 } as const; const stOrder = { aktif: 0, yeni: 1, kilitli: 2, bitti: 3 } as const;
   const localFirst = (q: { def: { at: string } }) => (PLACES.find(p => p.id === q.def.at)?.region ?? "taspinar") === (s.region ?? "taspinar") ? 0 : 1;
-  const all = questList(s).sort((a, b) => localFirst(a) - localFirst(b) || order[a.status] - order[b.status]);
-  const doneCount = all.filter(q => q.status === "bitti").length;
-  const list = all.filter(q => q.status !== "bitti" || ui.showDone).map(q => {
-    const g = npc(q.def.giverNpc); const imp = cfg.importance(q.def.importance);
-    const giver = cfg.giver(g.giver);
+  const all = questList(s).sort((a, b) => stOrder[a.status] - stOrder[b.status] || localFirst(a) - localFirst(b) || kindOrder[questKind(a.def)] - kindOrder[questKind(b.def)]);
+  const open = all.filter(q => q.status === "aktif" || q.status === "yeni");
+  const closed = all.filter(q => q.status === "bitti");
+  const next = all.filter(q => q.status === "kilitli");
+  const tab = ui.jobTab ?? "acik";
+  const card = (q: (typeof all)[number]) => {
+    const g = npc(q.def.giverNpc); const imp = cfg.importance(q.def.importance); const giver = cfg.giver(g.giver); const kind = questKind(q.def);
     let action = "";
     const giverAt = NPC_PLACE[q.def.giverNpc];
     const goBtn = (pl: string) => `<button class="btn small blue" data-act="show-place" data-id="${pl}">${esc(place(pl)?.name ?? pl)} · haritada göster</button>`;
@@ -379,28 +380,57 @@ export function islerScreen(cfg: Config, s: GameState, ui: UiState = {}): string
       ? `<div class="hand green" style="color:var(--green)">Ödül: ${esc(q.def.rewards.note)}</div>`
       : `<div style="font-size:14px" class="muted">${esc(giver?.name ?? "")} · ${esc(imp?.name ?? "")} iş. Ödülü verenin imkânı kadar olur.</div>`;
     return `<div class="entry"><div class="entry-head"><span class="entry-title">${esc(q.def.title)}</span><span class="entry-meta">${q.status === "bitti" ? "tamamlandı" : q.status === "aktif" ? "üstlendin" : q.status === "kilitli" ? "kilitli" : "yeni"}</span></div>
+      <div class="chips" style="margin:0 0 2px">${kindChip(kind)}</div>
       <div class="person">${personPic(g, 40)}<div><div class="nm" style="font-size:19px">${esc(g.name)}</div><div class="rl">${esc(g.role)}</div></div></div>
       <p style="margin:0">${esc(q.def.text)}</p>${reward}
       ${q.status === "kilitli" ? `<div class="lock">${esc(q.reason ?? "")}</div>` : ""}<div class="row">${action}</div></div>`;
-  }).join("");
+  };
+  // takip: şimdi ne yapmalı? Önce ana görev, sonra hikâye, sonra yan işler
+  const track = [...open].sort((a, b) => (a.status === "aktif" ? 0 : 1) - (b.status === "aktif" ? 0 : 1) || kindOrder[questKind(a.def)] - kindOrder[questKind(b.def)])[0];
+  const trackCard = track ? (() => {
+    const k = questKind(track.def); const at = place(track.def.at)?.name ?? ""; const giverAt = NPC_PLACE[track.def.giverNpc];
+    const step = track.status === "yeni" ? `${npc(track.def.giverNpc).name} ile konuş (${place(giverAt)?.name ?? ""}) ve işi üstlen.` : s.location === track.def.at ? `Buradasın: ${track.def.doneText ?? (track.def.battle || track.def.siege ? "savaşa hazırlan" : "işi yap")}.` : `${at} yerine git.`;
+    return `<section class="sec track"><div class="entry-head"><h2>Şimdi takip et</h2>${kindChip(k)}</div><div class="entry-title">${esc(track.def.title)}</div><p style="margin:0">${esc(step)}</p></section>`;
+  })() : "";
+  const tabs: [string, string, number][] = [["acik", "Açık işler", open.length], ["biten", "Biten işler", closed.length], ["sonraki", "Sonraki iş", next.length]];
+  const seg = `<div class="seg" role="tablist">${tabs.map(([id, n, c]) => `<button role="tab" class="${tab === id ? "on" : ""}" data-act="jobtab" data-id="${id}" aria-selected="${tab === id}">${n}${c ? ` <small>${c}</small>` : ""}</button>`).join("")}</div>`;
+  const empty = (m: string) => `<p class="muted" style="margin:0">${m}</p>`;
+  const body = tab === "biten" ? `<section class="sec">${closed.map(card).join("") || empty("Henüz bitirdiğin bir iş yok.")}</section>`
+    : tab === "sonraki" ? `<section class="sec"><p class="muted tiny" style="margin:0">Henüz açılmamış işler. Önce yazan işi bitirince bunlar açılır.</p>${next.map(card).join("") || empty("Bilinen başka iş yok; insanlarla konuştukça yenileri çıkar.")}</section>`
+    : `${trackCard}<section class="sec"><p class="lede" style="margin:0">${s.region && s.region !== "taspinar" ? "Önce bulunduğun yerin işleri; uzaktakiler aşağıda." : "Köylünün işi küçük, ödülü de küçük olur. Önemli bir iş, onun için değerli bir şey demektir."}</p>${open.map(card).join("") || empty("Şu an açık bir iş yok. Köyü dolaş, insanlarla tanış.")}</section>${dailyCards(cfg, s)}`;
+  // yer resmi: üstünde mercek; basınca saklı şeyleri bulma oyunu açılır
+  let hero = "";
+  if (!s.journey) {
+    const can = FINDS[s.location] ? canSearch(s) : null;
+    const pic = placePic(s.location, here(s).name, "art-place") || `<div class="art-place plain"><span class="hand">${esc(here(s).name)}</span></div>`;
+    if (can) {
+      const inf = searchInfo(s);
+      hero = `<div class="hero-lens">${pic}<button class="lens-btn" data-act="search" ${can.ok ? "" : "disabled"} aria-label="Etrafa bak"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10" cy="10" r="6.5" fill="rgba(255,255,255,.35)"/><path d="M15 15l6 6"/></svg><span>Etrafa bak</span></button>
+        <span class="lens-note">${can.ok ? `bugün ${inf.left} bulgu daha · ${SEARCH_MINUTES} dk` : esc(can.reason ?? "")}</span></div>`;
+    } else hero = pic;
+  }
+  return `<div class="page">
+    ${hero}
+    <section class="sec"><h1>İşler</h1></section>
+    ${seg}${body}
+  </div>`;
+}
+
+/** Pazar: Çanta'nın bir sekmesi. Pazarın olduğu yerde alış-satış, değilse en yakın pazara yönlendirme. */
+export function pazarSection(cfg: Config, s: GameState): string {
   const market = MARKETS[s.location];
-  const shop = (market?.items ?? []).map(id => {
+  if (!market) {
+    const ids = Object.keys(MARKETS); const near = ids.find(id => (PLACES.find(p => p.id === id)?.region ?? "taspinar") === (s.region ?? "taspinar")) ?? ids[0];
+    const nm = MARKETS[near]?.name ?? "pazar"; const pl = place(near)?.name ?? "";
+    return `<section class="sec"><h2>Pazar</h2><p style="margin:0">Burada pazar yok.</p><p class="muted" style="margin:0">Alıp satmak istersen <b>${esc(pl)}</b> (${esc(nm)}) tarafına git.</p>
+      <div class="row"><button class="btn small blue" data-act="show-place" data-id="${near}">${esc(pl)} · haritada göster</button></div></section>`;
+  }
+  const shop = market.items.map(id => {
     const it = itemInfo(cfg, id);
     return `<div class="shop-item">${itemPic(id, 40)}<div><div class="nm">${esc(it.name)}</div><div class="muted tiny">${esc(it.desc)}</div></div>
       <button class="btn small price" data-act="buy" data-id="${id}" ${s.money < (it.price ?? 0) ? "disabled" : ""}><span class="coin">${VITAL_ICONS.coin}</span>${it.price}</button></div>`;
   }).join("");
-  return `<div class="page">
-    ${s.journey ? "" : placePic(s.location, here(s).name, "art-place")}
-    <section class="sec card"><div class="entry-head"><h2>Bugün</h2><span class="hand">${clock(s)}</span></div>
-      <p style="margin:0">${(() => { const dark = minutesToDark(s); const hm = (m: number) => `${Math.floor(m / 60)} saat ${Math.round(m % 60)} dakika`;
-        return dark > 0 ? `Hava kararmadan <b>${hm(dark)}</b> var.` : left > 0 ? `<b class="red">Gece.</b> Kurtlar avda, yollar tehlikeli; ama gece işi daha çok kazandırır. Uykusuzluk sınırına <b>${hm(left)}</b> var; geç yatarsan iyi dinlenemezsin.` : "Gecenin sonu. Uyumazsan yarın hiçbir şey yapamazsın."; })()}</p>
-</section>
-    ${exploreCards(cfg, s)}
-    <section class="sec"><h1>İşler</h1><p class="lede">${s.region && s.region !== "taspinar" ? "Önce bulunduğun yerin işleri; uzaktakiler aşağıda." : "Köylünün işi küçük, ödülü de küçük olur. Önemli bir iş, onun için değerli bir şey demektir."}</p></section>
-    <section class="sec">${list || `<p class="muted" style="margin:0">Şu an açık bir iş yok. Köyü dolaş, insanlarla tanış.</p>`}
-      ${doneCount ? `<div class="row"><button class="btn small" data-act="toggle-done">${ui.showDone ? "Tamamlananları gizle" : `Tamamlananları göster (${doneCount})`}</button></div>` : ""}</section>
-    <section class="sec"><h2>${esc(market?.name ?? "Pazar")}</h2>${market ? `<h3>Al</h3><div>${shop}</div>${sellList(cfg, s)}` : `<p class="muted" style="margin:0">Burada pazar yok. ${s.region === "taspinar" ? "Köy pazarı meydanda." : s.region === "karacam" ? "Karaçam çarşısına git." : ""}</p>${s.region === "taspinar" ? `<div class="row"><button class="btn small blue" data-act="show-place" data-id="${SHOP_PLACE}">Haritada göster</button></div>` : ""}`}</section>
-  </div>`;
+  return `<section class="sec"><div class="entry-head"><h2>${esc(market.name)}</h2><span class="hand">${s.money} bakır</span></div><h3>Al</h3><div>${shop}</div>${sellList(cfg, s)}</section>`;
 }
 
 /** El işi sayfasının gövdesi: mühendislik atölyesi (kalıcı yapılar) ve eşya yapımı. */

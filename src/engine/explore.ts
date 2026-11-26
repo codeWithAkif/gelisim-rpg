@@ -5,7 +5,7 @@ import { type GameState, DAY_MINUTES, addRep, log, minutesLeft, hourOf } from ".
 import { applyGain, type GainReport } from "./progression";
 import { addItem, removeItem } from "./inventory";
 import { Rng } from "./rng";
-import { COLLECTIBLES, FINDS, FINDS_PER_DAY, RELIC_FINDS, SEARCH_MINUTES, REQUESTS, REQUESTS_PER_DAY, type Collectible, type RequestDef } from "../content/explore";
+import { COLLECTIBLES, FINDS, FINDS_PER_DAY, RELIC_FINDS, SEARCH_MINUTES, REQUESTS, REQUESTS_PER_DAY, type Collectible, type Find, type RequestDef } from "../content/explore";
 import { PLACES, ROADS, NPC_PLACE } from "../content/map";
 import { QUESTS, NPCS } from "../content/world";
 import { grantRelic, hasRelic } from "./relics";
@@ -65,22 +65,29 @@ export function findChance(s: GameState, sense: string): number {
   const pet = s.pet ? ((sense === "koku" ? 12 : 6) + s.pet.bond / 8 + (s.pet.id === "kedi" && s.pet.bond >= 10 ? 6 : 0)) * petMul(s) : 0;
   return Math.max(25, Math.min(92, 40 + (lv - 10) * 1.5 + pet));
 }
-/** 20 dakika etrafı arar. Bulunanlar çantaya, ilk kez bulunanlar deftere. */
-export function searchHere(cfg: Config, s: GameState): SearchResult {
-  const gains: GainReport = {};
-  const can = canSearch(s); if (!can.ok) return { ok: false, reason: can.reason, gains, text: can.reason ?? "" };
-  const t = todaySearch(s); const rng = new Rng((s.seed * 31 + s.day * 977 + Math.round(s.minute) * 13) | 0);
-  t.tries[s.location] = (t.tries[s.location] ?? 0) + 1;
+/** Etrafa bak oyunu başlar: zaman ve enerji harcanır; bugün bulunabilecek şeylerden en çok üçü saklanır. */
+export function beginSearch(s: GameState): { ok: boolean; reason?: string; targets: Find[] } {
+  const can = canSearch(s); if (!can.ok) return { ok: false, reason: can.reason, targets: [] };
+  const t = todaySearch(s); t.tries[s.location] = (t.tries[s.location] ?? 0) + 1;
   s.minute = Math.min(DAY_MINUTES, s.minute + SEARCH_MINUTES); s.energy = Math.max(0, s.energy - 3); s.satiety = Math.max(0, s.satiety - 1);
-  const night = isNight(s);
+  const night = isNight(s); const rng = new Rng((s.seed * 37 + s.day * 577 + Math.round(s.minute) * 11) | 0);
   const pool = FINDS[s.location].filter(f => f.night === undefined || f.night === night);
-  // önce ne çıkacağı, sonra fark edip etmediğin
-  const total = pool.reduce((a, f) => a + f.w, 0); let r = rng.next() * total; let pick = pool[0];
-  for (const f of pool) { r -= f.w; if (r <= 0) { pick = f; break; } }
-  applyGain(cfg, s, pick.sense, 0.04, gains); applyGain(cfg, s, "analiz", 0.02, gains);
-  if (!pick || !rng.chance(findChance(s, pick.sense))) {
-    return { ok: true, gains, text: night ? "Karanlıkta pek bir şey seçemedin." : "Uzun uzun baktın ama gözüne bir şey çarpmadı." };
+  const n = Math.min(searchInfo(s).left, 3); const out: Find[] = []; const left = [...pool];
+  for (let i = 0; i < n && left.length; i++) {
+    const total = left.reduce((a, f) => a + f.w, 0); let r = rng.next() * total; let k = 0;
+    for (let j = 0; j < left.length; j++) { r -= left[j].w; if (r <= 0) { k = j; break; } }
+    out.push(left[k]); left.splice(k, 1);
   }
+  // az çeşit varsa aynı şeyden birden fazla saklanabilir
+  while (out.length < n && pool.length) out.push(pool[rng.int(0, pool.length - 1)]);
+  return { ok: true, targets: out };
+}
+
+/** Bulunan şeyi işler: nadir eşya şansı, çanta, defter. Etrafa bak oyununda her bulunan için çağrılır. */
+export function collectFind(cfg: Config, s: GameState, pickId: string, rng = new Rng((s.seed * 17 + s.day * 131 + Math.round(s.minute) * 7 + pickId.length) | 0), gains: GainReport = {}, gained = false): SearchResult {
+  const night = isNight(s); const t = todaySearch(s);
+  const pick = FINDS[s.location].find(f => f.id === pickId)!;
+  if (!gained) { applyGain(cfg, s, pick.sense, 0.04, gains); applyGain(cfg, s, "analiz", 0.02, gains); }
   // nadir: vadiyi iyi tanıyan biri, çamurda annenin pusulasını bulabilir
   if (!hasRelic(s, "olcer_pusulasi") && ["dere", "yayla"].includes(s.location) && collected(s).size >= 6 && rng.chance(30)) {
     const relic = grantRelic(cfg, s, "olcer_pusulasi", gains)!;
@@ -106,6 +113,25 @@ export function searchHere(cfg: Config, s: GameState): SearchResult {
   const text = c.item ? `${c.name} buldun${count > 1 ? ` (${count})` : ""}.${dropped ? " Çantanda yer yoktu; bıraktın." : ""}` : `${c.name} gördün.`;
   if (first) log(s, `Deftere yeni sayfa: ${c.name}.`, "info");
   return { ok: true, found: c, first, count, dropped, gains, text };
+}
+
+/** 20 dakika etrafı arar. Bulunanlar çantaya, ilk kez bulunanlar deftere. */
+export function searchHere(cfg: Config, s: GameState): SearchResult {
+  const gains: GainReport = {};
+  const can = canSearch(s); if (!can.ok) return { ok: false, reason: can.reason, gains, text: can.reason ?? "" };
+  const t = todaySearch(s); const rng = new Rng((s.seed * 31 + s.day * 977 + Math.round(s.minute) * 13) | 0);
+  t.tries[s.location] = (t.tries[s.location] ?? 0) + 1;
+  s.minute = Math.min(DAY_MINUTES, s.minute + SEARCH_MINUTES); s.energy = Math.max(0, s.energy - 3); s.satiety = Math.max(0, s.satiety - 1);
+  const night = isNight(s);
+  const pool = FINDS[s.location].filter(f => f.night === undefined || f.night === night);
+  // önce ne çıkacağı, sonra fark edip etmediğin
+  const total = pool.reduce((a, f) => a + f.w, 0); let r = rng.next() * total; let pick = pool[0];
+  for (const f of pool) { r -= f.w; if (r <= 0) { pick = f; break; } }
+  applyGain(cfg, s, pick.sense, 0.04, gains); applyGain(cfg, s, "analiz", 0.02, gains);
+  if (!pick || !rng.chance(findChance(s, pick.sense))) {
+    return { ok: true, gains, text: night ? "Karanlıkta pek bir şey seçemedin." : "Uzun uzun baktın ama gözüne bir şey çarpmadı." };
+  }
+  return collectFind(cfg, s, pick.id, rng, gains, true);
 }
 
 /* ---------- günlük istekler ---------- */
