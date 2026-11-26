@@ -7,7 +7,7 @@ import { maxHp } from "../engine/combat";
 import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
 import { QUESTS, CRAFTS, ENEMIES } from "../content/world";
-import { itemInfo, equip, unequip, drop, buy, bagOf } from "../engine/inventory";
+import { itemInfo, equip, unequip, drop, buy, bagOf, attachPouch, detachPouch, type InvTab } from "../engine/inventory";
 import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
 import { openSessionSheet, openSessionRun } from "./session-view";
 import { mountMap } from "./map-view";
@@ -208,6 +208,9 @@ export function startApp(root: HTMLElement) {
       case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }
       case "unequip": { const r = unequip(cfg, s, id as "weapon" | "armor"); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "sleep": openSleep(); break;
+      case "invtab": ui.invTab = id as InvTab; ui.sel = undefined; sfx("page"); render(); break;
+      case "attach": { const r = attachPouch(cfg, s, id); sfx(r.ok ? "thunk" : "bad"); toast(r.ok ? `${itemInfo(cfg, id).name} ana çantaya dikildi: +${r.slots} göz.` : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
+      case "detach": { const r = detachPouch(cfg, s, +id); toast(r.ok ? "Ek bölmeyi söktün." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "accept": acceptQuest(s, id); sfx("page"); persist(); render(); toast("İşi üstlendin."); break;
       case "walk": doWalk(id); break;
       case "fight": doFight(id); break;

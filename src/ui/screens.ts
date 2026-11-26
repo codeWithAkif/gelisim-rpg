@@ -7,8 +7,8 @@ import { questList, npc } from "../engine/quests";
 import { maxHp } from "../engine/combat";
 import { maxMana } from "../engine/derived";
 import { planSession, SESSION_OPTIONS, wounded, TIME_SCALE, fmtDur } from "../engine/session";
-import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount } from "../engine/inventory";
-import { canSell, dayFactor, PARTNERS, stake } from "../engine/finance";
+import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount, pouchesOf, pouchSlots, inTab, INV_TABS, MAX_POUCHES, POUCH_SHARE, type InvTab } from "../engine/inventory";
+import { canSell, dayFactor, PARTNERS, stake, ITEM_VALUES } from "../engine/finance";
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, MARKETS, CRAFTS } from "../content/world";
 import { esc, inkBar, wolfSketch, humanSketch, bodySketch, VITAL_ICONS } from "./sketch";
@@ -22,7 +22,7 @@ import { phase, PHASE_ICONS } from "./daylight";
 import { here, place, activityPlace } from "../engine/travel";
 import { NPC_PLACE, SHOP_PLACE, PLACES } from "../content/map";
 
-export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number }
+export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number; invTab?: InvTab }
 
 const fmt = (v: number) => (Math.abs(v) < 0.01 ? v.toFixed(3) : Math.abs(v) < 0.1 ? v.toFixed(2) : v.toFixed(1));
 const catColor = (cfg: Config, id?: string) => cfg.cat.get(id ?? "")?.color ?? "var(--pencil)";
@@ -203,8 +203,9 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
     return `<button class="eq-slot ${ui.sel === "eq:" + key ? "sel" : ""}" data-act="pick" data-id="eq:${key}" aria-label="${label}${it ? ": " + esc(it.name) : " boş"}">
       ${it ? itemPic(it.id, 40) : `<span class="muted tiny">boş</span>`}<span class="eq-l">${label}</span></button>`;
   };
-  const cells = Array.from({ length: cap }, (_, i) => {
-    const x = st[i];
+  const tab: InvTab = ui.invTab ?? "hepsi";
+  const shown = st.map((x, i) => ({ x, i })).filter(v => inTab(cfg, v.x.id, tab));
+  const cells = (tab === "hepsi" ? Array.from({ length: cap }, (_, i) => ({ x: st[i], i })) : shown).map(({ x, i }) => {
     if (!x) return `<div class="cell empty" aria-hidden="true"></div>`;
     const it = itemInfo(cfg, x.id);
     return `<button class="cell ${ui.sel === "inv:" + i ? "sel" : ""}" data-act="pick" data-id="inv:${i}" aria-label="${esc(it.name)} ${x.count}">${itemPic(x.id, 38)}${x.count > 1 ? `<span class="cnt">${x.count}</span>` : ""}</button>`;
@@ -212,15 +213,18 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
   // seçili eşya ayrıntısı
   let selId: string | undefined, equippedKey: string | undefined;
   if (ui.sel?.startsWith("inv:")) selId = st[+ui.sel.slice(4)]?.id;
-  if (ui.sel?.startsWith("eq:")) { equippedKey = ui.sel.slice(3); selId = equippedKey === "weapon" ? s.equipped.weapon : equippedKey === "armor" ? s.equipped.armor : bagOf(s); }
+  if (ui.sel?.startsWith("eq:")) { equippedKey = ui.sel.slice(3); selId = equippedKey === "weapon" ? s.equipped.weapon : equippedKey === "armor" ? s.equipped.armor : equippedKey.startsWith("pouch") ? pouchesOf(s)[+equippedKey.slice(5)] : bagOf(s); }
   let detail = `<p class="muted tiny" style="margin:0">Bir eşyaya dokun: ne işe yaradığını gör, kuşan, ye ya da bırak.</p>`;
   if (selId) {
     const it = itemInfo(cfg, selId); const acts: string[] = [];
     if (!equippedKey && (it.kind === "Silah" || it.kind === "Zırh" || it.kind === "Çanta")) acts.push(`<button class="btn small primary" data-act="equip" data-id="${esc(selId)}">Kuşan</button>`);
-    if (equippedKey && equippedKey !== "bag") acts.push(`<button class="btn small" data-act="unequip" data-id="${esc(equippedKey)}">Çıkar</button>`);
+    if (equippedKey && equippedKey !== "bag" && !equippedKey.startsWith("pouch")) acts.push(`<button class="btn small" data-act="unequip" data-id="${esc(equippedKey)}">Çıkar</button>`);
+    if (equippedKey?.startsWith("pouch")) acts.push(`<button class="btn small" data-act="detach" data-id="${equippedKey.slice(5)}">Sök</button>`);
+    if (!equippedKey && it.kind === "Çanta") acts.push(`<button class="btn small" data-act="attach" data-id="${esc(selId)}" ${pouchesOf(s).length >= MAX_POUCHES ? "disabled" : ""}>${esc(itemInfo(cfg, bagOf(s)).name)}'na dik (+${pouchSlots(cfg, selId)} göz)</button>`);
     if (it.kind === "Yiyecek") acts.push(`<button class="btn small primary" data-act="eat" data-id="${esc(selId)}">Ye (+${it.satiety} tokluk)</button>`);
     if (!equippedKey && it.kind !== "Çanta") acts.push(`<button class="btn small red" data-act="drop" data-id="${esc(selId)}">Bırak</button>`);
-    const stats = [it.damage ? `hasar ${it.damage}` : "", it.armor ? `koruma ${it.armor}` : "", it.capacity ? `${it.capacity} göz` : "", it.satiety ? `tokluk +${it.satiety}` : "",
+    const val = ITEM_VALUES[selId];
+    const stats = [it.damage ? `hasar ${it.damage}` : "", val ? `değeri ~${val} bakır` : "", equippedKey?.startsWith("pouch") ? `ek bölme: +${pouchSlots(cfg, selId)} göz` : "", it.armor ? `koruma ${it.armor}` : "", it.capacity ? `${it.capacity} göz` : "", it.satiety ? `tokluk +${it.satiety}` : "",
       it.kind === "Silah" && s.familiarity[selId] !== undefined ? `alışkınlık ${Math.round(s.familiarity[selId] ?? 0)}/100` : ""].filter(Boolean).join(" · ");
     detail = `<div class="item-detail">${itemPic(selId, 64)}<div><div class="entry-title">${esc(it.name)}</div><div class="muted tiny">${esc(it.kind)}${stats ? " · " + stats : ""}</div>
       <p style="margin:4px 0 8px;font-size:15px">${esc(it.desc)}</p><div class="row">${acts.join("")}</div></div></div>`;
@@ -235,8 +239,11 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
   return `<div class="page">
     <section class="sec"><div class="entry-head"><h1>Çanta</h1><span class="hand">${st.length}/${cap} göz</span></div>
       <div class="purse"><span class="coin">${VITAL_ICONS.coin}</span><span>Kese: <b>${s.money} bakır</b></span></div>
-      <div class="eq-row">${slot("Silah", s.equipped.weapon, "weapon")}${slot("Giysi", s.equipped.armor, "armor")}${slot("Çanta", bagOf(s), "bag")}</div></section>
-    <div class="grid">${cells}</div>
+      <div class="eq-row">${slot("Silah", s.equipped.weapon, "weapon")}${slot("Giysi", s.equipped.armor, "armor")}${slot("Çanta", bagOf(s), "bag")}${Array.from({ length: MAX_POUCHES }, (_, i) => slot(`Ek ${i + 1}`, pouchesOf(s)[i], "pouch" + i)).join("")}</div>
+      <p class="muted tiny" style="margin:0">${esc(itemInfo(cfg, bagOf(s)).name)} ${itemInfo(cfg, bagOf(s)).capacity} göz${pouchesOf(s).map(p => ` + ${esc(itemInfo(cfg, p).name)} ${pouchSlots(cfg, p)}`).join("")} = <b>${cap} göz</b>. Boştaki bir çantayı ana çantaya dikersen kendi gözünün ancak %${Math.round(POUCH_SHARE * 100)}'ını katar.</p></section>
+    <div class="inv-tabs" role="tablist">${INV_TABS.map(x => { const n = x.id === "hepsi" ? st.length : st.filter(v => inTab(cfg, v.id, x.id)).length;
+      return `<button role="tab" class="inv-tab ${tab === x.id ? "on" : ""}" data-act="invtab" data-id="${x.id}" aria-selected="${tab === x.id}">${x.name}<small>${n}</small></button>`; }).join("")}</div>
+    <div class="grid">${cells || `<p class="muted tiny" style="grid-column:1/-1;margin:6px 0">Bu bölmede bir şey yok.</p>`}</div>
     <section class="sec">${detail}</section>
     <section class="sec"><h2>El işi</h2><p class="muted tiny" style="margin:0">Malzemen ve becerin yetiyorsa kendin yap. Daha büyük çanta, daha çok göz.</p>${crafts}</section>
   </div>`;

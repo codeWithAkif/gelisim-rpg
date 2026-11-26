@@ -241,7 +241,7 @@ h3 { font-size: 22px; }
 .alert-strip i { font-style: normal; opacity: .7; }
 
 /* çanta */
-.eq-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.eq-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .eq-slot { border: 1.5px solid var(--ink); background: rgba(255,255,255,.3); border-radius: 6px 12px 6px 12px; padding: 6px 4px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; min-height: 72px; justify-content: center; }
 .eq-slot .eq-l { font-family: var(--f-hand); font-size: 16px; color: var(--ink-soft); }
 .eq-slot.sel, .cell.sel { box-shadow: 0 0 0 2.5px var(--red); }
@@ -466,3 +466,10 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .nb-tip { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--paper); border: 1.5px solid var(--ink); border-radius: 8px; padding: 4px 10px; font-family: var(--f-hand); font-size: 17px; pointer-events: none; white-space: nowrap; }
 .here-act .act-ic { flex: none; }
 .here-act > .grow { flex: 1; }
+/* çanta sekmeleri */
+.inv-tabs { display: flex; gap: 4px; overflow-x: auto; margin: 0 0 6px; border-bottom: 1.5px solid var(--ink); }
+.inv-tab { flex: none; border: 1.5px solid var(--pencil); border-bottom: none; background: var(--paper-2); border-radius: 8px 10px 0 0; padding: 4px 7px 3px; font-family: var(--f-hand); font-size: 16px; color: var(--ink-soft); cursor: pointer; display: flex; gap: 4px; align-items: baseline; }
+.inv-tab small { font-family: var(--f-body, serif); font-size: 11px; color: var(--pencil); }
+.inv-tab.on { background: var(--paper); color: var(--ink); border-color: var(--ink); margin-bottom: -1.5px; padding-bottom: 5px; }
+.nb-skill.armed { box-shadow: 0 0 0 3px var(--red); background: rgba(158,52,35,.1); }
+.nb-tip[hidden] { display: none; }

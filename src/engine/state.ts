@@ -30,7 +30,7 @@ export interface GameState {
   attrs: Record<string, AttrState>;
   rep: Record<string, Record<string, number>>; // bölge → boyut → değer
   inventory: Record<string, number>;           // eşya → adet
-  equipped: { weapon?: string; armor?: string; bag?: string };
+  equipped: { weapon?: string; armor?: string; bag?: string; pouches?: string[] }; // pouches: ana çantaya dikilmiş ek çantalar
   familiarity: Record<string, number>;         // silah → alışkınlık (0–100)
   quests: Record<string, QuestState>;
   metNpcs: string[];

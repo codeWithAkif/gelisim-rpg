@@ -15,8 +15,41 @@ export function itemInfo(cfg: Config, id: string): ItemInfo {
 }
 export const DEFAULT_BAG = "bez_torba";
 export function bagOf(s: GameState) { return s.equipped.bag ?? DEFAULT_BAG; }
-export function capacity(cfg: Config, s: GameState): number { return itemInfo(cfg, bagOf(s)).capacity ?? 8; }
-function equippedIds(s: GameState) { return [s.equipped.weapon, s.equipped.armor, bagOf(s)].filter((x): x is string => !!x); }
+/** Ana çantaya dikilen ek çanta kendi gözünün ancak bir kısmını katar (kayış, dikiş yer kaplar). */
+export const POUCH_SHARE = 0.4, MAX_POUCHES = 2;
+export const pouchSlots = (cfg: Config, id: string) => Math.max(1, Math.floor((itemInfo(cfg, id).capacity ?? 0) * POUCH_SHARE));
+export const pouchesOf = (s: GameState) => s.equipped.pouches ?? [];
+export function capacity(cfg: Config, s: GameState): number {
+  return (itemInfo(cfg, bagOf(s)).capacity ?? 8) + pouchesOf(s).reduce((a, id) => a + pouchSlots(cfg, id), 0);
+}
+function equippedIds(s: GameState) { return [s.equipped.weapon, s.equipped.armor, bagOf(s), ...pouchesOf(s)].filter((x): x is string => !!x); }
+
+/** Bir çantayı ana çantaya ek bölme olarak dik. */
+export function attachPouch(cfg: Config, s: GameState, id: string): { ok: boolean; reason?: string; slots?: number } {
+  if (itemInfo(cfg, id).kind !== "Çanta") return { ok: false, reason: "Bu bir çanta değil" };
+  if (freeCount(cfg, s, id) <= 0) return { ok: false, reason: "Takılı olmayan bir tane yok" };
+  if (pouchesOf(s).length >= MAX_POUCHES) return { ok: false, reason: `En çok ${MAX_POUCHES} ek bölme dikilir` };
+  (s.equipped.pouches ??= []).push(id);
+  return { ok: true, slots: pouchSlots(cfg, id) };
+}
+/** Ek bölmeyi sök: çantaya geri döner (yer varsa). */
+export function detachPouch(cfg: Config, s: GameState, index: number): { ok: boolean; reason?: string } {
+  const p = pouchesOf(s); if (!p[index]) return { ok: false };
+  const id = p.splice(index, 1)[0];
+  if (slotsUsed(cfg, s) > capacity(cfg, s)) { p.splice(index, 0, id); return { ok: false, reason: "Sökersen eşyaların sığmaz" }; }
+  return { ok: true };
+}
+
+/** Çanta sekmeleri: eşyalar türüne göre ayrılır. */
+export type InvTab = "hepsi" | "yiyecek" | "malzeme" | "kusanilir" | "diger";
+export const INV_TABS: { id: InvTab; name: string; kinds: ItemKind[] }[] = [
+  { id: "hepsi", name: "Hepsi", kinds: [] },
+  { id: "yiyecek", name: "Yiyecek", kinds: ["Yiyecek"] },
+  { id: "malzeme", name: "Malzeme", kinds: ["Malzeme"] },
+  { id: "kusanilir", name: "Kuşanılır", kinds: ["Silah", "Zırh", "Çanta"] },
+  { id: "diger", name: "Diğer", kinds: ["Eşya"] },
+];
+export const inTab = (cfg: Config, id: string, tab: InvTab) => tab === "hepsi" || INV_TABS.find(t => t.id === tab)!.kinds.includes(itemInfo(cfg, id).kind);
 
 /** Çantadaki gözler: kuşanılanlar hariç, her yığın bir göz. */
 export interface Stack { id: string; count: number }
@@ -60,6 +93,8 @@ export function equip(cfg: Config, s: GameState, id: string): { ok: boolean; rea
   if (it.kind === "Silah") { s.equipped.weapon = id; s.familiarity[id] ??= 0; return { ok: true }; }
   if (it.kind === "Zırh") { s.equipped.armor = id; return { ok: true }; }
   if (it.kind === "Çanta") {
+    // ek bölme olarak dikiliyse önce sökülür; ana çanta olur
+    const pi = pouchesOf(s).indexOf(id); if (pi >= 0 && freeCount(cfg, s, id) <= 0) s.equipped.pouches!.splice(pi, 1);
     const prev = bagOf(s); s.equipped.bag = id;
     if (slotsUsed(cfg, s) > capacity(cfg, s)) { s.equipped.bag = prev; return { ok: false, reason: "Eşyaların bu çantaya sığmıyor" }; }
     return { ok: true };

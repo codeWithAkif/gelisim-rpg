@@ -5,7 +5,7 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Nobet, type StatId, type NobetResult, NFIELD, TOWER, STAT_NAMES, CARDS, PERMS, createNobet, stepNobet, buyUpgrade, upgradeCost, statValue,
-  pickCard, useSpell, placePet, petGuard, SPELL_NAMES, type SpellId, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave, waveScale, type Loot,
+  pickCard, useSpell, spellReady, placePet, petGuard, SPELL_NAMES, type SpellId, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave, waveScale, type Loot,
 } from "../engine/nobet";
 import { ENEMIES } from "../content/world";
 import { artUrl } from "./art";
@@ -118,16 +118,33 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   spellBar.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-spell]"); if (!b) return;
     const id = b.dataset.spell as SpellId;
-    if (useSpell(n, id)) { sfx(id === "simsek" ? "spark" : id === "kilic" ? "clang" : id === "karga" ? "whoosh" : "thunk"); if (id !== "karga") sfx("crit"); buzz("heavy"); shake = id === "sarmasik" ? 4 : 10; } else sfx("bad");
+    // büyüyü seç, sonra araziye dokunarak nereye düşeceğini işaretle (kılıçlar: hangi yöne)
+    if (armed === id) { armed = null; sfx("tap"); }
+    else if (spellReady(n, id)) { armed = id; sfx("tap"); buzz("light"); }
+    else { sfx("bad"); return; }
+    tip.hidden = !armed; if (armed) tip.textContent = armed === "kilic" ? "Kılıçların yükseleceği yöne dokun" : `${SPELL_NAMES[armed]}: hedefe dokun`;
+    for (const x of spellBar.querySelectorAll<HTMLElement>("[data-spell]")) x.classList.toggle("armed", x.dataset.spell === armed);
   });
+  let armed: SpellId | null = null; let aim: { x: number; y: number } | null = null;
+  function castAt(x: number, y: number) {
+    const id = armed!; armed = null; aim = null; tip.hidden = true;
+    for (const b of spellBar.querySelectorAll<HTMLElement>("[data-spell]")) b.classList.remove("armed");
+    if (useSpell(n, id, x, y)) { sfx(id === "simsek" ? "spark" : id === "kilic" ? "clang" : id === "karga" ? "whoosh" : "thunk"); if (id !== "karga") sfx("crit"); buzz("heavy"); shake = id === "sarmasik" ? 4 : 10; } else sfx("bad");
+  }
   // köpeğin bekleyeceği yer: araziye dokun
   const tip = el.querySelector<HTMLElement>("#nbTip")!;
-  if (n.pet) { tip.textContent = `${s.pet!.name}'ın bekleyeceği yere dokun`; setTimeout(() => tip.remove(), 6000); } else tip.remove();
+  tip.hidden = true;
+  if (n.pet) { tip.hidden = false; tip.textContent = `${s.pet!.name}'ın kollayacağı yere dokun`; setTimeout(() => { if (!armed) tip.hidden = true; }, 6000); }
+  const at = (e: PointerEvent) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left - ox) / scale, y: (e.clientY - r.top - oy) / scale }; };
   cv.addEventListener("pointerdown", e => {
-    if (!n.pet || n.phase !== "play") return;
-    const r = cv.getBoundingClientRect(); const x = (e.clientX - r.left - ox) / scale, y = (e.clientY - r.top - oy) / scale;
-    if (placePet(n, x, y)) { sfx("tap"); petMark = performance.now(); }
+    if (n.phase !== "play") return;
+    const p = at(e);
+    if (armed) { aim = p; cv.setPointerCapture(e.pointerId); return; }   // parmağı kaldırınca atılır; sürükleyerek nişan düzeltilir
+    if (n.pet && placePet(n, p.x, p.y)) { sfx("tap"); petMark = performance.now(); }
   });
+  cv.addEventListener("pointermove", e => { if (armed && aim) aim = at(e); });
+  cv.addEventListener("pointerup", e => { if (armed && aim) { const p = at(e); castAt(p.x, p.y); } });
+  cv.addEventListener("pointercancel", () => { aim = null; });
   let petMark = 0;
 
   /* ---------- çizim ---------- */
@@ -176,6 +193,13 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       if (f.stun > 0) { g.fillStyle = C("--blue"); g.font = `${scale * 3}px serif`; g.textAlign = "center"; g.fillText("✦", X(f.x), Y(f.y) - h * scale * 1.05); }
       if (f.slow > 0) { g.fillStyle = "rgba(159,211,232,.6)"; g.beginPath(); g.arc(X(f.x), Y(f.y), scale * 2, 0, 7); g.fill(); }
       if (f.hp < f.max || f.boss) { const w = f.boss ? 40 : 20; g.fillStyle = "rgba(234,224,200,.9)"; g.fillRect(X(f.x) - w / 2, Y(f.y) - h * scale * 0.95, w, 4); g.fillStyle = C("--red"); g.fillRect(X(f.x) - w / 2, Y(f.y) - h * scale * 0.95, w * Math.max(0, f.hp / f.max), 4); }
+    }
+    // nişan: seçili büyünün düşeceği yer / kılıçların hattı
+    if (armed && aim) {
+      g.setLineDash([5, 5]); g.strokeStyle = C("--red"); g.lineWidth = 2;
+      if (armed === "kilic") { const a = Math.atan2(aim.y - TOWER.y, aim.x - TOWER.x); g.beginPath(); g.moveTo(X(TOWER.x + Math.cos(a) * 8), Y(TOWER.y + Math.sin(a) * 8)); g.lineTo(X(TOWER.x + Math.cos(a) * 48), Y(TOWER.y + Math.sin(a) * 48)); g.lineWidth = 10 * scale / 4; g.globalAlpha = 0.35; g.stroke(); g.globalAlpha = 1; }
+      else { const R = armed === "simsek" ? 14 : armed === "sarmasik" ? 18 : 26; g.beginPath(); g.arc(X(aim.x), Y(aim.y), R * scale, 0, 7); g.stroke(); g.fillStyle = "rgba(158,52,35,.08)"; g.fill(); }
+      g.setLineDash([]);
     }
     // kule ve sen
     tower();

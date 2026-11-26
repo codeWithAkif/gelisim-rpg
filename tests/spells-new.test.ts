@@ -5,7 +5,7 @@ import { newGame } from "../src/engine/state";
 import { spellOptions, castSpell } from "../src/engine/magic";
 import { grantRelic } from "../src/engine/relics";
 import { createBattle, enemies } from "../src/engine/combat";
-import { createNobet, stepNobet, useSpell, pickCard, placePet, nobetSite, TOWER } from "../src/engine/nobet";
+import { createNobet, stepNobet, useSpell, pickCard, placePet, petGuard, nobetSite, TOWER } from "../src/engine/nobet";
 
 const withRelics = () => { const s = newGame(cfg, 6); s.mana = 100; for (const r of ["ardic_koku", "kara_tuy", "pasli_kabza"]) grantRelic(cfg, s, r, {}); return s; };
 
@@ -27,12 +27,14 @@ test("savaşta sarmaşık yere bağlar, kılıçlar sersemletir", () => {
   expect(e2.stunned ?? 0).toBeGreaterThan(0);
 });
 
-test("nöbette Karabaş yerinde bekler, kolladığı yere gireni kovalar", () => {
+test("nöbette Karabaş alanında gezinir, dışına çıkmaz; alanına gireni kovalar", () => {
   const s = newGame(cfg, 6); s.pet = { id: "kopek", name: "Karabaş", bond: 20 };
   const n = createNobet(cfg, s, nobetSite("yayla")!, 1); n.breakT = 999;
   placePet(n, TOWER.x + 20, TOWER.y);
-  for (let i = 0; i < 60; i++) stepNobet(s, n, 0.05);
-  expect(Math.hypot(n.pet!.x - n.pet!.hx, n.pet!.y - n.pet!.hy)).toBeLessThan(1);   // durur, dönmez
+  for (let i = 0; i < 80; i++) stepNobet(s, n, 0.05); // önce yerine koşar
+  const seen = new Set<string>();
+  for (let i = 0; i < 300; i++) { stepNobet(s, n, 0.05); expect(Math.hypot(n.pet!.x - n.pet!.hx, n.pet!.y - n.pet!.hy)).toBeLessThan(petGuard(n)); seen.add(`${Math.round(n.pet!.x / 3)},${Math.round(n.pet!.y / 3)}`); }
+  expect(seen.size).toBeGreaterThan(3);   // tek yerde durmaz, gezinir
   n.foes.push({ id: 99, def: "kurt", x: n.pet!.hx + 10, y: n.pet!.hy, hp: 50, max: 50, speed: 0, dmg: 1, cd: 1, r: 3, boss: false, burn: 0, slow: 0, root: 0, stun: 0, peck: 0, human: false, reward: 1 });
   for (let i = 0; i < 30; i++) stepNobet(s, n, 0.05);
   expect(n.foes[0].hp).toBeLessThan(50);
@@ -50,4 +52,7 @@ test("nöbet büyüleri: sarmaşık durdurur, karga saldırtmaz, kılıçlar ser
   for (let i = 0; i < 20; i++) stepNobet(s, n, 0.05); expect(n.hp).toBeGreaterThanOrEqual(hp0);
   n.foes = [foe(3, TOWER.x + 25)]; expect(useSpell(n, "kilic")).toBe(true); expect(n.foes[0].stun).toBeGreaterThan(0);
   expect(useSpell(n, "kilic")).toBe(false); // doluyor
+  // işaretlenen yere düşer: kalabalık başka yerdeyken bile
+  n.spells.sarmasik!.cd = 0; n.foes = [foe(4, TOWER.x + 30), foe(5, TOWER.x - 30)];
+  useSpell(n, "sarmasik", TOWER.x - 30, TOWER.y); expect(n.foes[1].root).toBeGreaterThan(0); expect(n.foes[0].root).toBe(0);
 });

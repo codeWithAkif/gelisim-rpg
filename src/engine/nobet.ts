@@ -88,7 +88,7 @@ export interface Nobet {
   lv: Record<StatId, number>; coins: number; cards: Record<string, number>; offer: string[];
   page: number; pageNeed: number; fireCd: number; shotsFired: number;
   spells: Partial<Record<SpellId, { cd: number; max: number }>>;
-  pet?: { x: number; y: number; hx: number; hy: number; cd: number; lv: number };
+  pet?: { x: number; y: number; hx: number; hy: number; cd: number; lv: number; wx: number; wy: number; wt: number }; // wx/wy: boşta gezindiği nokta
   loot: Loot; rewarded: number; foes: NFoe[]; shots: Shot[]; fx: NFx[]; nextId: number; seed: number; rng: Rng;
   stats: { kills: number; shots: number; bosses: number; dmgTaken: number; coins: number; cards: number; skills: number };
 }
@@ -104,7 +104,7 @@ export function createNobet(cfg: Config, s: GameState, site: NobetSite, seed: nu
     hp, maxHp: hp, regen: 0.3, dmg, rate: (0.9 + lvA(s, "refleks") / 80) * (1 + pm("cabuk") * 0.05), range: 30 + lvA(s, "gorus") / 8, crit: 0.05 + lvA(s, "okculuk") / 400 + pm("keskin") * 0.02,
     lv: { dmg: 0, rate: 0, hp: 0, regen: 0, range: 0 }, coins: 8 + pm("miras") * 6, cards: {}, offer: [],
     page: 0, pageNeed: 6, fireCd: 0, shotsFired: 0,
-    spells: startSpells(s), pet: s.pet ? { x: TOWER.x, y: TOWER.y + 16, hx: TOWER.x, hy: TOWER.y + 16, cd: 0, lv: 1 } : undefined,
+    spells: startSpells(s), pet: s.pet ? { x: TOWER.x, y: TOWER.y + 16, hx: TOWER.x, hy: TOWER.y + 16, cd: 0, lv: 1, wx: TOWER.x, wy: TOWER.y + 16, wt: 0 } : undefined,
     loot: { money: 0, items: {} }, rewarded: 0, foes: [], shots: [], fx: [], nextId: 1, seed, rng,
     stats: { kills: 0, shots: 0, bosses: 0, dmgTaken: 0, coins: 0, cards: 0, skills: 0 },
   };
@@ -143,7 +143,7 @@ export function pickCard(s: GameState, n: Nobet, id: string): boolean {
 export function placePet(n: Nobet, x: number, y: number): boolean {
   if (!n.pet) return false;
   const dx = x - TOWER.x, dy = y - TOWER.y, d = Math.hypot(dx, dy) || 1; const k = Math.min(1, 34 / d);
-  n.pet.hx = TOWER.x + dx * k; n.pet.hy = TOWER.y + dy * k; return true;
+  n.pet.hx = TOWER.x + dx * k; n.pet.hy = TOWER.y + dy * k; n.pet.wx = n.pet.hx; n.pet.wy = n.pet.hy; n.pet.wt = 1; return true;
 }
 export const petGuard = (n: Nobet) => 16 + (n.pet?.lv ?? 1) * 3;
 /* ---------- büyüler ---------- */
@@ -163,10 +163,16 @@ function crowdCenter(n: Nobet, r: number) {
   for (const f of n.foes) { const c = n.foes.filter(g => Math.hypot(g.x - f.x, g.y - f.y) < r).length + (f.boss ? 1 : 0); if (c > bc) { bc = c; best = f; } }
   return best;
 }
-/** Büyü yapar: kalabalığın ortasını kendisi bulur. */
-export function useSpell(n: Nobet, id: SpellId): boolean {
-  const sp = n.spells[id]; if (!sp || sp.cd > 0 || n.phase !== "play" || !n.foes.length) return false;
-  const c = crowdCenter(n, 14); const hits: number[] = [];
+/** Büyüyü hazır mı: dolmuş ve nöbet sürüyor. */
+export const spellReady = (n: Nobet, id: SpellId) => !!n.spells[id] && n.spells[id]!.cd <= 0 && n.phase === "play";
+/**
+ * Büyü yapar. Hedef verilirse oraya düşer (kılıçlar: kuleden o yöne doğru yükselir);
+ * verilmezse kalabalığın ortasını kendisi bulur.
+ */
+export function useSpell(n: Nobet, id: SpellId, tx?: number, ty?: number): boolean {
+  const sp = n.spells[id]; if (!sp || sp.cd > 0 || n.phase !== "play") return false;
+  if (tx === undefined && !n.foes.length) return false;
+  const c = tx !== undefined && ty !== undefined ? { x: tx, y: ty } : crowdCenter(n, 14); const hits: number[] = [];
   if (id === "simsek") {
     const R = 14;
     for (const f of [...n.foes]) if (Math.hypot(f.x - c.x, f.y - c.y) < R) { hits.push(f.id); f.slow = Math.max(f.slow, 1.5); hurt(n, f, n.dmg * 3.5, false); }
@@ -276,10 +282,14 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
   if (n.pet) {
     const pt = n.pet; pt.cd -= dt; const G = petGuard(n);
     const t = n.foes.filter(f => Math.hypot(f.x - pt.hx, f.y - pt.hy) < G).sort((a, b) => Math.hypot(a.x - pt.x, a.y - pt.y) - Math.hypot(b.x - pt.x, b.y - pt.y))[0];
-    const [gx, gy] = t ? [t.x, t.y] : [pt.hx, pt.hy];
+    // boştayken alanının içinde rastgele gezinir; arada bir durup koklanır
+    if (!t && ((pt.wt -= dt) <= 0 || Math.hypot(pt.wx - pt.x, pt.wy - pt.y) < 0.6)) {
+      if (pt.wt <= 0) { const a = n.rng.next() * Math.PI * 2, r = Math.sqrt(n.rng.next()) * G * 0.75; pt.wx = pt.hx + Math.cos(a) * r; pt.wy = pt.hy + Math.sin(a) * r; pt.wt = 1.5 + n.rng.next() * 2.5; }
+    }
+    const [gx, gy] = t ? [t.x, t.y] : [pt.wx, pt.wy];
     const dx = gx - pt.x, dy = gy - pt.y, d = Math.hypot(dx, dy);
     const reach = t ? t.r + 2 : 0.5;
-    if (d > reach) { const k = Math.min(d - reach, 20 * dt) / d; pt.x += dx * k; pt.y += dy * k; }
+    if (d > reach) { const k = Math.min(d - reach, (t ? 20 : 7) * dt) / d; pt.x += dx * k; pt.y += dy * k; }
     else if (t && pt.cd <= 0) {
       pt.cd = 1.1 - pt.lv * 0.12; hurt(n, t, n.dmg * (0.45 + pt.lv * 0.3), false); t.slow = Math.max(t.slow, 0.8);
       n.fx.push({ k: "bite", x: t.x, y: t.y });
