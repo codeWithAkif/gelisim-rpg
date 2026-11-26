@@ -27,6 +27,7 @@ import { openSiege } from "./siege-view";
 import { openStealth } from "./stealth-view";
 import { diyarScreen } from "./diyar-screen";
 import { openNobetHub, lootText } from "./nobet-view";
+import { openScavHub } from "./scav-view";
 import { rollFoes, bonusOf, modeOptions, stealthGoal, siegeFromFoes, groundOf, type Mode, type Context } from "../engine/encounter";
 import { addItem } from "../engine/inventory";
 import { isNight } from "../engine/state";
@@ -274,6 +275,7 @@ export function startApp(root: HTMLElement) {
       }
       case "partner": openPartner(id); break;
       case "nobet": doNobet(id); break;
+      case "scav": doScav(id); break;
       case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;
       case "jobtab": ui.jobTab = id as UiState["jobTab"]; sfx("page"); render(false); break;
       case "deliver": {
@@ -285,6 +287,20 @@ export function startApp(root: HTMLElement) {
   });
 
   /** Nöbet: önce kalıcı güçlenmeler, sonra sonsuz dalgalar; bitince sonuç. */
+  function doScav(id: string) {
+    openScavHub(cfg, s, id, persist, r => {
+      persist(); render();
+      const items = Object.entries(r.items).map(([k, v]) => `${itemInfo(cfg, k).name}${v > 1 ? " ×" + v : ""}`);
+      const lost = Object.entries(r.lostItems).map(([k, v]) => `${itemInfo(cfg, k).name}${v > 1 ? " ×" + v : ""}`);
+      modal(`<p class="hand ${r.result === "exit" ? "muted" : "red"}" style="margin:0">Harabe araması</p><h2>${r.result === "exit" ? "Sağ salim çıktın" : "Yaralı kaçtın"}</h2>
+        <p style="margin:0">${r.result === "exit" ? "Bulduklarını çıkışa kadar getirdin." : "Baskın seni yere serdi; çantandakiler harabede kaldı."}</p>
+        <div class="odds"><span>Aranan yer <b>${r.searched}</b></span><span>Baskın <b>${r.waves}</b></span><span>Süre <b>${r.minutes} dk</b></span></div>
+        ${items.length || r.money ? `<p class="hand blue" style="margin:0">Getirdiklerin: ${esc([...(r.money ? [`${r.money} bakır`] : []), ...items].join(", "))}</p>` : `<p class="tiny muted" style="margin:0">Eli boş döndün.</p>`}
+        ${lost.length ? `<p class="tiny red" style="margin:0">Kaybolan: ${esc(lost.join(", "))}</p>` : ""}
+        ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
+        <h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
+    });
+  }
   function doNobet(id: string) {
     openNobetHub(cfg, s, id, persist, r => {
       persist(); render();

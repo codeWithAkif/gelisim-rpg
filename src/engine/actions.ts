@@ -11,11 +11,12 @@ import { MARKETS } from "../content/world";
 import { partnerAt, stake } from "./finance";
 import { lodgingAt } from "./rest";
 import { nobetSite, nobetSave } from "./nobet";
+import { scavSite } from "./scavenge";
 import { PET_TYPES, canAdopt } from "./pet";
 import { homeBed, candidatesAt, canHire, canBuyHouse, HOUSES, HOME_PLACES, ROLE_NAMES } from "./estate";
 
 export interface PlaceAction {
-  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place" | "partner" | "sleep" | "nobet" | "pet-adopt" | "hire" | "house";
+  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place" | "partner" | "sleep" | "nobet" | "scav" | "pet-adopt" | "hire" | "house";
   id: string; label: string; sub?: string; disabled?: string; primary?: boolean;
 }
 /** Bulunduğun yerde yapılabilecekler, önem sırasıyla. */
@@ -37,6 +38,8 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
   if (HOME_PLACES.includes(placeId) && !(s.estate?.house)) { const c = canBuyHouse(cfg, s, placeId); out.push({ act: "house", id: placeId, label: `Ev kur: ${HOUSES[0].name}`, sub: `${HOUSES[0].cost.money} bakır + ${Object.entries(HOUSES[0].cost.items).map(([k, n]) => `${n} ${k}`).join(", ")} · ${HOUSES[0].desc}`, disabled: placeId === s.location ? (c.ok ? undefined : c.reason) : "Oraya git" }); }
   const ns = nobetSite(placeId);
   if (ns && !ns.unlock(s)) out.push({ act: "nobet", id: placeId, label: `Nöbet tut: ${ns.name}`, sub: `Sonsuz dalga · rekor ${nobetSave(s).best[placeId] ?? 0}. dalga`, disabled: placeId === s.location ? undefined : "Oraya git" });
+  const sv = scavSite(placeId);
+  if (sv && !sv.unlock(s)) out.push({ act: "scav", id: placeId, label: `Harabeyi ara: ${sv.name}`, sub: `${sv.floors} kat · baskınlar gelir · çıkışta kazanç`, disabled: placeId === s.location ? undefined : "Oraya git" });
   if (placeId === s.location) {
     const l = lodgingAt(placeId); const hb = homeBed(s); const ok = !!hb || (!!l && !l.unlock(s));
     out.push({ act: "sleep", id: "", label: ok ? `Konakla: ${hb?.name ?? l!.name}` : "Dinlen ya da kamp kur", sub: ok ? "Güvenli uyku, dinlenme" : "Açıkta uyumak tehlikeli" });

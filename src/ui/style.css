@@ -560,3 +560,10 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .nb-sup { position: relative; width: 42px; height: 42px; border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper); display: grid; place-items: center; padding: 0; cursor: pointer; }
 .nb-sup:disabled { opacity: .45; }
 .nb-sup i { position: absolute; right: -4px; bottom: -4px; font-style: normal; font-family: var(--f-hand); font-size: 14px; background: var(--ink); color: var(--paper); border-radius: 8px; padding: 0 5px; }
+
+/* harabe araması */
+.sc-hud { flex: 1; display: flex; justify-content: space-between; gap: 8px; font-family: var(--f-hand); font-size: 20px; }
+.sc-hud .hot { color: var(--red); font-weight: 700; }
+.sc-bar { display: flex; align-items: center; gap: 12px; padding: 6px 12px; font-family: var(--f-hand); font-size: 19px; border-top: 1.5px solid var(--ink); }
+.sc-bar .btn { margin-left: auto; }
+
