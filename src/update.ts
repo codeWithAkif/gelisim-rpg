@@ -59,13 +59,13 @@ async function nativeGet(url: string): Promise<{ status: number; data: unknown }
   const r = await CapacitorHttp.get({ url, headers: { Accept: "application/json" }, connectTimeout: 8000, readTimeout: 8000 });
   return { status: r.status, data: typeof r.data === "string" ? (() => { try { return JSON.parse(r.data); } catch { return r.data; } })() : r.data };
 }
-interface LatestInfo { version: string; native: number }
+interface LatestInfo { version: string; native: number; checksum?: string }
 /** Son sürüm: önce yayındaki küçük sürüm dosyası, olmazsa GitHub API. */
 async function latestRelease(): Promise<LatestInfo> {
   try {
     const r = await nativeGet(VERSION_URL);
     const d = r.data as Partial<LatestInfo>;
-    if (r.status === 200 && d?.version) return { version: String(d.version), native: Number(d.native) || 0 };
+    if (r.status === 200 && d?.version) return { version: String(d.version), native: Number(d.native) || 0, checksum: typeof d.checksum === "string" ? d.checksum : undefined };
     note(`Sürüm dosyası okunamadı (${r.status}); GitHub'a soruluyor.`);
   } catch (e) { note(`Sürüm dosyasına ulaşılamadı: ${(e as Error)?.message ?? e}`); }
   const r = await nativeGet(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`);
@@ -104,12 +104,14 @@ export async function checkForUpdates(h: UpdateHooks): Promise<void> {
       if (old) { note(`${latest.version} daha önce bozuk inmiş (${old.status}); siliniyor.`); await CapacitorUpdater.delete({ id: old.id }); }
     } catch (e) { note(`Paket listesi alınamadı: ${(e as Error)?.message ?? e}`); }
 
+    // Eklenti paketin SHA-256 özetini ister; yoksa indirmeyi reddeder ("Failed to download").
+    if (!latest.checksum) { setStatus(`${latest.version} için paket özeti yok; bir sonraki sürümü bekle.`, false); return; }
     step = "indirme";
     h.onDownloading(latest.version);
     const sub = await CapacitorUpdater.addListener("download", ev => h.onProgress?.(ev.percent)).catch(() => null);
     let bundle;
-    try { bundle = await CapacitorUpdater.download({ url: zipUrl(latest.version), version: latest.version }); }
-    catch (e) { note(`İlk indirme olmadı: ${(e as Error)?.message ?? e}; tekrar deneniyor.`); bundle = await CapacitorUpdater.download({ url: zipUrl(latest.version), version: latest.version }); }
+    try { bundle = await CapacitorUpdater.download({ url: zipUrl(latest.version), version: latest.version, checksum: latest.checksum }); }
+    catch (e) { note(`İlk indirme olmadı: ${(e as Error)?.message ?? e}; tekrar deneniyor.`); bundle = await CapacitorUpdater.download({ url: zipUrl(latest.version), version: latest.version, checksum: latest.checksum }); }
     void sub?.remove();
     note(`${latest.version} indirildi (${bundle.status}).`);
 

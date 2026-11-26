@@ -52,7 +52,8 @@ jobs:
         run: |
           npm run build
           cd dist && zip -qr ../dist.zip . && cd ..
-          echo "{\"version\":\"${{ steps.v.outputs.app }}\",\"native\":${{ steps.v.outputs.native }}}" > version.json
+          SUM=$(sha256sum dist.zip | cut -d' ' -f1)
+          echo "{\"version\":\"${{ steps.v.outputs.app }}\",\"native\":${{ steps.v.outputs.native }},\"checksum\":\"$SUM\"}" > version.json
           cat version.json
 
       - name: Android eşitleme
