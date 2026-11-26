@@ -176,7 +176,13 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     // sen: merdivende yavaş yavaş çıkar
     { const x = n.px; const fl = n.py; const climbing = n.climbing; const key = n.atkFx > 0 ? "poz_kahraman_vurus" : "poz_kahraman_durus";
       const walkQ = n.moving ? quad("anim_kahraman_yuru", walkFrame(now, 0, 9)) : null; const bowQ = n.bow && n.atkFx > 0 ? quad("anim_kahraman_yay", 3) : null;
-      if (bowQ) drawQuad(g, bowQ, X(x), gy(fl), 20 * sc(), n.face === 1);
+      const castQ = n.castT > 0 ? quad("anim_kahraman_buyu", Math.min(3, Math.floor((1 - n.castT / 0.6) * 4))) : null;
+      const searchQ = n.searchId ? quad("anim_kahraman_ara", n.foundT > 0 ? 3 : walkFrame(now, 0, 2.5) % 3) : n.foundT > 0 ? quad("anim_kahraman_ara", 3) : null;
+      const climbQ = climbing ? quad("anim_kahraman_tirman", Math.floor(n.py * 10)) : null;
+      if (climbQ) { const hh = 20 * sc(), ww = hh * climbQ.sw / climbQ.sh; drawQuad(g, climbQ, X(x) - ww * 0.075, gy(fl), hh, false); }
+      else if (castQ) drawQuad(g, castQ, X(x), gy(fl), 20 * sc(), n.face === 1);
+      else if (searchQ) drawQuad(g, searchQ, X(x), gy(fl), 20 * sc(), n.face === 1);
+      else if (bowQ) drawQuad(g, bowQ, X(x), gy(fl), 20 * sc(), n.face === 1);
       else if (walkQ) drawQuad(g, walkQ, X(x), gy(fl), 20 * sc(), n.face === 1);
       else { const im = img(key); if (im) { const hh = 20 * sc(), w = hh * im.naturalWidth / im.naturalHeight; const bob = climbing ? Math.sin(fl * 16) * 3 : 0; g.save(); g.globalAlpha = climbing ? 0.85 : 1; g.translate(X(x), gy(fl) + bob); if (n.face === 1) g.scale(-1, 1); g.drawImage(im, -w / 2, -hh, w, hh); g.restore(); } }
       { const w = 44, hx = X(x) - w / 2, hy = gy(fl) - 20 * sc() - 14; g.fillStyle = "rgba(20,16,10,.85)"; g.fillRect(hx - 1, hy - 1, w + 2, 8); g.fillStyle = n.hp / n.maxHp < 0.3 ? "#E0483A" : "#D9503A"; g.fillRect(hx, hy, w * Math.max(0, n.hp / n.maxHp), 6);

@@ -118,7 +118,7 @@ export interface Scav {
   px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
   spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number;
   bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
-  foundWeapons: string[]; weaponId: string; armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[];
+  foundWeapons: string[]; weaponId: string; castT: number; foundT: number; armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[];
   ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number };
 }
 const bagCount = (n: Scav) => Object.values(n.bag).reduce((a, b) => a + b, 0);
@@ -187,7 +187,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   return {
     site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4)), maxHp: Math.round(mh * 1.4),
     spots, searchId: 0, searchWait: 0, foes: [], nextId: 1, wave: 0, raidT: 15, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
-    atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], weaponId: "", armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
+    atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
     ground: [], gid: 1, proj: [], locks, keys: [], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
 }
@@ -225,7 +225,7 @@ export function aimTarget(n: Scav, aim?: { dx: number; dy: number }): { floor: n
 export function castSpell(n: Scav, aim?: { dx: number; dy: number }): boolean {
   const sp = n.spell; if (!sp || sp.cd > 0 || n.phase !== "play") return false;
   const { floor, dir } = aimTarget(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.5;
-  sp.cd = sp.max; n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + dir * 5, floor, dir, left: 150, base: n.dmg * sp.mul * 0.5, r: sp.r * 0.9 });
+  sp.cd = sp.max; n.castT = 0.6; n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + dir * 5, floor, dir, left: 150, base: n.dmg * sp.mul * 0.5, r: sp.r * 0.9 });
   n.fx.push({ k: "cast", kind: sp.kind, x: n.px, floor }); return true;
 }
 /** Elle ok atışı: nişan aldığın yönde/katta ilk düşmana vurur. */
@@ -273,6 +273,7 @@ export function pickScavCard(n: Scav, id: string): boolean {
 function applyStage(n: Scav, sp: Spot, st: Stage) {
   const at = { x: sp.x, floor: sp.floor };
   if (st.kind === "key") { n.keys.push(st.key!); n.fx.push({ k: "key", ...at }); return; }
+  if (st.kind !== "empty") n.foundT = 0.7;
   if (st.kind === "empty") { n.fx.push({ k: "loot", text: "boş", ...at }); return; }
   if (st.kind === "money") { n.money += st.money ?? 0; n.fx.push({ k: "loot", text: `+${st.money} bakır`, ...at }); return; }
   if (st.kind === "weapon") {
@@ -305,7 +306,7 @@ function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean, quiet = false) {
 
 /** Zamanı ilerlet. */
 export function stepScav(n: Scav, dt: number) {
-  if (n.phase !== "play") return; dt = Math.min(dt, 0.05); n.time += dt; n.atkFx = Math.max(0, n.atkFx - dt);
+  if (n.phase !== "play") return; dt = Math.min(dt, 0.05); n.time += dt; n.atkFx = Math.max(0, n.atkFx - dt); n.castT = Math.max(0, n.castT - dt); n.foundT = Math.max(0, n.foundT - dt);
   n.raidT -= dt; if (n.raidT <= 0) spawnRaid(n);   // baskınlar sabit aralıkla gelir; yığılma olabilir
   if (n.spell) n.spell.cd = Math.max(0, n.spell.cd - dt);
   // yönlendirme

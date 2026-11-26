@@ -18,7 +18,7 @@ test("her görsel bilinen bir kişi, yer ya da eşyaya ait ve küçük boyutlu",
     expect(f, f).toMatch(/^(portre|yer|esya|hikaye|dusman|poz|harita|anim|vucut|yapi|kule|harabe)_[a-z0-9_]+\.webp$/);
     const [, kind, id] = f.match(/^([a-z]+)_(.+)\.webp$/)!;
     if (kind === "portre") expect(id === "anne" || NPCS.some(n => n.id === id) || HEROES.some(h => h.id === id), f).toBe(true);
-    if (kind === "anim") expect(["kahraman_yuru", "kahraman_yay", "kurt_yuru", ...Object.keys(PET_TYPES).map(k => k + "_yuru")], f).toContain(id);
+    if (kind === "anim") expect(["kahraman_yuru", "kahraman_yay", "kahraman_ara", "kahraman_tirman", "kahraman_buyu", "kurt_yuru", ...Object.keys(PET_TYPES).map(k => k + "_yuru")], f).toContain(id);
     if (kind === "yapi") expect(STRUCTURES.some(d => d.id === id), f).toBe(true);
     if (kind === "kule") expect(NOBET_SITES.some(d => d.place === id), f).toBe(true);
     if (kind === "harabe") expect(/^(oda_(koru|karacam_sarnic|ardic_kul)|merdiven|kilit_kapi|kapi_acik|cikis|sandik|dolap|fici|cuval|raf|yatak|ocak|kasa|tas_nis|soba|anahtar|silah_(pasli_kilic|eski_mizrak|civili_sopa|kemik_balta|avci_yayi|kisa_yay))$/.test(id), f).toBe(true);
