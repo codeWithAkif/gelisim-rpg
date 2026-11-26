@@ -79,9 +79,11 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
         g.save(); g.beginPath(); g.rect(x0, y0, x1 - x0, fh()); g.clip(); if (k % 2) { g.translate(x0 + x1, 0); g.scale(-1, 1); } g.drawImage(rimg, k % 2 ? x0 : x0, y0, x1 - x0, fh()); g.restore(); }
       g.strokeStyle = "rgba(20,16,10,.7)"; g.lineWidth = 2; g.beginPath(); g.moveTo(0, y1 - 10); g.lineTo(W, y1 - 10); g.stroke();
       const lk0 = n.locks.find(l => l.floor === f);
-      if (lk0 && !lk0.open) { const px = X(lk0.x); g.fillStyle = "#1B150E"; g.fillRect(px - 5, y0 + 5, 10, fh() - 15); g.strokeStyle = "#B08A3A"; g.lineWidth = 3; g.strokeRect(px - 5, y0 + 5, 10, fh() - 15);
+      if (lk0) { const dim2 = img(lk0.open ? "harabe_kapi_acik" : "harabe_kilit_kapi"); if (dim2) { const hh = fh() * 0.82, ww = hh * dim2.naturalWidth / dim2.naturalHeight; g.drawImage(dim2, X(lk0.x) - ww / 2, y1 - 8 - hh, ww, hh); } }
+      if (lk0 && !lk0.open && !img("harabe_kilit_kapi")) { const px = X(lk0.x); g.fillStyle = "#1B150E"; g.fillRect(px - 5, y0 + 5, 10, fh() - 15); g.strokeStyle = "#B08A3A"; g.lineWidth = 3; g.strokeRect(px - 5, y0 + 5, 10, fh() - 15);
         const cy = y0 + fh() * 0.5; g.fillStyle = "#D9B84A"; g.fillRect(px - 9, cy - 3, 18, 14); g.strokeStyle = "#D9B84A"; g.lineWidth = 3; g.beginPath(); g.arc(px, cy - 3, 6, Math.PI, 0); g.stroke();
-        g.fillStyle = "rgba(0,0,0,.4)"; if (lk0.side === "R") g.fillRect(px + 5, y0, W, fh()); else g.fillRect(-W, y0, px - 5 + W, fh()); }
+      }
+      if (lk0 && !lk0.open) { const px2 = X(lk0.x); g.fillStyle = "rgba(0,0,0,.4)"; if (lk0.side === "R") g.fillRect(px2 + 5, y0, W, fh()); else g.fillRect(-W, y0, px2 - 5 + W, fh()); }
       if (dim) { g.fillStyle = "rgba(10,8,6,.6)"; g.fillRect(0, y0, W, fh()); }
       return;
     }
@@ -100,13 +102,18 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     if (dim) { g.fillStyle = "rgba(10,8,6,.55)"; g.fillRect(0, y0, W, fh()); }
   }
   function ladders() {
+    const lim = img("harabe_merdiven");
+    if (lim) { for (let gap = 0; gap < F - 1; gap++) { const x = X(LADDER_XS[gap % 2]); const yLow = floorBottom(gap) - 6, yHigh = floorBottom(gap + 1) - 10; const h = yLow - yHigh + 6, w = h * lim.naturalWidth / lim.naturalHeight; g.drawImage(lim, x - Math.max(w, 22) / 2, yHigh - 6, Math.max(w, 22), h); } return; }
     for (let gap = 0; gap < F - 1; gap++) {
       const x = X(LADDER_XS[gap % 2]); const yLow = floorBottom(gap) - 10, yHigh = floorBottom(gap + 1) - 10;
       g.strokeStyle = "#3A2A1A"; g.lineWidth = 3; g.beginPath(); g.moveTo(x - 9, yLow); g.lineTo(x - 9, yHigh); g.moveTo(x + 9, yLow); g.lineTo(x + 9, yHigh); g.stroke();
       g.lineWidth = 2; for (let y = yLow - 8; y > yHigh + 4; y -= 11) { g.beginPath(); g.moveTo(x - 9, y); g.lineTo(x + 9, y); g.stroke(); }
     }
   }
+  const FURN_ART: Record<string, [string, number]> = { "Sandık": ["sandik", 8], "Kömürleşmiş sandık": ["sandik", 8], "Kasa": ["sandik", 8], "Dolap": ["dolap", 17], "Fıçı": ["fici", 10], "Çuval": ["cuval", 9] };
   function furniture(name: string, x: number, f: number, done: boolean) {
+    const fa = FURN_ART[name]; const fim = fa ? img("harabe_" + fa[0]) : null;
+    if (fim && fa) { const hh = fa[1] * sc(), ww = hh * fim.naturalWidth / fim.naturalHeight; g.save(); g.globalAlpha = done ? 0.55 : 1; g.drawImage(fim, X(x) - ww / 2, floorBottom(f) - 8 - hh, ww, hh); g.restore(); return; }
     const px = X(x), gy = groundY(f) + 10, w = 22 * sc() / 2.4, h = 16 * sc() / 2.4; g.save(); g.globalAlpha = done ? 0.55 : 1; g.strokeStyle = "#1E160E"; g.lineWidth = 1.6;
     g.fillStyle = /Fıçı/.test(name) ? "#7A5A34" : /Yatak/.test(name) ? "#8E8A6A" : /Dolap|Raf/.test(name) ? "#6B4E2E" : "#835F36";
     if (/Fıçı/.test(name)) { g.beginPath(); g.ellipse(px, gy - h / 2, w * 0.45, h / 2, 0, 0, 7); g.fill(); g.stroke(); g.beginPath(); g.moveTo(px - w * 0.45, gy - h * 0.7); g.lineTo(px + w * 0.45, gy - h * 0.7); g.stroke(); }
@@ -141,6 +148,9 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       for (const sp of n.spots) if (sp.floor === f) furniture(sp.name, sp.x, f, sp.done);
     }
     ladders();
+    const eim = img("harabe_cikis");
+    if (eim) { const hh = Math.min(fh() * 0.8, 120), ww = hh * eim.naturalWidth / eim.naturalHeight; g.drawImage(eim, X(EXIT_X) - ww * 0.35, floorBottom(0) - 8 - hh, ww, hh);
+      g.fillStyle = "#EFE6CC"; g.font = `700 ${Math.max(13, sc() * 1.9)}px Caveat, cursive`; g.textAlign = "left"; g.strokeStyle = "rgba(0,0,0,.7)"; g.lineWidth = 3; g.strokeText("Çıkış", X(EXIT_X) + ww * 0.7, gy(0) - 12); g.fillText("Çıkış", X(EXIT_X) + ww * 0.7, gy(0) - 12); } else
     { const ex = X(EXIT_X), gyy = gy(0); g.fillStyle = "#2E4C7A"; g.beginPath(); g.moveTo(ex + 18, gyy - 26); g.lineTo(ex - 4, gyy - 14); g.lineTo(ex + 18, gyy - 2); g.closePath(); g.fill();
       g.fillStyle = "#EFE6CC"; g.font = `700 ${Math.max(13, sc() * 1.9)}px Caveat, cursive`; g.textAlign = "left"; g.fillText("Çıkış", ex + 22, gyy - 10); }
     const ns = nearSpot(n);
