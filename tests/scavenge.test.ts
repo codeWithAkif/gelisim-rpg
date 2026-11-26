@@ -33,7 +33,7 @@ test("merdivende yavaş yavaş çıkılır, birden değil", () => {
 });
 
 test("ilk baskın en geç 15 sn sonra gelir", () => {
-  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 4, { kind: "yumruk" }); run(n, 16); expect(n.wave).toBeGreaterThanOrEqual(1);
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 4, { kind: "yumruk" }); n.hp = n.maxHp = 99999; run(n, 16); expect(n.wave).toBeGreaterThanOrEqual(1);
   const t0 = n.wave; run(n, 16); expect(n.wave).toBeGreaterThan(t0);
 });
 
