@@ -344,7 +344,9 @@ export function islerScreen(cfg: Config, s: GameState, ui: UiState = {}): string
     const giverAt = NPC_PLACE[q.def.giverNpc];
     const goBtn = (pl: string) => `<button class="btn small blue" data-act="show-place" data-id="${pl}">${esc(place(pl)?.name ?? pl)} · haritada göster</button>`;
     if (q.status === "yeni") action = s.location === giverAt ? `<button class="btn small" data-act="accept" data-id="${q.def.id}">Üstlen</button>` : `<span class="muted tiny">${esc(g.name)} ${esc(place(giverAt)?.name ?? "")} tarafında.</span>${goBtn(giverAt)}`;
-    if (q.status === "aktif") action = s.location !== q.def.at ? goBtn(q.def.at) : q.def.battle
+    if (q.status === "aktif") action = s.location !== q.def.at ? goBtn(q.def.at) : q.def.siege
+      ? `<button class="btn small red" data-act="fight" data-id="${q.def.id}" ${left < 30 ? "disabled" : ""}>Savunmaya geç</button>`
+      : q.def.battle
       ? `<button class="btn small red" data-act="fight" data-id="${q.def.id}" ${left < 30 ? "disabled" : ""}>Meraya çık</button>`
       : `<button class="btn small blue" data-act="walk" data-id="${q.def.id}" ${left < q.def.minutes ? "disabled" : ""}>${esc(q.def.doneText ?? "Yap")} (${q.def.minutes} dk)</button>`;
     const reward = q.status === "bitti"

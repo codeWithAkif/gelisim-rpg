@@ -405,3 +405,18 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .map-card.folded > :not(.fold-head) { display: none; }
 .map-card.folded { max-height: none; }
 .map-card::before { content: ""; display: block; width: 40px; height: 4px; margin: -4px auto 2px; border-radius: 2px; background: var(--paper-edge); }
+
+/* ---------- Kuşatma (gerçek zamanlı savunma) ---------- */
+.siege { position: fixed; inset: 0; z-index: 30; background: var(--paper); display: flex; flex-direction: column; max-width: 520px; margin: 0 auto; touch-action: none; }
+.siege-top { padding: calc(var(--safe-top) + 8px) 14px 6px; border-bottom: 1.5px solid var(--ink); display: flex; flex-direction: column; gap: 4px; }
+.siege-title { font-size: 22px; font-weight: 700; }
+.siege-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.siege-stage { flex: 1; min-height: 0; position: relative; }
+.siege-stage canvas { position: absolute; inset: 0; touch-action: none; }
+.siege-panel { padding: 8px 12px calc(var(--safe-bottom) + 10px); border-top: 1.5px solid var(--ink); display: flex; flex-direction: column; gap: 6px; min-height: 92px; }
+.siege-spells { display: flex; gap: 8px; overflow-x: auto; }
+.spell-btn { position: relative; flex: none; min-width: 84px; padding: 6px 8px; border: 1.5px solid var(--ink); border-radius: 10px 4px 10px 4px; background: var(--paper-2); display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; font-family: var(--f-hand); cursor: pointer; }
+.spell-btn b { font-size: 17px; position: relative; } .spell-btn small { font-size: 12px; color: var(--ink-soft); position: relative; }
+.spell-btn.on { background: rgba(158,52,35,.18); border-color: var(--red); }
+.spell-btn:disabled { opacity: .55; }
+.spell-btn .cdf { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(46,76,122,.28); transition: height .15s linear; }

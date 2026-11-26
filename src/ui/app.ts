@@ -19,6 +19,8 @@ import { esc, ICONS } from "./sketch";
 import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
+import { openSiege } from "./siege-view";
+import { SIEGES } from "../engine/siege";
 import { showIntro } from "./intro";
 import { applyDaylight } from "./daylight";
 import { notifyAt, clearNotify } from "../notify";
@@ -308,7 +310,17 @@ export function startApp(root: HTMLElement) {
         }
   function doFight(id: string) {
         const q = QUESTS.find(x => x.id === id)!;
-        if (s.energy < 15) { toast("Bu yorgunlukla kurtların karşısına çıkamazsın."); return; }
+        if (s.energy < 15) { toast("Bu yorgunlukla savaşa giremezsin; dinlen."); return; }
+        if (q.siege) {
+          openSiege(cfg, s, SIEGES[q.siege], (s.seed + s.day * 31) | 0, (won, gains) => {
+            let extra = "";
+            if (won) { const r = completeQuest(cfg, s, id); extra = `<h3>Ödül</h3>${rewardHtml(r)}`; }
+            persist(); render();
+            modal(`<h2>${won ? "Gece geçti" : "Savunma düştü"}</h2><p class="lede">${won ? "Son dalga da çekildi. Sabaha kadar nöbet tuttun." : "Geri çekilmek zorunda kaldın. Dinlen, kazıkları daha iyi yerleştir, yeniden dene."}</p>
+              <h3>Savaşta gelişen</h3>${gainList(cfg, gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
+          }, persist);
+          return;
+        }
         openPlan(cfg, s, id, q.title, q.battle!.map, q.battle!.enemies, (sc, plan) => openBattle(cfg, s, sc, plan, id, (o) => {
           let extra = "";
           if (o.result === "won") {

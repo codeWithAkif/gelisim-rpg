@@ -119,7 +119,7 @@ export const AMBUSH_MAP = "patika";
 
 export interface QuestDef {
   id: string; title: string; giverNpc: string; importance: "basit" | "onemli" | "hayati";
-  text: string; minutes: number; battle?: { enemies: string[]; map: string };
+  text: string; minutes: number; battle?: { enemies: string[]; map: string }; siege?: string;
   rewards: { items?: Record<string, number>; money?: number; note: string; gains?: Record<string, number>; relics?: string[]; pet?: string };
   requires?: string[];
   repeatable?: boolean;
@@ -151,6 +151,11 @@ export const QUESTS: QuestDef[] = [
     text: "Kurtlar tamamen gitmedi; biri ölünce yenisi geliyor. Hasan geceleri meraya bir göz atmanı istiyor.",
     battle: { enemies: ["kurt", "kurt"], map: "mera" },
     rewards: { items: { deri: 1 }, money: 2, note: "Hasan kurdun postundan bir parça tabaklayıp verdi, üstüne iki bakır." },
+  },
+  {
+    id: "agil_gecesi", title: "Ağıl gecesi", giverNpc: "hasan", importance: "onemli", minutes: 120, requires: ["kurt"], repeatable: true, at: "yayla", siege: "agil",
+    text: "\"Bu gece dolunay,\" diyor Hasan. \"Kurtlar dört yandan ağıla iner. Ortada dur, etrafa kazık çak; dalga dalga gelirler.\"",
+    rewards: { items: { deri: 1, peynir: 1 }, money: 3, note: "Sabah Hasan ağılı saydı: tek kuzu eksik değil. Bir deri, bir peynir ve üç bakır." },
   },
   {
     id: "kurt_izi", title: "Kurtlar nereden geliyor?", giverNpc: "hasan", importance: "onemli", minutes: 60, requires: ["kurt"], at: "koru", doneText: "İzleri sür",
