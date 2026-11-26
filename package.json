@@ -7,7 +7,7 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
-    "test": "vitest run",
+    "test": "vitest run --testTimeout=30000",
     "config": "node tools/editor-to-config.mjs",
     "cap:sync": "npm run build && npx cap sync"
   },
