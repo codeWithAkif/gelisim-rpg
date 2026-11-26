@@ -28,6 +28,8 @@ import { openSiege } from "./siege-view";
 import { openStealth } from "./stealth-view";
 import { diyarScreen } from "./diyar-screen";
 import { openScavHub } from "./scav-view";
+import { openOlcer } from "./olcer-view";
+import { canStartOlcer } from "../engine/olcer";
 import { rollFoes, bonusOf, modeOptions, stealthGoal, siegeFromFoes, groundOf, type Mode, type Context } from "../engine/encounter";
 import { addItem } from "../engine/inventory";
 import { isNight } from "../engine/state";
@@ -311,6 +313,15 @@ export function startApp(root: HTMLElement) {
       case "scav": doScav(id); break;
       case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;
       case "study": tab = "calis"; sfx("page"); render(false); break;
+      case "olcer": {
+        const c = canStartOlcer(s); if (!c.ok) { toast(c.reason ?? ""); break; }
+        openOlcer(cfg, s, id, persist, r => {
+          persist(); render();
+          modal(`<p class="hand muted" style="margin:0">Ölçer işi</p><h2>${esc(r.title)}</h2><p class="lede">${r.won ? (r.first ? "Köylüler pınarın başına toplandı. Kimse sormadı ama herkes gördü." : "Hesap yine tuttu.") : "Bu sefer tutmadı. Isı yine de bir yerde; nereye gittiğini bul."}</p>
+            ${r.first ? `<p class="hand green" style="margin:0">Taşpınar'da güven +1</p>` : ""}<h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
+        });
+        break;
+      }
       case "back-map": tab = "harita"; sfx("page"); render(false); break;
       case "jobtab": ui.jobTab = id as UiState["jobTab"]; sfx("page"); render(false); break;
       case "deliver": {

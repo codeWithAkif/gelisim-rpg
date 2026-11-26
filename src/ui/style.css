@@ -621,3 +621,17 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .more-attrs { margin-top: 6px; }
 .more-attrs summary { font-size: 14px; cursor: pointer; }
 .sess-pill { align-self: flex-start; border: 1.5px dashed var(--green); border-radius: 12px 8px 12px 9px; background: rgba(90,140,70,.12); padding: 2px 10px; font-family: var(--f-hand); font-size: 17px; color: var(--ink); cursor: pointer; }
+/* Ölçer işi: ısı ağı */
+.olcer { position: fixed; inset: 0; z-index: 60; background: var(--paper); display: flex; justify-content: center; overflow-y: auto; }
+.olcer-inner { width: 100%; max-width: 520px; padding: calc(var(--safe-top) + 12px) 16px 24px; display: flex; flex-direction: column; gap: 8px; }
+.h-map { width: 100%; max-height: 52vh; touch-action: manipulation; }
+.h-node { cursor: pointer; }
+.h-node .h-val { font-family: var(--f-hand); font-size: 7px; font-weight: 700; fill: var(--ink); pointer-events: none; }
+.h-node .h-name { font-family: var(--f-hand); font-size: 4.2px; fill: var(--ink); pointer-events: none; }
+.h-node .h-goal { font-size: 3.4px; fill: var(--ink-soft); pointer-events: none; }
+.h-node .h-goal.ok { fill: var(--green); font-weight: 700; }
+.h-node.sel path { stroke: var(--red); }
+.h-node.can path { stroke: var(--blue); stroke-dasharray: 2 1; }
+.h-node.flash path { animation: hFlash .6s ease-out; }
+@keyframes hFlash { from { filter: drop-shadow(0 0 3px var(--red)); } to { filter: none; } }
+.h-log { font-size: 13px; color: var(--ink-soft); font-style: italic; }

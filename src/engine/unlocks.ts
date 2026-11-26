@@ -4,6 +4,7 @@ import type { GameState } from "./state";
 import { MARKETS } from "../content/world";
 import { diyarOpen, venturesOpen } from "./estate";
 import { financeOpen } from "./finance";
+import { olcerOpen } from "./olcer";
 
 export interface Unlock { id: string; title: string; text: string; when: (s: GameState) => boolean }
 export const UNLOCKS: Unlock[] = [
@@ -11,6 +12,8 @@ export const UNLOCKS: Unlock[] = [
     text: "Burada alıp satabiliyorum. Çanta'daki Pazar sayfasında günün fiyatları yazıyor; aynı maldan çok satarsam fiyat düşüyor." },
   { id: "evcil", title: "Yol arkadaşı", when: s => !!s.pet,
     text: "Artık yalnız değilim. Karnını doyurup ilgilendikçe bağımız büyüyor; bağ büyüdükçe yeni şeyler yapıyor. Defter'deki Evcil sayfasında yazıyor." },
+  { id: "olcer", title: "Annemin işi", when: olcerOpen,
+    text: "Isı kaybolmaz, bir yere gider. Annem bunu ölçerdi. Köy meydanındaki pınar donmuş; ısıyı ölçüp yerinden taşıyabilirim. Harita'da meydanın kartında yazıyor." },
   { id: "diyar", title: "Adım duyuldu", when: diyarOpen,
     text: "Köyde artık beni tanıyorlar. Bir ev kurabilir, yanımda gezecek bir adam tutabilirim. Diyar sayfası açıldı." },
   { id: "ortaklik", title: "Ortaklık", when: financeOpen,

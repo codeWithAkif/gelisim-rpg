@@ -22,7 +22,7 @@ export function roughPath(pts: [number, number][], amp: number, seed: number, cl
   }
   return close ? d + " Z" : d;
 }
-function roughEllipse(cx: number, cy: number, rx: number, ry: number, amp: number, seed: number, n = 14): string {
+export function roughEllipse(cx: number, cy: number, rx: number, ry: number, amp: number, seed: number, n = 14): string {
   const pts: [number, number][] = [];
   for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2 + 0.3; pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); }
   return roughPath(pts, amp, seed);
@@ -251,6 +251,8 @@ export const ACT_ICONS: Record<string, string> = {
   "show-place": ai('<path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/>', "var(--blue)"),
 };
 ACT_ICONS.study = ACT_ICONS["session-pick"];
+// Ölçer: termometre ve dalga
+ACT_ICONS.olcer = ai('<path d="M9 14.5V5a2 2 0 0 1 4 0v9.5a3.5 3.5 0 1 1-4 0z"/><path d="M11 9v7" stroke="var(--red)"/><path d="M16 7c1.5 1 1.5 3 0 4M18.5 5.5c2.5 2 2.5 5 0 7"/>');
 
 
 /** Mühendislik yapılarının mürekkep simgeleri. */
