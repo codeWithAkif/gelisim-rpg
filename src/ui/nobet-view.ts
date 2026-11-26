@@ -243,7 +243,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     for (const f of [...n.foes].sort((a, b) => a.y - b.y)) {
       const d = ENEMIES[f.def]; const right = TOWER.x > f.x; const h = (f.human ? 11 : 7) * (f.boss ? 1.45 : 1);
       const atk = Math.hypot(TOWER.x - f.x, TOWER.y - f.y) < TOWER.r + f.r + 0.5 && f.cd < 0.35;
-      const key = f.human ? (artUrl("dusman_" + f.def) ? "dusman_" + f.def : atk ? "poz_kahraman_vurus" : "poz_kahraman_durus") : atk ? "poz_kurt_atilma" : "dusman_kurt";
+      const key = f.human ? (artUrl("dusman_" + f.def) ? "dusman_" + f.def : atk ? "poz_kahraman_vurus" : "poz_kahraman_durus") : (f.def !== "kurt" && artUrl("dusman_" + f.def)) ? "dusman_" + f.def : atk ? "poz_kurt_atilma" : "dusman_kurt";
       const filt = artUrl("dusman_" + f.def) && f.human ? "none" : d.tint ?? "none";
       const moving = Math.hypot(TOWER.x - f.x, TOWER.y - f.y) > TOWER.r + f.r + 0.5 && f.root <= 0 && f.stun <= 0;
       const sheetKey = f.human ? "anim_kahraman_yuru" : "anim_kurt_yuru"; const wq = moving && !(f.human && artUrl("dusman_" + f.def)) ? quad(sheetKey, walkFrame(now, f.id)) : null; const gt = gait(now, f.id, moving && !wq);
@@ -264,7 +264,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       g.setLineDash([]);
     }
     // adamlar kulenin çevresinde
-    for (const h of n.helpers) { const hx = TOWER.x + Math.cos(h.a) * 11, hy = TOWER.y + Math.sin(h.a) * 8 + 4; figure("poz_kahraman_durus", hx, hy, 9, Math.cos(h.a) < 0, ENEMIES["h_" + h.role]?.tint ?? "none"); }
+    for (const h of n.helpers) { const hx = TOWER.x + Math.cos(h.a) * 11, hy = TOWER.y + Math.sin(h.a) * 8 + 4; artUrl("dusman_h_" + h.role) ? figure("dusman_h_" + h.role, hx, hy, 9, Math.cos(h.a) < 0) : figure("poz_kahraman_durus", hx, hy, 9, Math.cos(h.a) < 0, ENEMIES["h_" + h.role]?.tint ?? "none"); }
     // kule ve sen
     tower();
     const tgt = n.foes.filter(f => Math.hypot(f.x - TOWER.x, f.y - TOWER.y) <= n.range).sort((a, b) => Math.hypot(a.x - TOWER.x, a.y - TOWER.y) - Math.hypot(b.x - TOWER.x, b.y - TOWER.y))[0]; const target = !!tgt; const faceR = tgt ? tgt.x > TOWER.x : false; const bq = quad("anim_kahraman_yay", bowFrame(Math.max(0, Math.min(1, 1 - n.fireCd * n.rate)), target));
