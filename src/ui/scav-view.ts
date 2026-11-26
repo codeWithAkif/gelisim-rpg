@@ -202,6 +202,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       if (f.k === "spell") { rings.push({ x: f.x, floor: f.floor, t: now, r: f.r, color: f.kind === "buz" ? "rgba(159,211,232," : f.kind === "ates" ? "rgba(230,110,50," : "rgba(160,140,255," }); sfx("crit"); buzz("heavy"); shake = 8; }
       if (f.k === "bite") sfx("hit");
       if (f.k === "cast") buzz("light");
+      if (f.k === "dodge") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Sıyrıldın", color: "#9BD36B" }); sfx("whoosh"); }
       if (f.k === "key") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Anahtar buldun!", color: "#F4D35E" }); sfx("perfect"); buzz("medium"); }
       if (f.k === "unlock") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı açıldı", color: "#9BD36B" }); sfx("win"); buzz("medium"); }
       if (f.k === "locked") { if (now - lastLockedMsg > 1500) { lastLockedMsg = now; tip.hidden = false; tip.textContent = "Kilitli: başka bir odada anahtar var"; setTimeout(() => { tip.hidden = true; }, 1400); sfx("bad"); } }

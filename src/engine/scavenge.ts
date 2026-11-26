@@ -106,7 +106,7 @@ export interface SFoe { id: number; def: string; x: number; floor: number; hp: n
 export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
   | { k: "hurt"; dmg: number } | { k: "raid"; n: number } | { k: "card" } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
-  | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "key"; x: number; floor: number } | { k: "unlock"; x: number; floor: number } | { k: "locked"; x: number; floor: number } | { k: "cast"; kind: SpellKind; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
+  | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "dodge"; x: number; floor: number } | { k: "key"; x: number; floor: number } | { k: "unlock"; x: number; floor: number } | { k: "locked"; x: number; floor: number } | { k: "cast"; kind: SpellKind; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
 export interface Lock { floor: number; x: number; side: "R" | "L"; key: number; open: boolean }
 export interface GItem { id: number; item: string; x: number; floor: number }
 export interface Proj { id: number; kind: SpellKind; x: number; floor: number; dir: 1 | -1; left: number; base: number; r: number }
@@ -184,7 +184,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   if (load.kind === "spell" && load.id) { const o = spellOptions(cfg, { ...s, mana: 999 } as GameState).find(x => x.spell.id === load.id && x.ok); const info = SPELL_KIND[load.id];
     if (o && info) { const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0; spell = { id: load.id, kind: info.kind, name: o.spell.name, cd: 4, max: info.cd * 1.7 * Math.max(0.6, 1 - m / 120), mul: info.mul * (1 + m / 100), r: info.r }; } }
   return {
-    site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, s.hp || mh), maxHp: mh,
+    site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4)), maxHp: Math.round(mh * 1.4),
     spots, searchId: 0, foes: [], nextId: 1, wave: 0, raidT: 15, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
     atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
     ground: [], gid: 1, proj: [], locks, keys: [], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
@@ -289,11 +289,11 @@ function applyStage(n: Scav, sp: Spot, st: Stage) {
 }
 export const danger = (n: Scav) => 5 + n.wave * 2;
 function spawnRaid(n: Scav) {
-  n.wave++; const count = Math.min(11, 3 + Math.floor(n.wave * 1.1)); const scale = 1 + n.wave * 0.14;
+  n.wave++; const count = Math.min(9, 2 + Math.floor(n.wave * 0.9)); const scale = 1 + n.wave * 0.14;
   for (let i = 0; i < count; i++) {
     const def = n.site.foes[n.rng.int(0, n.site.foes.length - 1)]; const d = ENEMIES[def];
     const floor = n.rng.chance(60) ? n.floor : n.rng.int(0, n.site.floors - 1); const [lo, hi] = freeRange(n, floor); const x = n.rng.chance(50) ? hi - 6 - n.rng.next() * 30 : lo + 10 + n.rng.next() * 30;
-    n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale * 1.35, max: d.hp * scale * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + n.rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 1.05, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0, root: 0, slow: 0, burn: 0 });
+    n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale * 1.35, max: d.hp * scale * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + n.rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 0.7, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
   n.raidT = Math.max(10, 15 - n.wave); n.fx.push({ k: "raid", n: count });
 }
@@ -376,7 +376,9 @@ export function stepScav(n: Scav, dt: number) {
     }
     const d = n.px - f.x;
     if (Math.abs(d) > 5.5) { const [lo, hi] = freeRange(n, f.floor); f.x = Math.max(lo, Math.min(hi, f.x + Math.sign(d) * Math.min(Math.abs(d) - 5, sp * dt))); }
-    else if (f.cd <= 0 && exposed) { f.cd = 1.1; const dm = f.dmg * Math.max(0.35, 1 - n.armor / 40); n.hp -= dm; n.fx.push({ k: "hurt", dmg: Math.round(dm) }); }
+    else if (f.cd <= 0 && exposed) { f.cd = 1.5;
+      if (n.moving && n.rng.chance(60)) { n.fx.push({ k: "dodge", x: n.px, floor: n.floor }); continue; }   // koşarken yanından sıyrılırsın
+      const dm = f.dmg * Math.max(0.35, 1 - n.armor / 40); n.hp -= dm; n.fx.push({ k: "hurt", dmg: Math.round(dm) }); }
   }
   if (n.hp <= 0) { n.hp = 0; n.phase = "over"; n.result = "dead"; return; }
   // köpek: yanında durur, arada çıkıp düşmanla dövüşür
@@ -425,7 +427,7 @@ export function finishScav(cfg: Config, s: GameState, n: Scav): ScavResult {
   const weaponParts: string[] = [];
   if (!dead) for (const id of n.foundWeapons) { const w = FOUND_WEAPONS.find(x => x.id === id)!; const part = w.parts[Math.floor(Math.abs(Math.sin(n.seed + id.length)) * w.parts.length) % w.parts.length]; if (!addItem(cfg, s, part, 1)) weaponParts.push(part); }
   applyGain(cfg, s, "analiz", 0.05 + n.searched * 0.03, gains); applyGain(cfg, s, "gorus", 0.03 + n.searched * 0.02, gains); applyGain(cfg, s, "stres", 0.1 + n.wave * 0.04, gains);
-  s.hp = dead ? Math.max(1, Math.round(n.maxHp * 0.2)) : Math.max(1, Math.round(n.hp));
+  s.hp = dead ? Math.max(1, Math.round(n.maxHp / 1.4 * 0.2)) : Math.max(1, Math.round(n.hp / 1.4));   // harabede can 1,4 kat ölçeklidir
   const minutes = Math.min(120, 20 + Math.round(n.time / 3)); s.minute = Math.min(DAY_MINUTES, s.minute + minutes);
   s.energy = Math.max(0, s.energy - SCAV_ENERGY - Math.min(12, n.wave * 2)); s.satiety = Math.max(0, s.satiety - 5);
   return { result: n.result ?? "exit", items, lostItems, money, dropped, minutes, gains, kills: n.kills, waves: n.wave, searched: n.searched, weaponParts };
