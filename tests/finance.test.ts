@@ -39,3 +39,11 @@ test("ortaklık: kilitli başlar, ortağın yanında yatırılır, geceleri orta
   if (st) { const r = withdraw(s, "suru"); expect(r.amount).toBe(st); expect(stake(s, "suru")).toBe(0); }
   for (const p of PARTNERS) { expect(p.rate).toBeGreaterThan(p.risk * p.loss * 0.5); expect(p.min).toBeLessThan(p.max); }
 });
+
+test("en küçük payla da sürü zamanla para getirir (kesirler birikir)", () => {
+  const s = newGame(cfg, 9); s.quests.kurt = { status: "bitti", count: 1 }; s.location = "yayla"; s.money = 10;
+  expect(invest(s, "suru", 10).ok).toBe(true);
+  let gained = 0;
+  for (let d = 0; d < 15; d++) { s.day++; for (const l of nightlyFinance(s)) if (l.amount > 0) gained += l.amount; if (!stake(s, "suru")) break; }
+  expect(gained).toBeGreaterThanOrEqual(3);
+});

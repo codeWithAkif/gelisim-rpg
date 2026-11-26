@@ -72,19 +72,19 @@ export interface Partner {
 }
 const done = (s: GameState, q: string) => (s.quests[q]?.count ?? 0) > 0 || s.quests[q]?.status === "bitti";
 export const PARTNERS: Partner[] = [
-  { id: "suru", npc: "hasan", name: "Hasan'ın sürüsü", min: 10, max: 60, rate: 0.03, risk: 0.08, loss: 0.25,
+  { id: "suru", npc: "hasan", name: "Hasan'ın sürüsü", min: 10, max: 60, rate: 0.06, risk: 0.08, loss: 0.25,
     desc: "Sürüye ortak olursun: kuzu ve yün satışından pay. Az ama düzenli getirir; kurtlar dadanırsa kuzu gider.",
     goodNews: ["İki kuzu doğdu.", "Yün iyi fiyata gitti.", "Hasan peynir sattı."], badNews: ["Kurtlar bir kuzuyu kaptı.", "Bir koyun uçurumdan düştü."],
     unlock: s => done(s, "kurt") ? null : "Önce Hasan'ın kurt derdine yardım et", safer: s => done(s, "akyele") },
-  { id: "demirhane", npc: "kemal", name: "Kemal'in demirhanesi", min: 20, max: 100, rate: 0.045, risk: 0.05, loss: 0.2,
+  { id: "demirhane", npc: "kemal", name: "Kemal'in demirhanesi", min: 20, max: 100, rate: 0.065, risk: 0.05, loss: 0.2,
     desc: "Ocağa kömür ve demir alırsın; Kemal'in sattığı her nal ve bıçaktan payın olur.",
     goodNews: ["Kemal köyün bütün atlarını nalladı.", "Bir kervan bıçak sipariş etti."], badNews: ["Körük yırtıldı, iş durdu.", "Bir parti demir çatladı."],
     unlock: s => repOf(s, "taspinar", "guven") >= 4 ? null : "Taşpınar'da güven 4 gerekir" },
-  { id: "han", npc: "yaren", name: "Yaren'in hanı", min: 20, max: 120, rate: 0.05, risk: 0.04, loss: 0.15,
+  { id: "han", npc: "yaren", name: "Yaren'in hanı", min: 20, max: 120, rate: 0.07, risk: 0.04, loss: 0.15,
     desc: "Hanın yeni odalarına ortak olursun. Kervan geldikçe kazanır; kış uzarsa yolcu azalır.",
     goodNews: ["Han tıklım tıklım doldu.", "Bir tüccar haftalığını peşin ödedi."], badNews: ["Kar yolları kapattı, oda boş kaldı.", "Bir yolcu parasını ödemeden kaçtı."],
     unlock: s => s.story.reached.includes("k_varis") ? null : "Karaçam'a git" },
-  { id: "kervan", npc: "selim", name: "Selim'in kervanı", min: 30, max: 250, rate: 0.1, risk: 0.14, loss: 0.4,
+  { id: "kervan", npc: "selim", name: "Selim'in kervanı", min: 30, max: 250, rate: 0.12, risk: 0.14, loss: 0.4,
     desc: "Kervana mal koyarsın; kârı büyük, ama yolda haydut var. Kervanı bir kez korumuş olman güven verir.",
     goodNews: ["Kervan baharatla döndü.", "Kumaş iki katına satıldı.", "Selim yeni bir müşteri buldu."], badNews: ["Haydutlar bir arabayı soydu.", "Yükün yarısı yolda ıslandı."],
     unlock: s => done(s, "kervan") ? null : "Önce Selim'in kervanını koru", safer: s => done(s, "lonca_defteri") },
@@ -129,8 +129,10 @@ export function nightlyFinance(s: GameState): NightLine[] {
       ledger(s, `${p.name}: ${text}`, -lost);
       if (st.amount <= 0) delete s.partners![id];
     } else {
-      const gain = Math.round(st.amount * p.rate * (0.5 + rng.next()));
-      if (gain <= 0) continue;
+      // küçük paylar kaybolmasın: bakırın kesirleri birikir, bütün bakır olunca eline geçer
+      st.acc = (st.acc ?? 0) + st.amount * p.rate * (0.5 + rng.next());
+      const gain = Math.floor(st.acc); st.acc -= gain;
+      if (gain <= 0) { out.push({ partner: p.name, text: `İyi geçti; payın birikiyor (bir bakırın %${Math.round(st.acc * 100)}'i).`, amount: 0 }); continue; }
       s.money += gain; st.earned += gain;
       const text = rng.next() < 0.5 ? rng.pick(p.goodNews) : "Payın geldi.";
       out.push({ partner: p.name, text, amount: gain }); ledger(s, `${p.name}: ${text}`, gain);

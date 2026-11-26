@@ -261,7 +261,7 @@ export function startApp(root: HTMLElement) {
     modal(`<h2>Gün ${s.day - 1} bitti</h2><p class="lede">${esc(r.option.kind === "lodging" ? `Geceyi geçirdin: ${r.option.name}.` : r.option.kind === "tent" ? "Çadırda uyudun." : "Açıkta uyudun.")} ${rep.recovery < 0.75 ? "Tam dinlenemedin." : "Vücut gece çalıştı."}</p>
       ${r.event ? `<p class="story-after" style="border-color:var(--red)">${esc(r.event.text)}</p>` : ""}
       <h3>Gece işlenen</h3>${gainList(cfg, rep.applied, 8)}
-      ${fin.length ? `<h3>Ortaklıklar</h3>${fin.map(l => `<div class="ledger-row"><small>${esc(l.partner)}</small><span>${esc(l.text)}</span><b class="${l.amount >= 0 ? "green" : "red"}">${l.amount >= 0 ? "+" : ""}${l.amount}</b></div>`).join("")}` : ""}`,
+      ${fin.length ? `<h3>Ortaklıklar</h3>${fin.map(l => `<div class="ledger-row"><small>${esc(l.partner)}</small><span>${esc(l.text)}</span><b class="${l.amount >= 0 ? "green" : "red"}">${l.amount ? `${l.amount > 0 ? "+" : ""}${l.amount}` : ""}</b></div>`).join("")}` : ""}`,
       [{ label: "Güne başla", cls: "primary", fn: () => storyTick() }]);
   }
   /** Ortaklık: şartlar, payın, yatır ya da çek. */
