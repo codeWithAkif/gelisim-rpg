@@ -210,8 +210,8 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     for (const h of n.helpers) { const hx = TOWER.x + Math.cos(h.a) * 11, hy = TOWER.y + Math.sin(h.a) * 8 + 4; figure("poz_kahraman_durus", hx, hy, 9, Math.cos(h.a) < 0, ENEMIES["h_" + h.role]?.tint ?? "none"); }
     // kule ve sen
     tower();
-    const target = n.foes.some(f => Math.hypot(f.x - TOWER.x, f.y - TOWER.y) <= n.range); const bq = quad("anim_kahraman_yay", bowFrame(Math.max(0, Math.min(1, 1 - n.fireCd * n.rate)), target));
-    if (bq) drawQuad(g, bq, X(TOWER.x), Y(TOWER.y - 1.5), 13 * scale, false);
+    const tgt = n.foes.filter(f => Math.hypot(f.x - TOWER.x, f.y - TOWER.y) <= n.range).sort((a, b) => Math.hypot(a.x - TOWER.x, a.y - TOWER.y) - Math.hypot(b.x - TOWER.x, b.y - TOWER.y))[0]; const target = !!tgt; const faceR = tgt ? tgt.x > TOWER.x : false; const bq = quad("anim_kahraman_yay", bowFrame(Math.max(0, Math.min(1, 1 - n.fireCd * n.rate)), target));
+    if (bq) drawQuad(g, bq, X(TOWER.x), Y(TOWER.y - 1.5), 13 * scale, faceR);
     else if (!figure(n.fireCd > 1 / n.rate - 0.12 ? "poz_kahraman_vurus" : "poz_kahraman_durus", TOWER.x, TOWER.y - 1.5, 13, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y - 4), 2.5 * scale, 0, 7); g.fill(); }
     if (n.pet) {
       const pt = n.pet; const G = petGuard(n);

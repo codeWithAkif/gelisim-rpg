@@ -38,7 +38,7 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
   const X = (x: number) => ox + x * scale, Y = (y: number) => oy + y * scale;
 
   const lbolts: BoltFx[] = []; const limpacts: Impact[] = []; let wflash = 0;
-  let bowSwing = 0;
+  let bowSwing = 0; let lastShotRight = false;
   let armed: string | null = null; let petMode = false; let drag: { x: number; y: number; cx: number; cy: number; bow: boolean } | null = null;
   const pops: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = []; let shake = 0, flash = 0, swing = 0;
   const cs = getComputedStyle(document.documentElement); const C = (n: string) => cs.getPropertyValue(n).trim();
@@ -96,7 +96,7 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
     if (d.bow) {
       const dx = d.cx - CX, dy = d.cy - CY, L = Math.hypot(dx, dy);
       if (L > 4) { const r = canShoot(s, sg); if (r) { pops.push({ x: CX, y: CY - 8, t: performance.now(), text: r, color: C("--ink-soft") }); return; }
-        if (shoot(s, sg, Math.atan2(-dy, -dx), Math.min(1, L / 20))) { sfx("whoosh"); buzz("light"); bowSwing = performance.now() + 180; renderPanel(); } }
+        if (shoot(s, sg, Math.atan2(-dy, -dx), Math.min(1, L / 20))) { sfx("whoosh"); buzz("light"); bowSwing = performance.now() + 180; lastShotRight = Math.cos(Math.atan2(-dy, -dx)) > 0; renderPanel(); } }
       return;
     }
     const r = placeBarricade(s, sg, d.x, d.y, d.cx, d.cy);
@@ -161,7 +161,7 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
     }
     // oyuncu
     const pw = drag?.bow ? Math.min(1, Math.hypot(drag.cx - CX, drag.cy - CY) / 20) : 0; const bq = bowSwing > now ? quad("anim_kahraman_yay", 3) : drag?.bow ? quad("anim_kahraman_yay", pw < 0.3 ? 0 : pw < 0.75 ? 1 : 2) : null;
-    if (bq) drawQuad(g, bq, X(CX), Y(CY), 17 * scale, false);
+    if (bq) drawQuad(g, bq, X(CX), Y(CY), 17 * scale, drag?.bow ? drag.cx < CX : lastShotRight);
     else if (!figure(swing > now ? "poz_kahraman_vurus" : "poz_kahraman_durus", CX, CY, 17, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(CX), Y(CY), PLAYER_R * scale, 0, 7); g.fill(); }
     // ok
     g.strokeStyle = "#5B4630"; g.lineWidth = 2; for (const a of sg.arrows) { const L = Math.hypot(a.vx, a.vy) || 1; g.beginPath(); g.moveTo(X(a.x), Y(a.y)); g.lineTo(X(a.x - a.vx / L * 4), Y(a.y - a.vy / L * 4)); g.stroke(); }

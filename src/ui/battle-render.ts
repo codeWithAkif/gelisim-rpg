@@ -479,11 +479,12 @@ export class MapRenderer {
   }
   private wolf(k: number, d: DS, u: Unit) {
     const c = this.ctx;
-    const im = (d.pose === "leap" && this.img("poz_kurt_atilma")) || this.img("dusman_kurt");
+    const own = u.def && u.def !== "kurt" ? this.img("dusman_" + u.def) : null; // evcil hayvanların kendi resmi
+    const im = own ?? ((d.pose === "leap" && this.img("poz_kurt_atilma")) || this.img("dusman_kurt"));
     if (im) {
       // görseller sola bakar; kurt yönüne göre çevrilir
       const def = ENEMIES[u.def ?? "kurt"]; const w = 58 * k * (def?.scale ?? 1), h = w * im.naturalHeight / im.naturalWidth;
-      c.scale(-d.face, 1); c.filter = d.flash > 0 ? `sepia(1) saturate(4) hue-rotate(-30deg) brightness(${1 - d.flash * 0.2})` : def?.tint ?? "none";
+      c.scale(-d.face, 1); c.filter = d.flash > 0 ? `sepia(1) saturate(4) hue-rotate(-30deg) brightness(${1 - d.flash * 0.2})` : own ? "none" : def?.tint ?? "none";
       c.drawImage(im, -w / 2, -h * 0.95, w, h); c.filter = "none"; d.flash = Math.max(0, d.flash - 0.05); return;
     }
     c.scale(d.face, 1);

@@ -45,7 +45,7 @@ export function openStealth(cfg: Config, s: GameState, title: string, foes: stri
   const toField = (e: PointerEvent) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left - ox) / scale, y: (e.clientY - r.top - oy) / scale }; };
   const X = (x: number) => ox + x * scale, Y = (y: number) => oy + y * scale;
   const cs = getComputedStyle(document.documentElement); const C = (n: string) => cs.getPropertyValue(n).trim();
-  let stoneMode = false; let holding = false;
+  let stoneMode = false; let holding = false; let faceRight = false;
   const pops: { x: number; y: number; t: number; text: string; color: string }[] = [];
   const stones: { x: number; y: number; t: number }[] = [];
 
@@ -145,7 +145,8 @@ export function openStealth(cfg: Config, s: GameState, title: string, foes: stri
     // oyuncu
     const hid = inBush(st);
     const pm = !!st.target && holding; const pq = pm ? quad("anim_kahraman_yuru", walkFrame(now, 0, st.run ? 13 : 8)) : null;
-    if (pq) drawQuad(g, pq, X(st.px), Y(st.py), 12 * scale, false, "none", hid ? 0.55 : 1);
+    if (st.target && st.target.x !== st.px) faceRight = st.target.x > st.px;
+    if (pq) drawQuad(g, pq, X(st.px), Y(st.py), 12 * scale, faceRight, "none", hid ? 0.55 : 1);
     else if (!figure("poz_kahraman_durus", st.px, st.py + gait(now, 0, pm).dy * 2.5, 12, false, "none", hid ? 0.55 : 1)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(st.px), Y(st.py), 2.6 * scale, 0, 7); g.fill(); }
     if (st.target && holding) { g.setLineDash([3, 5]); g.strokeStyle = C("--ink-soft"); g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(st.px), Y(st.py)); g.lineTo(X(st.target.x), Y(st.target.y)); g.stroke(); g.setLineDash([]); }
     if (stoneMode) { g.strokeStyle = C("--blue"); g.setLineDash([4, 4]); g.beginPath(); g.arc(X(st.px), Y(st.py), 45 * scale, 0, 7); g.stroke(); g.setLineDash([]); }

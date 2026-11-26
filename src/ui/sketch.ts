@@ -147,7 +147,7 @@ export function bodySketch(lv: (id: string) => number, pend: (id: string) => num
     <path d="M214,94 L106,120" stroke="var(--pencil)" stroke-width=".7" fill="none"/><path d="M214,134 L117,118" stroke="var(--pencil)" stroke-width=".7" fill="none"/>`;
   parts += labelAt(266, 92, "r", names("kardiyo"), `${kv.toFixed(1)}${kp > 0.01 ? ` <tspan fill="var(--green)">+${kp.toFixed(1)}</tspan>` : ""}`);
   parts += labelAt(266, 132, "r", names("nefes"), `${nv.toFixed(1)}${np > 0.01 ? ` <tspan fill="var(--green)">+${np.toFixed(1)}</tspan>` : ""}`, "var(--blue)");
-  return `<svg viewBox="-70 0 340 360" role="img" aria-label="Vücut çizimi">${imageUrl ? `<image href="${imageUrl}" x="-80" y="0" width="360" height="360" preserveAspectRatio="xMidYMid meet"/>` : ""}<g fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-linecap="round">${imageUrl ? "" : fig.map(d => `<path d="${d}"/>`).join("")}</g>${parts}</svg>`;
+  return `<svg viewBox="-70 0 340 360" role="img" aria-label="Vücut çizimi">${imageUrl ? `<image href="${imageUrl}" x="10" y="0" width="180" height="360" preserveAspectRatio="xMidYMid meet"/>` : ""}<g fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-linecap="round">${imageUrl ? "" : fig.map(d => `<path d="${d}"/>`).join("")}</g>${parts}</svg>`;
 }
 
 export const ICONS = {
