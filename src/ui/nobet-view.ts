@@ -193,7 +193,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   function tower() {
     const x = X(TOWER.x), y = Y(TOWER.y), r = TOWER.r * scale;
     const ta = artUrl("kule_" + site.place) ? img("kule_" + site.place) : null;   // çizilmiş kule varsa o, yoksa eskiz
-    if (ta) { const w = r * 3.2, h = w * ta.naturalHeight / ta.naturalWidth; g.drawImage(ta, x - w / 2, y - h * 0.78, w, h); return; }
+    if (ta) { const w = r * 3.2, h = w * ta.naturalHeight / ta.naturalWidth; g.drawImage(ta, x - w / 2, y - h * 0.17, w, h); return; }
     g.fillStyle = "rgba(42,39,34,.18)"; g.beginPath(); g.ellipse(x, y + r * 0.55, r * 1.25, r * 0.55, 0, 0, 7); g.fill();
     g.fillStyle = "#8A6A45"; g.strokeStyle = C("--ink"); g.lineWidth = 1.6;
     g.beginPath(); g.moveTo(x - r, y - r * 0.2); g.lineTo(x - r * 0.85, y + r * 0.55); g.lineTo(x + r * 0.85, y + r * 0.55); g.lineTo(x + r, y - r * 0.2); g.closePath(); g.fill(); g.stroke();
@@ -222,9 +222,11 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       if (tr.type === "ates_tuzagi") { g.fillStyle = "#C4552B"; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke(); g.beginPath(); g.moveTo(x - r * .5, y + r * .4); g.lineTo(x, y - r * .8); g.lineTo(x + r * .5, y + r * .4); g.stroke(); }
       else if (tr.type === "kazik_cukuru") { g.fillStyle = "#3A2E22"; g.beginPath(); g.ellipse(x, y, r * 1.2, r * .7, 0, 0, 7); g.fill(); g.stroke(); for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + k * r * .6, y + r * .3); g.lineTo(x + k * r * .6, y - r * .6); g.stroke(); } }
       else { g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke(); g.beginPath(); g.arc(x, y, r * .55, 0, 7); g.stroke(); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; g.beginPath(); g.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r); g.lineTo(x + Math.cos(a) * r * 1.5, y + Math.sin(a) * r * 1.5); g.stroke(); } }
-      if (art) { /* çizim varsa üstüne basılır */ const im = img(art); if (im) { g.drawImage(im, x - r * 1.6, y - r * 1.6, r * 3.2, r * 3.2); } }
+      if (art) { /* çizim varsa üstüne basılır */ const im = img(art); if (im) { const w = r * 4, h = w * im.naturalHeight / im.naturalWidth; g.drawImage(im, x - w / 2, y - h / 2, w, h); } }
       g.globalAlpha = 1; }
     for (const b of n.bars) { const dx = Math.cos(b.a) * b.len / 2, dy = Math.sin(b.a) * b.len / 2; const k = Math.max(0.25, b.hp / b.max);
+      const bim = artUrl("yapi_kazik_barikat") ? img("yapi_kazik_barikat") : null;
+      if (bim) { const w = b.len * scale * 1.35, h = w * bim.naturalHeight / bim.naturalWidth; g.save(); g.globalAlpha = 0.45 + 0.55 * k; g.translate(X(b.x), Y(b.y)); g.rotate(Math.cos(b.a) < 0 ? b.a + Math.PI : b.a); g.rotate(-0.3); g.drawImage(bim, -w / 2, -h / 2, w, h); g.restore(); continue; }
       g.strokeStyle = "#6B4A2E"; g.lineWidth = 2.2; g.globalAlpha = 0.4 + 0.6 * k;
       const m = Math.max(4, Math.round(b.len / 2.2)); for (let i = 0; i <= m; i++) { const u = i / m - 0.5; const x = b.x + u * b.len * Math.cos(b.a), y = b.y + u * b.len * Math.sin(b.a); g.beginPath(); g.moveTo(X(x), Y(y) + 1.5 * scale); g.lineTo(X(x) , Y(y) - 2.6 * scale); g.stroke(); }
       g.beginPath(); g.moveTo(X(b.x - dx), Y(b.y - dy)); g.lineTo(X(b.x + dx), Y(b.y + dy)); g.stroke(); g.globalAlpha = 1; }
