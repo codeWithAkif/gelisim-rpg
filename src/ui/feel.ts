@@ -36,7 +36,7 @@ function hiss(dur: number, vol: number, freq: number, q = 1, delay = 0, type: Bi
   src.connect(f).connect(g).connect(dest ?? master); src.start(t, Math.random()); src.stop(t + dur + 0.02);
 }
 
-export type Sfx = "thunk" | "clang" | "splash" | "tap" | "page" | "step" | "hit" | "crit" | "miss" | "hurt" | "whoosh" | "fire" | "good" | "perfect" | "bad" | "beat" | "win" | "lose" | "coin" | "spark" | "draw";
+export type Sfx = "thunk" | "clang" | "splash" | "tap" | "page" | "step" | "hit" | "crit" | "miss" | "hurt" | "whoosh" | "fire" | "good" | "perfect" | "bad" | "beat" | "win" | "lose" | "coin" | "thunder" | "spark" | "draw";
 export function sfx(k: Sfx) {
   if (!settings().sound) return;
   switch (k) {
@@ -53,6 +53,7 @@ export function sfx(k: Sfx) {
     case "whoosh": hiss(0.3, 0.2, 900, 1.5); break;
     case "hurt": tone(140, 70, 0.25, 0.4, "sawtooth"); hiss(0.12, 0.2, 700, 1); break;
     case "fire": hiss(0.6, 0.3, 500, 0.5, 0, "lowpass"); hiss(0.4, 0.12, 2500, 1, 0.1); break;
+    case "thunder": hiss(0.09, 0.5, 5200, 0.6); tone(2600, 300, 0.12, 0.22, "sawtooth"); hiss(0.7, 0.45, 160, 0.5, 0.06, "lowpass"); tone(70, 38, 0.8, 0.4, "sine", 0.08); break;
     case "spark": tone(2200, 3200, 0.06, 0.08, "triangle"); break;
     case "draw": hiss(0.06, 0.05, 3500, 2); break;
     case "good": tone(660, 660, 0.12, 0.18, "triangle"); break;

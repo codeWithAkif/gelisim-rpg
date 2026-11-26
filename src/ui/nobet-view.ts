@@ -13,6 +13,7 @@ import { esc } from "./sketch";
 import { GAME_ITEMS } from "../content/world";
 export const lootText = (l: Loot) => [l.money ? `${l.money} bakır` : "", ...Object.entries(l.items).map(([k, v]) => `${GAME_ITEMS[k]?.name ?? k}${v > 1 ? " ×" + v : ""}`)].filter(Boolean).join(", ");
 import { sfx, buzz } from "./feel";
+import { chain, skyBolt, drawBolt, drawImpact, impact, type BoltFx, type Impact } from "./lightning";
 
 const imgCache = new Map<string, HTMLImageElement | null>();
 const img = (key: string) => { if (!imgCache.has(key)) { const u = artUrl(key); imgCache.set(key, u ? Object.assign(new Image(), { src: u }) : null); } const i = imgCache.get(key)!; return i && i.complete && i.naturalWidth ? i : null; };
@@ -66,7 +67,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   const X = (x: number) => ox + x * scale, Y = (y: number) => oy + y * scale;
   const cs = getComputedStyle(document.documentElement); const C = (v: string) => cs.getPropertyValue(v).trim();
   const pops: { x: number; y: number; t: number; text: string; color: string; big?: boolean; dur?: number }[] = [];
-  const zaps: { pts: [number, number][]; t: number }[] = []; const blades: { x: number; y: number; x2: number; y2: number; t: number }[] = [];
+  const bolts: BoltFx[] = []; const impacts: Impact[] = []; let whiteFlash = 0; const blades: { x: number; y: number; x2: number; y2: number; t: number }[] = [];
   const vines: { x: number; y: number; r: number; t: number }[] = []; const flocks: { x: number; y: number; r: number; t: number }[] = []; const blasts: { x: number; y: number; r: number; t: number }[] = [];
   let shake = 0, flash = 0;
 
@@ -214,8 +215,8 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     g.strokeStyle = "#4A3826"; g.lineWidth = 2;
     for (const sh of n.shots) { const dx = sh.tx - sh.x, dy = sh.ty - sh.y, L = Math.hypot(dx, dy) || 1; g.strokeStyle = sh.burn ? "#D9682A" : "#4A3826"; g.beginPath(); g.moveTo(X(sh.x), Y(sh.y)); g.lineTo(X(sh.x - dx / L * 3.5), Y(sh.y - dy / L * 3.5)); g.stroke(); }
     // şimşek ve patlamalar
-    for (let i = zaps.length - 1; i >= 0; i--) { const z = zaps[i]; const k = (now - z.t) / 260; if (k > 1) { zaps.splice(i, 1); continue; }
-      g.strokeStyle = `rgba(120,170,255,${1 - k})`; g.lineWidth = 3; g.beginPath(); z.pts.forEach(([x, y], j) => { const jx = j ? (Math.random() - 0.5) * 3 : 0; j ? g.lineTo(X(x + jx), Y(y + jx)) : g.moveTo(X(x), Y(y)); }); g.stroke(); }
+    for (let i = bolts.length - 1; i >= 0; i--) if (!drawBolt(g, bolts[i], now, Math.max(0.8, scale / 4.5))) bolts.splice(i, 1);
+    for (let i = impacts.length - 1; i >= 0; i--) if (!drawImpact(g, impacts[i], now)) impacts.splice(i, 1);
     for (let i = blades.length - 1; i >= 0; i--) { const bl = blades[i]; const k = (now - bl.t) / 700; if (k > 1) { blades.splice(i, 1); continue; }
       const up = k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75; const n2 = 9;
       for (let j = 0; j < n2; j++) { const u = (j + 0.5) / n2; const x = bl.x + (bl.x2 - bl.x) * u, y = bl.y + (bl.y2 - bl.y) * u; const hgt = (4 + (j % 3)) * scale * up;
@@ -230,6 +231,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     for (let i = pops.length - 1; i >= 0; i--) { const p = pops[i]; const k = Math.max(0, (now - p.t) / (p.dur ?? 800)); if (k > 1) { pops.splice(i, 1); continue; } g.globalAlpha = 1 - k; g.fillStyle = p.color; g.font = `700 ${p.big ? 26 : 16}px Caveat, cursive`; g.textAlign = "center"; g.fillText(p.text, X(p.x), Y(p.y) - k * 22); g.globalAlpha = 1; }
     g.restore();
     if (flash > 0) { g.fillStyle = `rgba(158,52,35,${flash * 0.25})`; g.fillRect(0, 0, r.width, r.height); }
+    if (whiteFlash > 0) { g.fillStyle = `rgba(210,225,255,${whiteFlash * 0.45})`; g.fillRect(0, 0, r.width, r.height); whiteFlash = Math.max(0, whiteFlash - 0.06); }
   }
   function hud() {
     (el.querySelector("#nbHp") as HTMLElement).style.width = `${(n.hp / n.maxHp) * 100}%`;
@@ -253,9 +255,17 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       if (f.k === "hit") { if (f.crit || pops.length < 18) pops.push({ x: f.x, y: f.y - 6, t: now, text: `${f.crit ? "Kritik " : ""}${f.dmg}`, color: f.crit ? C("--red") : C("--ink") }); }
       if (f.k === "die") { pops.push({ x: f.x, y: f.y - 3, t: now, text: `+${f.coins} ◉`, color: "#B07A1E", big: f.boss }); if (speed === 1 || f.boss) sfx(f.boss ? "win" : "coin"); }
       if (f.k === "hurt") { shake = Math.max(shake, 4); flash = 0.7; if (speed === 1) sfx("hurt"); buzz("light"); }
-      if (f.k === "zap") { zaps.push({ pts: f.pts, t: now }); sfx("spark"); }
+      if (f.k === "zap") {
+        const pts = f.pts.map(([x, y]) => [X(x), Y(y)] as [number, number]); const seed = (now | 0) % 9973;
+        for (const c of chain(pts, seed)) { bolts.push({ b: c.bolt, t0: now, delay: c.delay, dur: 380 }); impacts.push(impact(pts[0][0], pts[0][1], 0, 1, now)); }
+        pts.slice(1).forEach(([x, y], i) => impacts.push(Object.assign(impact(x, y, scale * 4, seed + i, now), { t0: now + i * 70 })));
+        sfx("spark"); if (speed === 1) sfx("thunder");
+      }
       if (f.k === "spell") {
-        if (f.id === "simsek") blasts.push({ x: f.x, y: f.y, r: f.r, t: now });
+        if (f.id === "simsek") {
+          const px = X(f.x), py = Y(f.y); bolts.push({ b: skyBolt([px, py], -10, (now | 0) % 9973), t0: now, delay: 0, dur: 520 }); impacts.push(impact(px, py, f.r * scale, (now | 0) % 997, now)); whiteFlash = 1; sfx("thunder");
+          for (const id of f.hits.slice(0, 5)) { const t = n.foes.find(q => q.id === id); if (t) impacts.push(impact(X(t.x), Y(t.y), scale * 5, id, now + 60)); }
+        }
         else if (f.id === "kilic") blades.push({ x: f.x, y: f.y, x2: f.x2!, y2: f.y2!, t: now });
         else if (f.id === "sarmasik") vines.push({ x: f.x, y: f.y, r: f.r, t: now });
         else flocks.push({ x: f.x, y: f.y, r: f.r, t: now });

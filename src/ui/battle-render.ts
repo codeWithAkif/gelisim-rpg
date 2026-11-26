@@ -4,6 +4,7 @@ import { TERRAIN, ENEMIES, type Terrain } from "../content/world";
 import type { Unit, Weather, XY } from "../engine/combat";
 import { animScale } from "./settings";
 import { artUrl } from "./art";
+import { chain, drawBolt, drawImpact, impact, type BoltFx, type Impact, type Pt } from "./lightning";
 
 const SQ3 = Math.sqrt(3);
 const TAU = Math.PI * 2;
@@ -42,6 +43,7 @@ export class MapRenderer {
   private tweens: Tween[] = []; private hiddenFire = new Set<string>();
   private shakeT = 0; private shakeAmp = 6; private raf = 0; private now = 0;
   private splats: { x: number; y: number; r: number; t0: number; color: string; seed: number }[] = [];
+  private bolts: BoltFx[] = []; private impacts: Impact[] = []; private whiteFlash = 0;
   private slashes: { x1: number; y1: number; x2: number; y2: number; t0: number; color: string }[] = [];
   private zoom: { x: number; y: number; t0: number; k: number } | null = null;
   private imgs = new Map<string, HTMLImageElement | null>();
@@ -142,6 +144,15 @@ export class MapRenderer {
     a.offX = a.offY = 0; a.pose = undefined;
   }
   /** Yere mürekkep/kan lekesi: birkaç saniyede solar. */
+  /** Zincir şimşek: birim konumlarını sırayla bağlar. */
+  zap(uids: string[], from: XY) {
+    const a = this.center(...from); const pts: Pt[] = [[a.cx, a.cy - this.size * 0.6]];
+    for (const u of uids) { const d = this.ds.get(u); if (d) pts.push([d.x, d.y - this.size * 0.5]); }
+    if (pts.length < 2) return; const now = performance.now(); const seed = (now | 0) % 9973;
+    for (const c of chain(pts, seed)) this.bolts.push({ b: c.bolt, t0: now, delay: c.delay, dur: 420 });
+    pts.slice(1).forEach(([x, y], i) => this.impacts.push(Object.assign(impact(x, y, this.size * 0.9, seed + i, now), { t0: now + i * 70 })));
+    this.whiteFlash = 0.8; this.shake(5, 260);
+  }
   splat(x: number, y: number, r: number, color: string) { this.splats.push({ x, y, r, t0: performance.now(), color, seed: Math.random() * 1000 }); if (this.splats.length > 30) this.splats.shift(); }
   async animProjectile(from: XY, to: XY, kind: Projectile["kind"]) {
     const a = this.center(...from), b = this.center(...to);
@@ -284,6 +295,9 @@ export class MapRenderer {
       for (let i = 0; i < 6; i++) { const a = hash(i, sp.seed | 0) * TAU, d = hash(sp.seed | 0, i) * sp.r; c.beginPath(); c.ellipse(sp.x + Math.cos(a) * d, sp.y + Math.sin(a) * d * 0.45, sp.r * (0.25 + hash(i, 7) * 0.35), sp.r * 0.18, 0, 0, TAU); c.fill(); }
       c.globalAlpha = 1;
     }
+    for (let i = this.bolts.length - 1; i >= 0; i--) if (!drawBolt(c, this.bolts[i], this.now, Math.max(0.8, this.size / 40))) this.bolts.splice(i, 1);
+    for (let i = this.impacts.length - 1; i >= 0; i--) if (!drawImpact(c, this.impacts[i], this.now)) this.impacts.splice(i, 1);
+    if (this.whiteFlash > 0) { c.fillStyle = `rgba(210,225,255,${this.whiteFlash * 0.35})`; c.fillRect(0, 0, this.cw, this.ch); this.whiteFlash = Math.max(0, this.whiteFlash - 0.05); }
     for (const sl of [...this.slashes]) {
       const k = (this.now - sl.t0) / 320; if (k >= 1) { this.slashes.splice(this.slashes.indexOf(sl), 1); continue; }
       const e = Math.min(1, k * 3); c.globalAlpha = 1 - k; c.strokeStyle = sl.color; c.lineCap = "round";

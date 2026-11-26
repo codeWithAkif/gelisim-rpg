@@ -29,7 +29,7 @@ export interface Arrow { x: number; y: number; vx: number; vy: number; dmg: numb
 export type SiegeFx =
   | { k: "hit"; x: number; y: number; dmg: number; crit?: boolean; by: "ok" | "kilic" | "buyu" | "kopek" | "ates" }
   | { k: "hurt"; dmg: number } | { k: "die"; x: number; y: number } | { k: "bar"; id: number; broken: boolean }
-  | { k: "cast"; spell: string; x: number; y: number; r: number } | { k: "shoot" } | { k: "wave"; n: number };
+  | { k: "cast"; spell: string; x: number; y: number; r: number; chain?: [number, number][]; fire?: boolean } | { k: "shoot" } | { k: "wave"; n: number };
 
 export interface Siege {
   def: SiegeDef; phase: "build" | "fight" | "rest" | "won" | "lost"; time: number; wave: number;
@@ -152,6 +152,8 @@ export function cast(cfg: Config, s: GameState, sg: Siege, id: string, x: number
     if (fx.ignite) f.burnT = 3;
     if (fx.ignite && !f.human) f.flee = f.hp < f.max * 0.5;   // hayvanlar ateşten kaçar
   }
+  const cf = sg.fx.find(e => e.k === "cast" && e.spell === id && e.x === x && e.y === y) as Extract<SiegeFx, { k: "cast" }> | undefined;
+  if (cf) { cf.fire = !!fx.ignite; if (fx.chain || id.includes("simsek") || id.includes("yildirim")) cf.chain = hits.map(f => [f.x, f.y] as [number, number]); }
   if (fx.ignite) sg.zones.push({ x, y, r: sp.r * 0.8, kind: "ates", t: 4 });
   if (fx.mud) sg.zones.push({ x, y, r: sp.r, kind: "camur", t: 6 });
   return true;

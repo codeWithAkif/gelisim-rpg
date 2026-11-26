@@ -12,6 +12,7 @@ import type { GainReport } from "../engine/progression";
 import { artUrl } from "./art";
 import { esc } from "./sketch";
 import { sfx, buzz } from "./feel";
+import { chain, drawBolt, drawImpact, impact, type BoltFx, type Impact, type Pt } from "./lightning";
 
 const CX = ARENA.w / 2, CY = ARENA.h / 2;
 const imgCache = new Map<string, HTMLImageElement | null>();
@@ -35,6 +36,7 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
   const toArena = (e: PointerEvent) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left - ox) / scale, y: (e.clientY - r.top - oy) / scale }; };
   const X = (x: number) => ox + x * scale, Y = (y: number) => oy + y * scale;
 
+  const lbolts: BoltFx[] = []; const limpacts: Impact[] = []; let wflash = 0;
   let armed: string | null = null; let petMode = false; let drag: { x: number; y: number; cx: number; cy: number; bow: boolean } | null = null;
   const pops: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = []; let shake = 0, flash = 0, swing = 0;
   const cs = getComputedStyle(document.documentElement); const C = (n: string) => cs.getPropertyValue(n).trim();
@@ -160,6 +162,9 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
     for (let i = pops.length - 1; i >= 0; i--) { const p = pops[i]; const k = (now - p.t) / 800; if (k > 1) { pops.splice(i, 1); continue; } g.globalAlpha = 1 - k; g.fillStyle = p.color; g.font = `700 ${p.big ? 24 : 18}px Caveat, cursive`; g.textAlign = "center"; g.fillText(p.text, X(p.x), Y(p.y) - k * 26); g.globalAlpha = 1; }
     g.restore();
     if (flash > 0) { g.fillStyle = `rgba(158,52,35,${flash * 0.3})`; g.fillRect(0, 0, r.width, r.height); }
+    for (let i = lbolts.length - 1; i >= 0; i--) if (!drawBolt(g, lbolts[i], now, Math.max(0.8, scale / 4.5))) lbolts.splice(i, 1);
+    for (let i = limpacts.length - 1; i >= 0; i--) if (!drawImpact(g, limpacts[i], now)) limpacts.splice(i, 1);
+    if (wflash > 0) { g.fillStyle = `rgba(210,225,255,${wflash * 0.4})`; g.fillRect(0, 0, r.width, r.height); wflash = Math.max(0, wflash - 0.07); }
     (el.querySelector("#sgHp") as HTMLElement).style.width = `${(sg.hp / sg.maxHp) * 100}%`;
     (el.querySelector("#sgMana") as HTMLElement).style.width = `${(sg.mana / Math.max(1, sg.maxMana)) * 100}%`;
   }
@@ -174,6 +179,14 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
       if (f.k === "hurt") { shake = 8; flash = 1; sfx("hurt"); buzz("medium"); }
       if (f.k === "die") sfx("thunk");
       if (f.k === "bar" && f.broken) { sfx("clang"); buzz("light"); }
+      if (f.k === "cast") {
+        if (f.chain) { const pts: Pt[] = [[X(CX), Y(CY) - scale * 8], ...f.chain.map(([x, y]) => [X(x), Y(y) - scale * 4] as Pt)]; const seed = (now | 0) % 9973;
+          if (pts.length < 2) pts.push([X(f.x), Y(f.y)]);
+          for (const c of chain(pts, seed)) lbolts.push({ b: c.bolt, t0: now, delay: c.delay, dur: 380 });
+          pts.slice(1).forEach(([x, y], i) => limpacts.push(Object.assign(impact(x, y, scale * 5, seed + i, now), { t0: now + i * 70 }))); sfx("thunder"); wflash = 0.7; }
+        else if (f.fire) { limpacts.push(Object.assign(impact(X(f.x), Y(f.y), f.r * scale, (now | 0) % 997, now), { color: "255,150,60" })); sfx("fire"); }
+        else limpacts.push(Object.assign(impact(X(f.x), Y(f.y), f.r * scale * 0.8, (now | 0) % 997, now), { color: "150,200,150" }));
+      }
       if (f.k === "wave") pops.push({ x: CX, y: CY - 22, t: now, text: `Dalga ${f.n}!`, color: C("--red"), big: true });
     }
     shake = Math.max(0, shake - dt * 30); flash = Math.max(0, flash - dt * 3);

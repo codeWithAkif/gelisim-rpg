@@ -15,7 +15,7 @@ import { settings } from "./settings";
 import { sfx, buzz } from "./feel";
 import { TERRAIN, ENEMIES, MAPS } from "../content/world";
 import { esc, wolfSketch, humanSketch } from "./sketch";
-import { spellOptions, previewSpell, castSpell, hexRange, areaHexes } from "../engine/magic";
+import { spellOptions, previewSpell, castSpell, hexRange, areaHexes, SPELL_FX } from "../engine/magic";
 import { MapRenderer } from "./battle-render";
 
 type Mode = { k: "normal" } | { k: "spell"; id: string; target?: XY } | { k: "torch" };
@@ -96,7 +96,8 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
           const sp = cfg.spell.get(e.spell)!;
           if (e.fizzle) { R.floatAt("p", "büyü dağıldı", "#8B8270"); await R.wait(400); break; }
           const cold = sp.sources.some(x => x.id.includes("ayaz") || x.id.includes("buz"));
-          sfx("whoosh"); await R.animProjectile(e.from, e.to, cold ? "buz" : "ates"); sfx("fire"); buzz("medium");
+          if (SPELL_FX[e.spell]?.chain) { sfx("thunder"); buzz("heavy"); R.zap(e.hits.map(h => h.uid), e.from); await R.wait(260); }
+          else { sfx("whoosh"); await R.animProjectile(e.from, e.to, cold ? "buz" : "ates"); sfx("fire"); buzz("medium"); }
           for (const [x, y] of areaHexes(b, sp, e.to[0], e.to[1])) R.showFire(key(x, y));
           for (const h of e.hits) { R.flash(h.uid); R.floatAt(h.uid, `−${h.dmg}`, "#9E3423"); }
           await R.wait(250); break;
