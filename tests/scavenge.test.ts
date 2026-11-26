@@ -144,3 +144,13 @@ test("baskınlar sabit aralıkla gelir (12-15 sn), önceki düşmanlar sağ olsa
   let w = 0; for (let t = 0; t < 200 / 0.05; t++) { stepScav(n, 0.05); if (n.wave > w) { w = n.wave; times.push(n.time); } }
   expect(times[0]).toBeLessThanOrEqual(15.2); for (let i = 1; i < times.length; i++) { const d = times[i] - times[i - 1]; expect(d).toBeGreaterThanOrEqual(11.9); expect(d).toBeLessThanOrEqual(15.2); }
 });
+
+test("sargı bezi ve merhem canı doldurur (envanterde ve harabede)", async () => {
+  const { useHeal } = await import("../src/engine/healing"); const { healRun } = await import("../src/engine/scavenge"); const { maxHp } = await import("../src/engine/combat");
+  const s = fresh(); const mh = maxHp(cfg, s); s.hp = Math.round(mh * 0.3); s.inventory.sargi_bezi = 2; s.inventory.yara_merhemi = 1;
+  const r = useHeal(cfg, s, "sargi_bezi"); expect(r.ok).toBe(true); expect(s.hp).toBeGreaterThan(Math.round(mh * 0.3)); expect(s.inventory.sargi_bezi).toBe(1);
+  s.hp = mh; expect(useHeal(cfg, s, "yara_merhemi").ok).toBe(false); expect(useHeal(cfg, s, "ekmek").ok).toBe(false);
+  const n = createScav(cfg, s, scavSite("koru")!, 51, { kind: "yumruk" }); n.hp = 5; n.bag.sargi_bezi = 1; s.inventory.sargi_bezi = 1;
+  expect(healRun(cfg, s, n, "sargi_bezi").ok).toBe(true); expect(n.hp).toBeGreaterThan(20); expect(n.bag.sargi_bezi).toBeUndefined(); expect(s.inventory.sargi_bezi).toBe(1);
+  expect(healRun(cfg, s, n, "sargi_bezi").ok).toBe(true); expect(s.inventory.sargi_bezi).toBeUndefined();
+});

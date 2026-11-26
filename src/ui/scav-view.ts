@@ -3,7 +3,7 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Scav, type Spot, type Loadout, SW, EXIT_X, LADDER_XS, SPOT_STAGES, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, rerollScav, pickScavCard, finishScav, scavSite, canStartScav,
-  SCARDS, bagUsed, dropBag, nearGround, groundNear, pickGround, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
+  SCARDS, bagUsed, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
 import { ENEMIES } from "../content/world";
@@ -46,7 +46,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   const el = document.createElement("div"); el.className = "siege nobet scav"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Harabe araması");
   el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="sc-hud"><span id="scMoney"></span><span class="raid-pill" id="scRaid"></span><span id="scDanger"></span></div></div>
     <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="scTip"></div>
-      <div class="sc-stick" id="scStick"><i id="scKnob"></i></div>
+      <div class="sc-heal" id="scHeal"></div><div class="sc-stick" id="scStick"><i id="scKnob"></i></div>
       <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="pick" id="scPick" hidden></button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act aim" data-a="shoot" id="scShoot" hidden></button><button class="sc-act aim" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
     <div class="nb-hp"><div class="gb"><div class="gf" id="scHp" style="background:var(--red)"></div></div><span id="scHpT"></span></div>
     <div class="sc-bar"><span id="scAmmo"></span><button class="btn small" id="scBag" data-c="bag"></button></div>
@@ -185,6 +185,8 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     (q("#scSearch") as HTMLElement).hidden = true;
     const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", bagUsed(n) >= n.bagCap); }
     const tb = q("#scTrap") as HTMLButtonElement; tb.hidden = !n.traps.length; if (n.traps.length) { const hand = trapsInHand(n); const cool = n.traps.filter(x => x.state === "cool").map(x => Math.ceil(x.t)); tb.textContent = hand ? `Tuzak ${hand}` : cool.length ? `Tuzak ${Math.min(...cool)} sn` : "Tuzak 0"; tb.disabled = !hand || n.climbing; }
+    const hl = healItemsAvailable(s, n); const hk = hl.map(x => x.id + x.n).join() + (n.hp < n.maxHp); const he = q("#scHeal");
+    if (he.dataset.k !== hk) { he.dataset.k = hk; he.innerHTML = hl.map(x => `<button class="sc-sup" data-heal="${x.id}" ${n.hp >= n.maxHp ? "disabled" : ""} aria-label="${esc(itemInfo(cfg, x.id).name)}">${itemPic(x.id, 30)}<i>${x.n}</i></button>`).join(""); }
     const ob = q("#scShoot") as HTMLButtonElement; ob.hidden = !(n.bow && n.ammo > 0); ob.textContent = `Ok ${n.ammo}`; ob.disabled = n.atkCd > 0;
     const pb = q("#scSpell") as HTMLButtonElement; pb.hidden = !n.spell; if (n.spell) { pb.textContent = n.spell.cd > 0 ? `${n.spell.name} ${Math.ceil(n.spell.cd)}` : n.spell.name; pb.disabled = n.spell.cd > 0; }
   }
@@ -274,6 +276,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       ${near.length ? `<p class="tiny muted" style="margin:0">Yerde (yanında):</p>` : ""}${near.map(gi => `<div class="choice bagrow">${itemPic(gi.item, 36)}<b>${esc(itemInfo(cfg, gi.item).name)}</b><button class="btn small" data-take="${gi.id}" ${bagUsed(n) >= n.bagCap ? "disabled" : ""}>Al</button></div>`).join("")}
       <button class="choice" data-p="resume"><b>Kapat</b></button>`;
   }
+  q("#scHeal").addEventListener("click", e => { const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-heal]"); if (!b || b.disabled || n.phase !== "play" || paused) return; const r = healRun(cfg, s, n, b.dataset.heal!); if (r.ok) { sfx("good"); buzz("light"); pops.push({ x: n.px, floor: n.floor, t: performance.now(), text: `+${r.healed} can`, color: "#9BD36B" }); (q("#scHeal") as HTMLElement).dataset.k = ""; } else sfx("bad"); });
   el.querySelector(".sc-bar")!.addEventListener("click", e => { if ((e.target as HTMLElement).closest("[data-c=bag]") && n.phase === "play" && !paused) showBag(); });
   el.querySelector(".nb-top")!.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-c]"); if (!b || b.dataset.c !== "pause") return;

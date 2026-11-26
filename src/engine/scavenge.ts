@@ -16,6 +16,7 @@ import { spellOptions } from "./magic";
 import { SPELL_KIND, type SpellKind } from "./nobet";
 import { trapsOwned, trapEffect } from "./engineering";
 import { petMul } from "./pet";
+import { healOf } from "./healing";
 
 export const SW = 700;                 // yapının genişliği (birim): yedi daire, her biri 100
 export const ROOM_W = 100;
@@ -32,15 +33,15 @@ const done = (s: GameState, q: string) => (s.quests[q]?.count ?? 0) > 0 || s.que
 export const SCAV_SITES: ScavSite[] = [
   { place: "koru", name: "Yıkık avcı kulübesi", desc: "Korunun derinliğinde, çökmüş bir kulübe. İçinde eski avcıların bıraktıkları olabilir.", floors: 3, foes: ["kurt"], spotsPerFloor: 3,
     names: ["Sandık", "Yatak altı", "Raf", "Çuval", "Ocak yanı"],
-    loot: [{ item: "deri", w: 4 }, { item: "ok", w: 4, n: [2, 4] }, { item: "ip", w: 3 }, { item: "kekik", w: 2, n: [1, 2] }, { item: "ekmek", w: 2 }, { money: [1, 3], w: 3 }, { item: "eski_sikke", w: 1 }, { weapon: true, w: 1 }],
+    loot: [{ item: "sargi_bezi", w: 3 }, { item: "yara_merhemi", w: 1 }, { item: "deri", w: 4 }, { item: "ok", w: 4, n: [2, 4] }, { item: "ip", w: 3 }, { item: "kekik", w: 2, n: [1, 2] }, { item: "ekmek", w: 2 }, { money: [1, 3], w: 3 }, { item: "eski_sikke", w: 1 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "kurt") ? null : "Önce Hasan'ın kurt derdine yardım et" },
   { place: "karacam_sarnic", name: "Sarnıç mahzeni", desc: "Nemli taş katlar, aşağıya inen merdivenler. Eski depolar boş değil.", floors: 4, foes: ["haydut", "kurt"], spotsPerFloor: 3,
     names: ["Fıçı", "Dolap", "Sandık", "Kasa", "Taş niş"],
-    loot: [{ item: "demir_parca", w: 4, n: [1, 2] }, { item: "ok", w: 3, n: [2, 5] }, { item: "ip", w: 3 }, { item: "peynir", w: 2 }, { item: "deri", w: 2 }, { money: [2, 6], w: 4 }, { item: "eski_sikke", w: 2 }, { weapon: true, w: 1 }],
+    loot: [{ item: "sargi_bezi", w: 3 }, { item: "yara_merhemi", w: 2 }, { item: "demir_parca", w: 4, n: [1, 2] }, { item: "ok", w: 3, n: [2, 5] }, { item: "ip", w: 3 }, { item: "peynir", w: 2 }, { item: "deri", w: 2 }, { money: [2, 6], w: 4 }, { item: "eski_sikke", w: 2 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "sarnic") ? null : "Önce Selim'in sarnıç işini bitir" },
   { place: "ardic_kul", name: "Yanık evler", desc: "Kül Yangını'ndan kalan beş katlı yıkık bir yapı. Isı hâlâ burada gibi.", floors: 5, foes: ["muhafiz", "haydut"], spotsPerFloor: 3,
     names: ["Kömürleşmiş sandık", "Dolap", "Yatak", "Kasa", "Soba dibi"],
-    loot: [{ item: "demir_parca", w: 3, n: [1, 3] }, { item: "ok", w: 3, n: [3, 6] }, { item: "peynir", w: 2 }, { item: "ekmek", w: 2 }, { item: "deri", w: 2 }, { money: [4, 10], w: 5 }, { item: "eski_sikke", w: 2 }, { item: "kartal_tuyu", w: 1 }, { weapon: true, w: 1 }],
+    loot: [{ item: "sargi_bezi", w: 3 }, { item: "yara_merhemi", w: 2 }, { item: "demir_parca", w: 3, n: [1, 3] }, { item: "ok", w: 3, n: [3, 6] }, { item: "peynir", w: 2 }, { item: "ekmek", w: 2 }, { item: "deri", w: 2 }, { money: [4, 10], w: 5 }, { item: "eski_sikke", w: 2 }, { item: "kartal_tuyu", w: 1 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "kul_ana") ? null : "Önce Kül Ana'yı dinle" },
 ];
 export const scavSite = (place: string) => SCAV_SITES.find(x => x.place === place);
@@ -434,3 +435,13 @@ export function finishScav(cfg: Config, s: GameState, n: Scav): ScavResult {
   s.energy = Math.max(0, s.energy - SCAV_ENERGY - Math.min(12, n.wave * 2)); s.satiety = Math.max(0, s.satiety - 5);
   return { result: n.result ?? "exit", items, lostItems, money, dropped, minutes, gains, kills: n.kills, waves: n.wave, searched: n.searched, weaponParts };
 }
+
+/** Harabede yara sar: önce çantadan, yoksa cebinden; can 1,4 kat ölçeklidir. */
+export function healRun(cfg: Config, s: GameState, n: Scav, id: string): { ok: boolean; healed?: number } {
+  const h = healOf(cfg, id); if (!h || n.phase !== "play" || n.hp >= n.maxHp) return { ok: false };
+  if (n.bag[id] > 0) { n.bag[id]--; if (n.bag[id] <= 0) delete n.bag[id]; }
+  else if ((s.inventory[id] ?? 0) > 0) { s.inventory[id]--; if (s.inventory[id] <= 0) delete s.inventory[id]; }
+  else return { ok: false };
+  const before = n.hp; n.hp = Math.min(n.maxHp, n.hp + h * 1.4); return { ok: true, healed: Math.round(n.hp - before) };
+}
+export const healItemsAvailable = (s: GameState, n: Scav) => ["sargi_bezi", "yara_merhemi"].map(id => ({ id, n: (n.bag[id] ?? 0) + (s.inventory[id] ?? 0) })).filter(x => x.n > 0);

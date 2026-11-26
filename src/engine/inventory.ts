@@ -8,10 +8,10 @@ import "../content/gear";
 import "../content/engineering";
 import { GAME_ITEMS, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, CONFIG_PRICES, MARKETS, CRAFTS, type ItemKind, type Craft } from "../content/world";
 
-export interface ItemInfo { id: string; name: string; kind: ItemKind; stack: number; desc: string; capacity?: number; satiety?: number; damage?: number; armor?: number; price?: number }
+export interface ItemInfo { id: string; name: string; kind: ItemKind; stack: number; desc: string; capacity?: number; satiety?: number; heal?: number; damage?: number; armor?: number; price?: number }
 export function itemInfo(cfg: Config, id: string): ItemInfo {
   const g = GAME_ITEMS[id];
-  if (g) return { id, name: g.name, kind: g.slot, stack: g.stack ?? 1, desc: g.desc, capacity: g.capacity, satiety: g.satiety, damage: g.damage, armor: g.armor, price: g.price };
+  if (g) return { id, name: g.name, kind: g.slot, stack: g.stack ?? 1, desc: g.desc, capacity: g.capacity, satiety: g.satiety, heal: g.heal, damage: g.damage, armor: g.armor, price: g.price };
   const c = cfg.item.get(id);
   const kind: ItemKind = c?.slot === "Silah" ? "Silah" : c?.slot === "Zırh" || c?.slot === "Giysi" ? "Zırh" : "Eşya";
   return { id, name: c?.name ?? id, kind, stack: 1, desc: c?.desc ?? "", damage: CONFIG_WEAPON_DAMAGE[id], armor: CONFIG_ARMOR[id], price: CONFIG_PRICES[id] };

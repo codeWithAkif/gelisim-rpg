@@ -232,6 +232,7 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
     if (equippedKey?.startsWith("pouch")) acts.push(`<button class="btn small" data-act="detach" data-id="${equippedKey.slice(5)}">Sök</button>`);
     if (!equippedKey && it.kind === "Çanta") acts.push(`<button class="btn small" data-act="attach" data-id="${esc(selId)}" ${pouchesOf(s).length >= MAX_POUCHES ? "disabled" : ""}>${esc(itemInfo(cfg, bagOf(s)).name)}'na dik (+${pouchSlots(cfg, selId)} göz)</button>`);
     if (it.kind === "Yiyecek") acts.push(`<button class="btn small primary" data-act="eat" data-id="${esc(selId)}">Ye (+${it.satiety} tokluk)</button>`);
+    if (it.heal) acts.push(`<button class="btn small primary" data-act="heal" data-id="${esc(selId)}">Yarayı sar (+${it.heal} can)</button>`);
     if (!equippedKey && it.kind !== "Çanta") acts.push(`<button class="btn small red" data-act="drop" data-id="${esc(selId)}">Bırak</button>`);
     const val = ITEM_VALUES[selId] ?? it.price; const gm = gearOf(selId);
     const where = gm.bow ? "yay" : gm.shield ? "kalkan · sol el" : gm.hands === 2 ? "iki elli" : gm.hands === 1 ? "tek elli" : gm.part ? ({ bas: "baş", govde: "üst", alt: "alt", el: "eller", taki: "takı" } as const)[gm.part] : "";

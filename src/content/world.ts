@@ -8,6 +8,7 @@ export interface GameItem {
   damage?: number;        // silah: taban hasar
   armor?: number;         // zırh: hasar azaltma
   satiety?: number;       // yiyecek: tokluk
+  heal?: number;          // yara bakımı: iyileştirdiği can
   critBonus?: number;
   capacity?: number;      // çanta: göz sayısı
   stack?: number;         // bir gözde kaç tane
@@ -31,6 +32,8 @@ export const GAME_ITEMS: Record<string, GameItem> = {
   kurt_postu: { id: "kurt_postu", name: "Akyele'nin postu", slot: "Zırh", armor: 2, desc: "Kalın, beyaz yeleli bir post. Soğuğu ve dişleri tutar." },
   // keşifle toplananlar (content/explore.ts)
   kekik: { id: "kekik", name: "Kekik", slot: "Malzeme", stack: 10, desc: "Yaylanın taşlarında biter. Zehra çayına katar." },
+  sargi_bezi: { id: "sargi_bezi", name: "Sargı bezi", slot: "Eşya", heal: 20, stack: 5, price: 3, desc: "Temiz keten şerit. Yarayı sarar, kanı durdurur." },
+  yara_merhemi: { id: "yara_merhemi", name: "Yara merhemi", slot: "Eşya", heal: 40, stack: 5, price: 8, desc: "Isırgan ve kekikten. Yarayı çabuk kapatır." },
   isirgan: { id: "isirgan", name: "Isırgan", slot: "Malzeme", stack: 10, desc: "Dere kenarında, eldivensiz toplanmaz. Yara merhemine girer." },
   nane: { id: "nane", name: "Yabani nane", slot: "Malzeme", stack: 10, desc: "Suyun kıyısında. Kokusu parmağında kalır." },
   adacayi: { id: "adacayi", name: "Adaçayı", slot: "Malzeme", stack: 10, desc: "Gümüşi yapraklı. Zehra'nın bahçesinin çevresinde yabanisi var." },
@@ -44,14 +47,16 @@ export const GAME_ITEMS: Record<string, GameItem> = {
 export interface Craft { id: string; product: string; needs: Record<string, number>; skill: Record<string, number>; minutes: number; gains: Record<string, number> }
 /** El işleri: malzeme + beceri + zaman. */
 export const CRAFTS: Craft[] = [
+  { id: "merhem_yap", product: "yara_merhemi", needs: { isirgan: 2, kekik: 1 }, skill: {}, minutes: 20, gains: { odak: 0.1 } },
+  { id: "sargi_yap", product: "sargi_bezi", needs: { deri: 1, ip: 1 }, skill: {}, minutes: 10, gains: { el_becerisi: 0.1 } },
   { id: "canta_dik", product: "deri_canta", needs: { deri: 2, ip: 2 }, skill: { el_becerisi: 12 }, minutes: 60, gains: { el_becerisi: 0.8, odak: 0.2 } },
 ];
 /** Köy pazarında satılanlar. */
-export const SHOP = ["ekmek", "peynir", "deri", "ip", "ok", "av_yayi"];
+export const SHOP = ["ekmek", "peynir", "sargi_bezi", "yara_merhemi", "deri", "ip", "ok", "av_yayi"];
 /** Pazarlar: nerede ne satılır. Şehir pazarı daha zengin, daha pahalı. */
 export const MARKETS: Record<string, { name: string; items: string[] }> = {
   koy_meydani: { name: "Köy pazarı", items: [...SHOP, "cadir"] },
-  karacam: { name: "Karaçam çarşısı", items: ["ekmek", "peynir", "ok", "av_yayi", "deri", "ip", "deri_zirh", "cadir"] },
+  karacam: { name: "Karaçam çarşısı", items: ["ekmek", "peynir", "sargi_bezi", "yara_merhemi", "ok", "av_yayi", "deri", "ip", "deri_zirh", "cadir"] },
   ardic_kul: { name: "Kül mahallesi tezgâhı", items: ["ekmek", "ok"] },
 };
 /** Config eşyalarının köy pazarındaki fiyatı. */

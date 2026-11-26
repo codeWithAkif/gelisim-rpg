@@ -596,3 +596,7 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .raid-pill.amber { background: #B07A1E; }
 .raid-pill.red { background: #B3261E; animation: raidpulse .5s ease-in-out infinite alternate; }
 @keyframes raidpulse { from { transform: scale(1); } to { transform: scale(1.12); } }
+.sc-heal { position: absolute; left: 14px; top: 10px; display: flex; gap: 6px; }
+.sc-sup { position: relative; width: 44px; height: 44px; border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper); display: grid; place-items: center; padding: 0; cursor: pointer; }
+.sc-sup:disabled { opacity: .45; }
+.sc-sup i { position: absolute; right: -4px; bottom: -4px; font-style: normal; font-family: var(--f-hand); font-size: 14px; background: var(--ink); color: var(--paper); border-radius: 8px; padding: 0 5px; }

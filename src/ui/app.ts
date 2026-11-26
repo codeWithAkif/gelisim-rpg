@@ -1,6 +1,7 @@
 // Uygulama kabuğu: üst şerit, ekranlar, alt sekmeler, eylemler, kayıt.
 import { config as cfg } from "../engine/config";
 import type { GameState } from "../engine/state";
+import { useHeal } from "../engine/healing";
 import { sleep, eat, type GainReport } from "../engine/progression";
 import { acceptQuest, walkQuest, completeQuest, itemName, type RewardReport } from "../engine/quests";
 import { maxHp } from "../engine/combat";
@@ -211,6 +212,7 @@ export function startApp(root: HTMLElement) {
         persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist, scheduleNotify); break;
       }
       case "pick": ui.sel = ui.sel === id ? undefined : id; render(); break;
+      case "heal": { const r = useHeal(cfg, s, id); if (!r.ok) { toast(r.reason ?? ""); break; } sfx("good"); toast(`${itemInfo(cfg, id).name}: +${r.healed} can`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); break; }
       case "eat": { const it = itemInfo(cfg, id); if (eat(s, id, it.satiety ?? 20)) { toast(`${it.name} yedin. Tokluk +${it.satiety}.`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); } break; }
       case "buy": { const r = buy(cfg, s, id); sfx(r.ok ? "coin" : "bad"); toast(r.ok ? `${itemInfo(cfg, id).name} aldın.` : r.reason ?? ""); persist(); render(); break; }
       case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }
