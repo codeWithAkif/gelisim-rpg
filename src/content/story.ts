@@ -48,7 +48,7 @@ export const CHAPTERS: Chapter[] = [
         text: "Zehra eski bir sandığı açtı. İçinde annenin elinden çıkmış tek bir yaprak: ATEŞ. \"Isı, maddenin titreşimidir. Titreşimi tek noktada topla; nefesin yakıtındır.\" Defterine yeni bir sayfa eklendi. Artık Ateş çalışabilirsin (Çalış)." },
       { id: "kivilcim", title: "İlk kıvılcım", hint: "Ateş çalışmasıyla Ateş büyüsünü 5'e çıkar.", reached: s => (s.attrs.ates?.level ?? 0) >= 5,
         text: "Avucunda bir an için gerçek bir alev durdu. Nefesin titredi, alev de titredi. Ateş topu artık savaşta kullanılabilir." },
-      { id: "ates_kurt", title: "Ateş ve kurt", hint: "Bir savaşı büyü kullanarak kazan (İşler → Meraya devriye).", reached: s => (s.story.flags.buyuluZafer ?? 0) > 0,
+      { id: "ates_kurt", title: "Ateş ve kurt", hint: "Bir savaşı büyü kullanarak kazan (Defter → Görevler: Meraya devriye).", reached: s => (s.story.flags.buyuluZafer ?? 0) > 0,
         effects: { flag: "zaferGun" },
         text: "Kurtlar ateşi görünce dağıldı. Hasan uzaktan bakıp bir dua mırıldandı. Köyde biri yasak bir şey gördüğünü fısıldıyor." },
       { id: "suru_basi", side: true, title: "Sürünün başı", hint: "Kurtların neden çoğaldığını bul: Hasan'ın 'Kurtlar nereden geliyor?' işi.", reached: s => done(s, "akyele"),
@@ -62,7 +62,7 @@ export const CHAPTERS: Chapter[] = [
     milestones: [
       { id: "k_varis", title: "Karaçam", hint: "Annenin mektubu seni Karaçam'a çağırıyor. Harita'dan demirhanenin doğusundaki yola çık.", reached: s => !!s.story.flags.v_karacam,
         text: "Surlu şehrin kapısından girerken nefesin buğulandı; yazın ortasında herkes kürk giymiş. Çarşıda kehribar renginde taşlar satılıyor; yanlarından geçince elin ısınıyor. Han kapısında bir kadın sazını akort ediyor: Hancı Yaren." },
-      { id: "k_muhur", title: "Kar tanesi mührü", hint: "Hancı Yaren'den Selim'i sor (İşler).", reached: s => done(s, "selim_dukkan"),
+      { id: "k_muhur", title: "Kar tanesi mührü", hint: "Hancı Yaren'den Selim'i sor (Defter → Görevler).", reached: s => done(s, "selim_dukkan"),
         text: "Kor taşları ısıyı tutuyor, ama bir yerden alıyor. Her birinin altında Ayazkale'nin kar tanesi mührü var. Selim annenin adını duyunca sustu; bir şey biliyor." },
       { id: "k_selim", title: "Selim'in sözü", hint: "Selim'in kervanını haydutlara karşı koru.", reached: s => done(s, "kervan"),
         text: "Haydutlar dolu arabaları seçiyordu, çünkü biri onlara söylüyordu. Selim artık sana güveniyor: annen on iki yıl önce buradaydı, taşların ısıyı yerden çaldığını ilk o anladı." },

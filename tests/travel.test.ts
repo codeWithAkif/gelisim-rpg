@@ -65,3 +65,9 @@ test("açılmamış bölgenin çalışmaları gizlidir; bölüm açılınca gör
   expect(activityOpen(s, "satranc")).toBe(false);        // Usta Derya Karaçam'da
   s.story.reached.push("mektup"); expect(activityOpen(s, "satranc")).toBe(true);
 });
+
+test("Çalış sayfası: yeri olmayan her yerde, yeri olan yalnız orada yapılır", async () => {
+  const { activityHere } = await import("../src/engine/travel");
+  const s = newGame(cfg, 1); s.location = "yayla";
+  expect(activityHere(s, "kosu")).toBe(true); expect(activityHere(s, "tirmanma")).toBe(true); expect(activityHere(s, "yuzme")).toBe(false);
+});

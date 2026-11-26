@@ -129,7 +129,7 @@ h3 { font-size: 22px; }
 
 /* alt sekmeler */
 .tabs {
-  display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1.5px solid var(--ink); background: var(--paper-2);
+  display: grid; border-top: 1.5px solid var(--ink); background: var(--paper-2);
   padding-bottom: var(--safe-bottom);
 }
 .tabs button { border: 0; background: none; padding: 8px 0 9px; display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer; color: var(--ink-soft); min-height: 56px; }
@@ -378,6 +378,12 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 /* ---------- Defter: yana çevrilen sayfalar ---------- */
 main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .book { display: flex; flex-direction: column; width: 100%; min-height: 0; }
+.next-card { flex: none; display: flex; align-items: center; gap: 10px; margin: 8px 10px 0; padding: 8px 10px; border: 1.5px dashed var(--blue); border-radius: 10px 6px 12px 7px; background: rgba(255,255,255,.25); }
+.next-card .nc-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.next-card .nc-kind { font-family: var(--f-hand); font-size: 14px; color: var(--blue); }
+.next-card b { font-family: var(--f-hand); font-size: 20px; line-height: 1.1; }
+.next-card .nc-sub { font-size: 14px; color: var(--ink-soft); line-height: 1.25; }
+.next-card .btn { flex: none; }
 .book-tabs { display: flex; gap: 2px; overflow-x: auto; padding: 8px 10px 0; border-bottom: 1.5px solid var(--ink); scrollbar-width: none; flex: none; }
 .book-tabs::-webkit-scrollbar { display: none; }
 .book-tabs button { flex: none; font-family: var(--f-hand); font-size: 18px; padding: 4px 12px 2px; border: 1.5px solid var(--ink-soft); border-bottom: none; border-radius: 10px 10px 0 0; background: var(--paper-2); color: var(--ink-soft); cursor: pointer; }
@@ -483,10 +489,9 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .eq-row .eq-slot.two { opacity: .5; cursor: default; border-style: dashed; }
 .gear-sum { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--ink-soft); margin: 4px 0; }
 .gear-sum b { color: var(--ink); font-family: var(--f-hand); font-size: 18px; }
-/* alt menü: sığmayanlar yana kaydırılır */
-.tabs { display: flex; grid-template-columns: none; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
-.tabs::-webkit-scrollbar { display: none; }
-.tabs button { flex: 0 0 20%; scroll-snap-align: start; }
+/* alt menü: en çok beş sekme, eşit genişlikte (kaydırma yok) */
+.tabs { display: flex; grid-template-columns: none; }
+.tabs button { flex: 1 1 0; min-width: 0; }
 /* uyku düğmesi: her sayfada, üst şeritte */
 .sleepbtn { margin-left: 10px; width: 34px; height: 34px; border: 1.5px solid var(--ink); border-radius: 50%; background: var(--paper-2); color: var(--ink); display: inline-grid; place-items: center; cursor: pointer; vertical-align: middle; padding: 0; }
 .sleepbtn svg { width: 22px; height: 22px; }

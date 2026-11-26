@@ -185,7 +185,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     dyn.innerHTML = out;
   }
 
-  /** Buradayken yapılabilecekler: kart üzerinden doğrudan (İşler'e gitmeden). */
+  /** Buradayken yapılabilecekler: kart üzerinden doğrudan. */
   function hereActions(): string {
     const acts = placeActions(cfg, s, s.location);
     if (!acts.length) {
@@ -195,7 +195,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     const n = acts.some(x => x.primary) ? null : nextHint(s);
     const nextRow = n && n.id ? `<div class="here-act next">${ACT_ICONS["show-place"]}<div class="grow"><b>${esc(n.label)}</b>${n.sub ? `<div class="tiny muted">${esc(n.sub)}</div>` : ""}</div><button class="btn small blue" data-sel="${n.id}">Göster</button></div>` : "";
     return `<div class="here-acts">${nextRow}${acts.map(x => `<div class="here-act${x.primary ? " main" : ""}">${ACT_ICONS[x.act] ?? ""}<div class="grow"><b>${esc(x.label)}</b>${x.sub ? `<div class="tiny muted">${esc(x.sub)}</div>` : ""}${x.disabled ? `<div class="tiny red">${esc(x.disabled)}</div>` : ""}</div>
-      <button class="btn small ${x.primary ? "red" : x.act === "accept" ? "primary" : ""}" data-act="${x.act}" data-id="${esc(x.id)}" ${x.disabled ? "disabled" : ""}>${x.act === "accept" ? "Üstlen" : x.act === "fight" ? "Hazırlan" : x.act === "walk" ? "Yap" : x.act === "deliver" ? "Ver" : x.act === "search" ? "Ara" : x.act === "market" ? "Aç" : x.act === "partner" ? "Görüş" : x.act === "sleep" ? "Seç" : x.act === "pet-adopt" ? "Al" : x.act === "hire" ? "Tut" : x.act === "house" ? "Kur" : "Başla"}</button></div>`).join("")}</div>`;
+      <button class="btn small ${x.primary ? "red" : x.act === "accept" ? "primary" : ""}" data-act="${x.act}" data-id="${esc(x.id)}" ${x.disabled ? "disabled" : ""}>${x.act === "accept" ? "Üstlen" : x.act === "fight" ? "Hazırlan" : x.act === "walk" ? "Yap" : x.act === "deliver" ? "Ver" : x.act === "search" ? "Ara" : x.act === "market" ? "Aç" : x.act === "partner" ? "Görüş" : x.act === "sleep" ? "Seç" : x.act === "pet-adopt" ? "Al" : x.act === "hire" ? "Tut" : x.act === "house" ? "Kur" : x.act === "study" ? "Aç" : "Başla"}</button></div>`).join("")}</div>`;
   }
   function renderCard() {
     if (s.journey) {

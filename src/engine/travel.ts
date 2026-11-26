@@ -84,5 +84,9 @@ export function activityOpen(s: GameState, actId: string): boolean {
   const ps = activityPlace(actId); if (!ps) return true;
   return ps.some(id => { const p = place(id); return !!p && isOpen(p, s); });
 }
+/** Bu çalışma şu an bulunduğun yerde yapılabilir mi? (yeri olmayan her yerde) */
+export function activityHere(s: GameState, actId: string): boolean {
+  const ps = activityPlace(actId); return !ps || ps.includes(s.location);
+}
 export function npcHere(s: GameState, npcId: string) { return NPC_PLACE[npcId] === s.location; }
 export function peopleAt(placeId: string) { return Object.entries(NPC_PLACE).filter(([, p]) => p === placeId).map(([n]) => n); }

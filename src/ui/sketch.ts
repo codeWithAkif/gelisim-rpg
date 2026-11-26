@@ -249,6 +249,8 @@ export const ACT_ICONS: Record<string, string> = {
   "session-pick": ai('<path d="M12 6c-2-1.5-5-2-8-1.5V19c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V4.5c-3-.5-6 0-8 1.5z"/><path d="M12 6v14.5"/>'),
   "show-place": ai('<path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/>', "var(--blue)"),
 };
+ACT_ICONS.study = ACT_ICONS["session-pick"];
+
 
 /** Mühendislik yapılarının mürekkep simgeleri. */
 const si = (d: string, c = "var(--ink)") => `<svg class="act-ic" viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;

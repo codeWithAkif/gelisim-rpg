@@ -21,7 +21,7 @@ import { startJourney, dueEvent, pauseJourney, resumeJourney, resolveEvent, fini
 import { makeScenario, DEFAULT_PLAN, foeWords, cap } from "../engine/combat";
 import { AMBUSH_MAP } from "../content/world";
 import { esc, ICONS } from "./sketch";
-import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
+import { statusBar, defterScreen, vucutScreen, calisScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { openSiege } from "./siege-view";
@@ -48,14 +48,16 @@ import { minutesLeft } from "../engine/state";
 import { itemPic, artUrl } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
+import { newUnlocks } from "../engine/unlocks";
 
-type Tab = "defter" | "vucut" | "canta" | "harita" | "isler" | "calis" | "diyar";
-// bilgi sayfaları solda, karar sayfaları sağda
-const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["canta", "Çanta"], ["harita", "Harita"], ["isler", "İşler"], ["calis", "Çalış"], ["diyar", "Diyar"]];
+// "calis" alt çubukta yok: Harita'daki yer kartından açılır, geri düğmesiyle haritaya döner.
+type Tab = "defter" | "vucut" | "canta" | "harita" | "calis" | "diyar";
+// bilgi sayfaları solda, karar sayfaları sağda; görevler Defter'de
+const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["canta", "Çanta"], ["harita", "Harita"], ["diyar", "Diyar"]];
 
 export function startApp(root: HTMLElement) {
   let s: GameState = load(cfg);
-  let tab: Tab = (() => { try { return (localStorage.getItem("gelisim-sekme") as Tab) || "defter"; } catch { return "defter"; } })();
+  let tab: Tab = (() => { try { const t = localStorage.getItem("gelisim-sekme") as Tab; return TABS.some(([id]) => id === t) ? t : "defter"; } catch { return "defter"; } })();
   const ui: UiState = {};
   let mapState: ReturnType<ReturnType<typeof mountMap>["state"]> | undefined;
   let mapApi: ReturnType<typeof mountMap> | undefined;
@@ -72,12 +74,11 @@ export function startApp(root: HTMLElement) {
   window.addEventListener("gelisim-ayar", syncAmbience);
   document.addEventListener("visibilitychange", syncAmbience);
   function toast(t: string) { const el = root.querySelector("#toast")!; el.textContent = t; el.classList.add("on"); clearTimeout((toast as any).t); (toast as any).t = setTimeout(() => el.classList.remove("on"), 2400); }
-  /** Diyar sekmesi "Köy dostu" olunca belirir; ilk açıldığında bir kez haber verilir. */
+  /** Diyar sekmesi "Köy dostu" olunca belirir (tanıtımı storyTick'te "Yeni sayfa" olarak). */
   function syncTabs() {
     const open = diyarOpen(s);
     root.querySelector<HTMLButtonElement>('[data-tab="diyar"]')!.hidden = !open;
     if (!open && tab === "diyar") tab = "defter";
-    if (open && !s.story.flags.diyarAcik) { s.story.flags.diyarAcik = s.day; persist(); toast("Adın duyuldu: Diyar sayfası açıldı."); }
   }
   function render(keepScroll = true) {
     syncTabs();
@@ -100,8 +101,8 @@ export function startApp(root: HTMLElement) {
         onAct: (_k, qid) => { const q = QUESTS.find(x => x.id === qid)!; if (q.battle) doFight(qid); else doWalk(qid); },
       }, mapState);
     } else
-    main.innerHTML = tab === "defter" ? defterScreen(cfg, s, ui.page ?? 0) : tab === "vucut" ? vucutScreen(cfg, s, ui) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : tab === "diyar" ? diyarScreen(cfg, s, ui) : islerScreen(cfg, s, ui);
-    root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => { b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"); if (b.dataset.tab === tab) b.scrollIntoView({ block: "nearest", inline: "nearest" }); });
+    main.innerHTML = tab === "defter" ? defterScreen(cfg, s, ui.page ?? 0, ui) : tab === "vucut" ? vucutScreen(cfg, s, ui) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : diyarScreen(cfg, s, ui);
+    root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => { const on = b.dataset.tab === (tab === "calis" ? "harita" : tab); b.setAttribute("aria-current", on ? "page" : "false"); if (on) b.scrollIntoView({ block: "nearest", inline: "nearest" }); });
     if (keepScroll) main.scrollTop = y; else main.scrollTop = 0;
     if (tab === "defter") mountBook(keepScroll ? leafY : 0);
     vitalAlerts();
@@ -161,9 +162,9 @@ export function startApp(root: HTMLElement) {
     openSessionRun(cfg, s, sessionDone, persist, scheduleNotify);
     return true;
   }
-  /** Yeni kilometre taşlarını sırayla "Yeni sayfa" olarak gösterir. */
+  /** Yeni kilometre taşlarını ve ilk kez açılan sistemleri sırayla "Yeni sayfa" olarak gösterir. */
   function storyTick(after?: () => void) {
-    const fresh = advanceStory(s);
+    const fresh: { id: string; title: string; text: string }[] = [...advanceStory(s), ...newUnlocks(s)];
     if (!fresh.length) { after?.(); return; }
     persist(); render();
     // birden fazla sayfa birden açıldıysa (eski kayıt, art arda olaylar) tek özet pencere
@@ -285,6 +286,8 @@ export function startApp(root: HTMLElement) {
       case "partner": openPartner(id); break;
       case "scav": doScav(id); break;
       case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;
+      case "study": tab = "calis"; sfx("page"); render(false); break;
+      case "back-map": tab = "harita"; sfx("page"); render(false); break;
       case "jobtab": ui.jobTab = id as UiState["jobTab"]; sfx("page"); render(false); break;
       case "deliver": {
         const r = deliverRequest(cfg, s, id);

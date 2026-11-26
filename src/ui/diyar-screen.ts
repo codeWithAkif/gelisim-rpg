@@ -12,7 +12,7 @@ import { esc, ICONS } from "./sketch";
 import { personPic, itemPic } from "./art";
 import type { UiState } from "./screens";
 
-const TABS: [string, string][] = [["genel", "Genel"], ["ev", "Ev"], ["isletme", "İşletme"], ["adamlar", "Adamlar"], ["pano", "Görevler"]];
+const TABS: [string, string][] = [["genel", "Genel"], ["ev", "Ev"], ["isletme", "İşletme"], ["adamlar", "Adamlar"], ["pano", "Pano"]];
 const STATUS: Record<string, string> = { evde: "evde", yolda: "seninle", gorevde: "görevde", yarali: "yaralı" };
 
 export function diyarScreen(cfg: Config, s: GameState, ui: UiState): string {
@@ -28,7 +28,7 @@ const chips = (cfg: Config, s: GameState, c: { money: number; items: Record<stri
 function genelTab(_cfg: Config, s: GameState): string {
   const r = rankOf(s); const e = est(s); const wages = e.heroes!.reduce((n, h) => n + heroDef(h.id)!.wage, 0);
   const upkeep = VENTURES.reduce((n, d) => n + (e.ventures![d.id]?.worker ? d.upkeep * e.ventures![d.id].lv : 0), 0);
-  return `<section class="sec"><h1>Diyar</h1><p class="lede">Adın yayıldıkça ev, işletme ve adamlar edinirsin. Kendi işini kendin yaparsın; tekrar eden işleri adamlarına bırakırsın.</p>
+  return `<section class="sec"><h1>Diyar</h1><p class="lede">Tekrar eden işleri adamlarına bırakırsın.</p>
     <div class="card"><div class="entry-head"><span class="entry-title" style="font-size:26px">${esc(r.rank.name)}</span><span class="entry-meta">nüfuz ${r.score}${r.next ? ` / ${r.next.at}` : ""}</span></div>
       <div class="gb"><div class="gf" style="width:${Math.round(r.frac * 100)}%;background:var(--red)"></div></div>
       <p class="tiny" style="margin:4px 0 0">${esc(r.rank.unlocks)}</p>${r.next ? `<p class="tiny muted" style="margin:0">Sıradaki: <b>${esc(r.next.name)}</b>: ${esc(r.next.unlocks)}</p>` : ""}
@@ -37,7 +37,7 @@ function genelTab(_cfg: Config, s: GameState): string {
       <span>Ev <b>${houseOf(s)?.name ?? "yok"}</b></span><span>İşletme <b>${Object.keys(e.ventures!).length}</b></span><span>Adam <b>${e.heroes!.length}/${heroLimit(s)}</b></span><span>Evcil <b>${(s.pet ? 1 : 0) + homePets(s).length}</b></span></div>
       <p class="tiny muted" style="margin:4px 0 0">Günlük gider: maaş ${wages} + bakım ${upkeep} bakır. Her gece uyuyunca ödenir.</p></section>
     ${e.reports!.length ? `<section class="sec"><h2>Dün gece</h2>${e.reports!.map(x => `<div class="note">${esc(x)}</div>`).join("")}</section>` : ""}
-    <section class="sec"><h3>Nereden başlamalı?</h3><p class="tiny muted" style="margin:0">${venturesOpen(s) ? `1) Köy meydanında <b>ev kur</b>. 2) Bir <b>adam tut</b>. 3) Rütbe 2'de <b>işletme</b> kur, adama işletmeyi ver. 4) Tekrarlı işleri <b>Görevler</b>'den adamlarına ata.` : `1) Köy meydanında <b>ev kur</b>: kendi yatağında daha iyi dinlenirsin. 2) Bir <b>adam tut</b>: yanında gezen adam savaşta yardım eder. İşletme ve görev panosu ileride, adın şehre ulaşınca açılır.`}</p></section>`;
+    <section class="sec"><h3>Nereden başlamalı?</h3><p class="tiny muted" style="margin:0">${venturesOpen(s) ? `1) Köy meydanında <b>ev kur</b>. 2) Bir <b>adam tut</b>. 3) Rütbe 2'de <b>işletme</b> kur, adama işletmeyi ver. 4) Tekrarlı işleri <b>Pano</b>'dan adamlarına ata.` : `1) Köy meydanında <b>ev kur</b>: kendi yatağında daha iyi dinlenirsin. 2) Bir <b>adam tut</b>: yanında gezen adam savaşta yardım eder. İşletme ve görev panosu ileride, adın şehre ulaşınca açılır.`}</p></section>`;
 }
 function evTab(cfg: Config, s: GameState): string {
   const e = est(s); const h = houseOf(s); const lv = e.house ?? 0; const next = HOUSES[lv]; const c = canBuyHouse(cfg, s, s.location);
@@ -65,7 +65,7 @@ function isletmeTab(cfg: Config, s: GameState): string {
         <button class="btn small" data-act="venture-up" data-id="${d.id}" ${up?.ok ? "" : "disabled"}>${v.lv >= 3 ? "Tam seviye" : "Geliştir"}</button></div>
       ${v.lv < 3 ? `<div class="chips" style="margin-top:4px">${chips(cfg, s, ventureUpCost(d, v.lv))}</div>` : ""}${up && !up.ok && v.lv < 3 ? `<div class="tiny red">${esc(up.reason ?? "")}</div>` : ""}</div>`;
   }).join("");
-  return `<section class="sec"><h2>İşletmeler</h2><p class="muted tiny" style="margin:0">Kurmak için evinde olmalısın. Çalışanı olan işletme her gece üretir ve bakım parası öder.</p>${cards}</section>`;
+  return `<section class="sec"><h2>İşletmeler</h2><p class="muted tiny" style="margin:0">Evinde kurulur; çalışanı olan işletme her gece üretir ve bakım ister.</p>${cards}</section>`;
 }
 function adamlarTab(cfg: Config, s: GameState): string {
   const e = est(s);
@@ -80,7 +80,7 @@ function adamlarTab(cfg: Config, s: GameState): string {
       ${!inParty && !pc.ok ? `<div class="tiny red">${esc(pc.reason ?? "")}</div>` : ""}</div></div></div>`;
   }).join("");
   const open = HEROES.filter(h => !e.heroes!.some(x => x.id === h.id));
-  return `<section class="sec"><h2>Adamların</h2><p class="muted tiny" style="margin:0">En çok ${PARTY_MAX} kişi yanında gezer ve savaşta yardım eder. Yanında olmayana savaş yerinde haber salarsın; yetişmesi vakit alır.
+  return `<section class="sec"><h2>Adamların</h2><p class="muted tiny" style="margin:0">En çok ${PARTY_MAX} kişi yanında gezip savaşta yardım eder; evdekine haber salarsın.
     Maaşını her gece ödersin; ödemezsen sadakati düşer. Adam tutmak için bir evin ve rütben olmalı (en çok ${heroLimit(s)}).</p>${roster || `<p class="hand blue" style="margin:0">Henüz kimse yok.</p>`}</section>
     <section class="sec"><h2>Aranan kişiler</h2><p class="muted tiny" style="margin:0">Bulundukları yere gidince Harita kartından tutarsın.</p>${open.map(h => `<div class="entry"><div class="entry-head"><span class="entry-title">${esc(h.name)}</span><span class="entry-meta">${ROLE_NAMES[h.role]} · rütbe ${h.minRank}</span></div>
       <div class="tiny muted">${esc(h.bio)} · ${h.hire} bakır, maaş ${h.wage}/gün</div><div class="tiny">Nerede: ${esc(place(h.place)?.name ?? h.place)}</div></div>`).join("")}</section>`;
@@ -97,7 +97,7 @@ function panoTab(_cfg: Config, s: GameState): string {
       <div class="tiny muted">${esc(j.desc)} Uygun: ${j.role.map(r => ROLE_NAMES[r]).join(", ")}. Ödül: ${esc(rewards || "—")}</div>
       <div class="chips">${taken ? `<span class="tiny muted">Bir adam gitti</span>` : free.length ? free.map(h => { const c = canAssign(s, j.id, h.id); return `<button class="chip" data-act="job-assign" data-id="${j.id}|${h.id}" ${c.ok ? "" : "disabled"}>${esc(heroDef(h.id)!.name.split(" ")[0])} %${Math.round(successChance(h, j) * 100)}</button>`; }).join("") : `<span class="tiny muted">Evde boşta adam yok</span>`}</div></div>`;
   }).join("");
-  return `<section class="sec"><h2>Görev panosu</h2><p class="muted tiny" style="margin:0">Tekrar eden işleri adamların halleder; sonuç ertesi sabah belli olur. Yüzde, adamın o işte başarı şansıdır; başarısız olan yaralı döner. Bu işleri kendin de yapabilirsin (İşler ve Harita).</p>
+  return `<section class="sec"><h2>Görev panosu</h2><p class="muted tiny" style="margin:0">Sonuç ertesi sabah belli olur. Yüzde başarı şansıdır; başarısız olan yaralı döner.</p>
     ${active ? `<h3>Yolda olanlar</h3>${active}` : ""}<h3>Açık işler</h3>${list || `<p class="tiny muted" style="margin:0">Rütben ve yaptığın işler arttıkça yenileri açılır.</p>`}</section>`;
 }
 void ICONS; void rankNo; void RANKS;
