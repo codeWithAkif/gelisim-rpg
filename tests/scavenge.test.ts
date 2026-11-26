@@ -127,3 +127,20 @@ test("merdiven açıklığında alt/üst kata nişan alınıp ok ve büyü atıl
   n.foes = [foe(LADDER_XS[0] + 30, { floor: 1 })]; expect(shootArrow(n, { dx: 1, dy: -1 })).toBe(true); expect(n.foes[0].hp).toBeLessThan(500);
   setInput(n, 0, -1); run(n, 1); expect(n.climbing).toBe(true); n.atkCd = 0; expect(shootArrow(n, { dx: 1, dy: 0 })).toBe(true); void castSpell;
 });
+
+test("kutunun yanında durunca kendiliğinden arar, hareketle durur; aşamalar arası ara vardır; aranırken ateş edilmez", () => {
+  const s = fresh(); s.equipped.bow = "av_yayi"; s.inventory.av_yayi = 1; s.inventory.ok = 10;
+  const n = createScav(cfg, s, scavSite("koru")!, 41, { kind: "bow" }); n.raidT = 999; const sp = n.spots.find(q => q.floor === 0)!;
+  walkTo(n, sp.x); run(n, 0.3); expect(n.searchId).toBe(sp.id);
+  n.foes = [foe(n.px + 30)]; run(n, 0.6); expect(n.shots).toBe(0);                       // aranırken vurmaz
+  setInput(n, 1, 0); run(n, 0.2); expect(n.searchId).toBe(0); setInput(n, 0, 0);
+  n.foes = []; walkTo(n, sp.x); run(n, 0.2);
+  let sawGap = false; for (let t = 0; t < 400 && sp.stage < 2; t++) { stepScav(n, 0.05); if (n.searchWait > 0 && n.searchId === 0 && sp.stage >= 1) sawGap = true; }
+  expect(sawGap).toBe(true);
+});
+
+test("baskınlar sabit aralıkla gelir (12-15 sn), önceki düşmanlar sağ olsa da", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 42, { kind: "yumruk" }); n.hp = n.maxHp = 99999; const times: number[] = [];
+  let w = 0; for (let t = 0; t < 200 / 0.05; t++) { stepScav(n, 0.05); if (n.wave > w) { w = n.wave; times.push(n.time); } }
+  expect(times[0]).toBeLessThanOrEqual(15.2); for (let i = 1; i < times.length; i++) { const d = times[i] - times[i - 1]; expect(d).toBeGreaterThanOrEqual(11.9); expect(d).toBeLessThanOrEqual(15.2); }
+});

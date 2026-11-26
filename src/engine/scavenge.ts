@@ -115,7 +115,7 @@ export interface Dog { x: number; floor: number; state: "yanda" | "av" | "don"; 
 export interface Scav {
   site: ScavSite; seed: number; rng: Rng; time: number; phase: "play" | "card" | "over"; result?: "exit" | "dead"; load: Loadout;
   px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
-  spots: Spot[]; searchId: number; foes: SFoe[]; nextId: number; wave: number; raidT: number;
+  spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number;
   bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
   foundWeapons: string[]; armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[];
   ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number };
@@ -185,7 +185,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
     if (o && info) { const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0; spell = { id: load.id, kind: info.kind, name: o.spell.name, cd: 4, max: info.cd * 1.7 * Math.max(0.6, 1 - m / 120), mul: info.mul * (1 + m / 100), r: info.r }; } }
   return {
     site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4)), maxHp: Math.round(mh * 1.4),
-    spots, searchId: 0, foes: [], nextId: 1, wave: 0, raidT: 15, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
+    spots, searchId: 0, searchWait: 0, foes: [], nextId: 1, wave: 0, raidT: 15, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
     atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
     ground: [], gid: 1, proj: [], locks, keys: [], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
@@ -200,7 +200,7 @@ export function nearSpot(n: Scav): Spot | undefined {
   if (n.climbing) return undefined;
   return n.spots.filter(q => !q.done && q.floor === n.floor && Math.abs(q.x - n.px) <= 8).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
 }
-export function beginSearch(n: Scav): boolean { const sp = nearSpot(n); if (!sp || n.phase !== "play") return false; n.searchId = sp.id; n.px = sp.x; return true; }
+export function beginSearch(n: Scav): boolean { const sp = nearSpot(n); if (!sp || n.phase !== "play") return false; n.searchId = sp.id; n.searchWait = 0; return true; }
 export function placeTrap(n: Scav): boolean {
   const tr = n.traps.find(q => q.state === "hand"); if (!tr || n.phase !== "play" || n.climbing) return false;
   tr.state = "placed"; tr.x = n.px; tr.floor = n.floor; return true;
@@ -223,14 +223,14 @@ export function aimTarget(n: Scav, aim?: { dx: number; dy: number }): { floor: n
 /** Büyü: nişan aldığın yöne (merdiven açıklığında alt/üst kata da) bir top fırlatır; çarpınca patlar. */
 export function castSpell(n: Scav, aim?: { dx: number; dy: number }): boolean {
   const sp = n.spell; if (!sp || sp.cd > 0 || n.phase !== "play") return false;
-  const { floor, dir } = aimTarget(n, aim); n.face = dir;
+  const { floor, dir } = aimTarget(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.5;
   sp.cd = sp.max; n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + dir * 5, floor, dir, left: 150, base: n.dmg * sp.mul * 0.5, r: sp.r * 0.9 });
   n.fx.push({ k: "cast", kind: sp.kind, x: n.px, floor }); return true;
 }
 /** Elle ok atışı: nişan aldığın yönde/katta ilk düşmana vurur. */
 export function shootArrow(n: Scav, aim?: { dx: number; dy: number }): boolean {
   if (!n.bow || n.ammo <= 0 || n.atkCd > 0 || n.phase !== "play") return false;
-  const { floor, dir } = aimTarget(n, aim); n.face = dir; n.ammo--; n.shots++; n.atkCd = 1 / n.rate; n.atkFx = 0.25;
+  const { floor, dir } = aimTarget(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.5; n.ammo--; n.shots++; n.atkCd = 1 / n.rate; n.atkFx = 0.25;
   const tgt = n.foes.filter(f => f.floor === floor && f.climbT <= 0 && (f.x - n.px) * dir > 0 && Math.abs(f.x - n.px) <= 90).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
   n.fx.push({ k: "shot", from: n.px, to: tgt ? tgt.x : n.px + dir * 90, floor });
   if (tgt) { const crit = n.rng.chance(8); hurtFoe(n, tgt, n.dmg * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); }
@@ -289,13 +289,13 @@ function applyStage(n: Scav, sp: Spot, st: Stage) {
 }
 export const danger = (n: Scav) => 5 + n.wave * 2;
 function spawnRaid(n: Scav) {
-  n.wave++; const count = Math.max(1, Math.min(5 - n.foes.length, 1 + Math.floor(n.wave * 0.5))); const scale = 1 + n.wave * 0.14;
+  n.wave++; const count = Math.min(6, 1 + Math.floor(n.wave * 0.5)); const scale = 1 + n.wave * 0.14;
   for (let i = 0; i < count; i++) {
     const def = n.site.foes[n.rng.int(0, n.site.foes.length - 1)]; const d = ENEMIES[def];
     const floor = n.rng.chance(60) ? n.floor : n.rng.int(0, n.site.floors - 1); const [lo, hi] = freeRange(n, floor); const x = n.rng.chance(50) ? hi - 6 - n.rng.next() * 30 : lo + 10 + n.rng.next() * 30;
     n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale * 1.35, max: d.hp * scale * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + n.rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 0.7, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
-  n.raidT = Math.max(10, 15 - n.wave); n.fx.push({ k: "raid", n: count });
+  n.raidT = Math.max(12, 15 - Math.floor(n.wave / 2)); n.fx.push({ k: "raid", n: count });
 }
 function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean, quiet = false) {
   f.hp -= dmg; f.hitT = 0.2; if (!quiet) n.fx.push({ k: "hit", x: f.x, floor: f.floor, dmg: Math.round(dmg), crit });
@@ -305,7 +305,7 @@ function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean, quiet = false) {
 /** Zamanı ilerlet. */
 export function stepScav(n: Scav, dt: number) {
   if (n.phase !== "play") return; dt = Math.min(dt, 0.05); n.time += dt; n.atkFx = Math.max(0, n.atkFx - dt);
-  n.raidT -= dt; if (n.raidT <= 0) { if (n.foes.length >= 4) n.raidT = 5; else spawnRaid(n); }   // öncekiler bitmeden yığılma olmaz
+  n.raidT -= dt; if (n.raidT <= 0) spawnRaid(n);   // baskınlar sabit aralıkla gelir; yığılma olabilir
   if (n.spell) n.spell.cd = Math.max(0, n.spell.cd - dt);
   // yönlendirme
   const { dx, dy } = n.input; const moveIn = Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2; n.moving = false;
@@ -330,14 +330,16 @@ export function stepScav(n: Scav, dt: number) {
     }
   }
   n.climbing = Math.abs(n.py - Math.round(n.py)) > 0.02; n.floor = Math.round(n.py); if (n.climbing) n.moving = false;
-  // arama
+  // arama: kutunun yanında durunca kendiliğinden başlar; hareket edince bırakılır; her aşama arasında kısa bir ara vardır
+  n.searchWait = Math.max(0, n.searchWait - dt);
+  if (!n.searchId && !moveIn && !n.climbing && n.searchWait <= 0 && nearSpot(n)) beginSearch(n);
   if (n.searchId) {
     const sp = n.spots.find(q => q.id === n.searchId);
     if (!sp || sp.done || n.climbing) n.searchId = 0;
     else {
       sp.prog += dt / Math.max(0.3, stageSeconds(n, sp));
       if (sp.prog >= 1) {
-        const st = sp.stages[sp.stage]; sp.stage++; sp.prog = 0; applyStage(n, sp, st); n.fx.push({ k: "spot", x: sp.x, floor: sp.floor });
+        const st = sp.stages[sp.stage]; sp.stage++; sp.prog = 0; n.searchId = 0; n.searchWait = 1.1; applyStage(n, sp, st); n.fx.push({ k: "spot", x: sp.x, floor: sp.floor });
         if (sp.stage >= SPOT_STAGES) { sp.done = true; n.searchId = 0; n.searched++; if (n.searched >= n.nextCard) { n.nextCard += 3; offerCards(n); } }
       }
     }
@@ -402,7 +404,7 @@ export function stepScav(n: Scav, dt: number) {
   }
   // oyuncu saldırısı
   n.atkCd -= dt;
-  if (n.atkCd <= 0 && !n.climbing) {
+  if (n.atkCd <= 0 && !n.climbing && !n.searchId) {
     const same = n.foes.filter(f => f.floor === n.floor && f.climbT <= 0).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px));
     const t = same[0];
     if (t) {

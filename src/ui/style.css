@@ -589,3 +589,10 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .bag-grid .cell.empty { opacity: .45; border-style: dashed; }
 .bag-grid .cell.sel { box-shadow: inset 0 0 0 2px var(--blue); }
 .sc-act.aim { touch-action: none; user-select: none; }
+
+/* baskın sayacı: belirgin ve renkli */
+.raid-pill { font-family: var(--f-hand); font-size: 26px; font-weight: 700; line-height: 1; padding: 5px 14px; border-radius: 16px 20px 14px 20px; border: 2px solid var(--ink); color: #FFF7E0; letter-spacing: .5px; box-shadow: 2px 2px 0 rgba(0,0,0,.3); }
+.raid-pill.green { background: #3F6B2A; }
+.raid-pill.amber { background: #B07A1E; }
+.raid-pill.red { background: #B3261E; animation: raidpulse .5s ease-in-out infinite alternate; }
+@keyframes raidpulse { from { transform: scale(1); } to { transform: scale(1.12); } }

@@ -24,7 +24,7 @@ export function openScavHub(cfg: Config, s: GameState, place: string, persist: (
   const draw = () => {
     bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">Harabe araması</p><h2>${esc(site.name)}</h2>
       <p style="margin:0">${esc(site.desc)}</p>
-      <p class="tiny" style="margin:0">Odaları gez, mercek simgelerine yaklaşıp <b>Ara</b>'ya bas. Her kutu 3 kez aranır; değerli şey çıkacaksa yavaş aranır. Sayaç dolunca <b>baskın</b> gelir. <b>Çıkışa varırsan</b> bulduklarının hepsi senin, <b>ölürsen</b> çanta gider.</p>
+      <p class="tiny" style="margin:0">Kutunun yanında durunca <b>kendiliğinden aranır</b>, hareket edersen durur; aranırken ateş etmezsin. Her kutu 3 ayrı kez aranır; değerli şey çıkacaksa yavaş aranır. Sayaç dolunca <b>baskın</b> gelir. <b>Çıkışa varırsan</b> bulduklarının hepsi senin, <b>ölürsen</b> çanta gider.</p>
       <h3 style="margin:4px 0 0">Yanına ne alırsın? <span class="tiny muted">(yalnız bir tane)</span></h3>
       <div class="load-list">${opts.map((o, i) => `<button class="load-opt ${isSel(o) ? "on" : ""}" data-i="${i}"><b>${esc(o.label)}</b><span>${esc(o.note)}</span></button>`).join("")}
         <button class="load-opt ${sel.kind === "yumruk" ? "on" : ""}" data-i="-1"><b>Yumruk</b><span>hiçbir şey almazsın</span></button></div>
@@ -44,7 +44,7 @@ export function openScavHub(cfg: Config, s: GameState, place: string, persist: (
 export function openScav(cfg: Config, s: GameState, place: string, persist: () => void, onEnd: (r: ScavResult) => void, load: Loadout = defaultLoadout(cfg, s)) {
   const site = scavSite(place)!; const n: Scav = createScav(cfg, s, site, (s.seed * 29 + s.day * 811 + Math.floor(s.minute)) | 0, load);
   const el = document.createElement("div"); el.className = "siege nobet scav"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Harabe araması");
-  el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="sc-hud"><span id="scMoney"></span><span id="scRaid"></span><span id="scDanger"></span></div></div>
+  el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="sc-hud"><span id="scMoney"></span><span class="raid-pill" id="scRaid"></span><span id="scDanger"></span></div></div>
     <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="scTip"></div>
       <div class="sc-stick" id="scStick"><i id="scKnob"></i></div>
       <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="pick" id="scPick" hidden></button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act aim" data-a="shoot" id="scShoot" hidden></button><button class="sc-act aim" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
@@ -177,12 +177,12 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   /* ---------- HUD ---------- */
   const q = (id: string) => el.querySelector<HTMLElement>(id)!;
   function hud() {
-    q("#scMoney").textContent = `◉ ${n.money}`; q("#scRaid").textContent = `Sıradaki baskın: ${Math.max(0, Math.ceil(n.raidT))} sn`; q("#scRaid").classList.toggle("hot", n.raidT < 10);
+    q("#scMoney").textContent = `◉ ${n.money}`; const rs = Math.max(0, Math.ceil(n.raidT)); const rp = q("#scRaid"); rp.textContent = `BASKIN ${rs}`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`;
     q("#scDanger").textContent = `Tehlike ${danger(n)}`;
     (q("#scHp") as HTMLElement).style.width = `${Math.max(0, n.hp / n.maxHp * 100)}%`; q("#scHpT").textContent = `${Math.round(n.hp)}/${n.maxHp}`;
     q("#scAmmo").textContent = `${n.weaponName}${n.bow ? ` · ok ${n.ammo}` : ""}`; q("#scBag").textContent = `Çanta ${bagUsed(n)}/${n.bagCap}${n.keys.length ? ` · 🔑${n.keys.length}` : ""}`;
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
-    const ns = nearSpot(n); const sb = q("#scSearch") as HTMLButtonElement; sb.hidden = !ns; sb.textContent = n.searchId ? "Aranıyor…" : "Ara"; sb.classList.toggle("busy", !!n.searchId);
+    (q("#scSearch") as HTMLElement).hidden = true;
     const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", bagUsed(n) >= n.bagCap); }
     const tb = q("#scTrap") as HTMLButtonElement; tb.hidden = !n.traps.length; if (n.traps.length) { const hand = trapsInHand(n); const cool = n.traps.filter(x => x.state === "cool").map(x => Math.ceil(x.t)); tb.textContent = hand ? `Tuzak ${hand}` : cool.length ? `Tuzak ${Math.min(...cool)} sn` : "Tuzak 0"; tb.disabled = !hand || n.climbing; }
     const ob = q("#scShoot") as HTMLButtonElement; ob.hidden = !(n.bow && n.ammo > 0); ob.textContent = `Ok ${n.ammo}`; ob.disabled = n.atkCd > 0;
@@ -301,6 +301,6 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     if (n.phase === "over") { end(); return; }
     draw(now); hud(); raf = requestAnimationFrame(loop);
   };
-  layout(); tip.hidden = false; tip.textContent = `Joystick: yürü, merdivende yukarı/aşağı · Ara: kutuyu ara`; setTimeout(() => { tip.hidden = true; }, 4000);
+  layout(); tip.hidden = false; tip.textContent = `Kutunun yanında dur: kendiliğinden arar. Hareket edersen durur.`; setTimeout(() => { tip.hidden = true; }, 4000);
   raf = requestAnimationFrame(loop); void itemPic; void LADDER_XS; void walkT;
 }
