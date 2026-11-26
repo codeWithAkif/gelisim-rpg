@@ -289,7 +289,7 @@ function applyStage(n: Scav, sp: Spot, st: Stage) {
 }
 export const danger = (n: Scav) => 5 + n.wave * 2;
 function spawnRaid(n: Scav) {
-  n.wave++; const count = Math.min(9, 2 + Math.floor(n.wave * 0.9)); const scale = 1 + n.wave * 0.14;
+  n.wave++; const count = Math.max(1, Math.min(5 - n.foes.length, 1 + Math.floor(n.wave * 0.5))); const scale = 1 + n.wave * 0.14;
   for (let i = 0; i < count; i++) {
     const def = n.site.foes[n.rng.int(0, n.site.foes.length - 1)]; const d = ENEMIES[def];
     const floor = n.rng.chance(60) ? n.floor : n.rng.int(0, n.site.floors - 1); const [lo, hi] = freeRange(n, floor); const x = n.rng.chance(50) ? hi - 6 - n.rng.next() * 30 : lo + 10 + n.rng.next() * 30;
@@ -305,7 +305,7 @@ function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean, quiet = false) {
 /** Zamanı ilerlet. */
 export function stepScav(n: Scav, dt: number) {
   if (n.phase !== "play") return; dt = Math.min(dt, 0.05); n.time += dt; n.atkFx = Math.max(0, n.atkFx - dt);
-  n.raidT -= dt; if (n.raidT <= 0) spawnRaid(n);
+  n.raidT -= dt; if (n.raidT <= 0) { if (n.foes.length >= 4) n.raidT = 5; else spawnRaid(n); }   // öncekiler bitmeden yığılma olmaz
   if (n.spell) n.spell.cd = Math.max(0, n.spell.cd - dt);
   // yönlendirme
   const { dx, dy } = n.input; const moveIn = Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2; n.moving = false;
@@ -402,7 +402,7 @@ export function stepScav(n: Scav, dt: number) {
   }
   // oyuncu saldırısı
   n.atkCd -= dt;
-  if (n.atkCd <= 0 && !n.climbing && !n.searchId) {
+  if (n.atkCd <= 0 && !n.climbing) {
     const same = n.foes.filter(f => f.floor === n.floor && f.climbT <= 0).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px));
     const t = same[0];
     if (t) {
