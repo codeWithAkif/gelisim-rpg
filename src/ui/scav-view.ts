@@ -48,7 +48,6 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="scTip"></div>
       <div class="sc-heal" id="scHeal"></div><div class="sc-stick" id="scStick"><i id="scKnob"></i></div>
       <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="pick" id="scPick" hidden></button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act aim" data-a="shoot" id="scShoot" hidden></button><button class="sc-act aim" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
-    <div class="nb-hp"><div class="gb"><div class="gf" id="scHp" style="background:var(--red)"></div></div><span id="scHpT"></span></div>
     <div class="sc-bar"><span id="scAmmo"></span><button class="btn small" id="scBag" data-c="bag"></button></div>
     <div class="nb-card" id="scCard" hidden></div><div class="nb-card" id="scPause" hidden></div>`;
   document.body.appendChild(el);
@@ -103,15 +102,15 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     else { g.fillRect(px - w * 0.5, gy - h, w, h); g.strokeRect(px - w * 0.5, gy - h, w, h); g.beginPath(); g.moveTo(px - w * 0.5, gy - h * 0.6); g.lineTo(px + w * 0.5, gy - h * 0.6); g.stroke(); }
     g.restore();
   }
+  /** Kutunun üstünde yalnız aşama noktaları ve arama çubuğu (mercek simgesi yok). */
   function lens(sp: Spot, near: boolean, now: number) {
-    const px = X(sp.x), py = groundY(sp.floor) - 26 * sc() / 2.4 - Math.sin(now / 300 + sp.x) * 2; const r = 9 * sc() / 2.4 + 3; const done = sp.done;
-    g.save(); g.globalAlpha = done ? 0.35 : 1; g.strokeStyle = done ? "#9AA" : "#F2E7C9"; g.lineWidth = near && !done ? 4 : 3;
-    g.fillStyle = "rgba(255,255,255,.15)"; g.beginPath(); g.arc(px, py, r, 0, 7); g.fill(); g.stroke();
-    g.strokeStyle = "#2E4C7A"; g.lineWidth = 2; g.beginPath(); g.arc(px, py, r - 2, 0, 7); g.stroke();
-    g.strokeStyle = "#F2E7C9"; g.lineWidth = 4; g.lineCap = "round"; g.beginPath(); g.moveTo(px + r * 0.7, py + r * 0.7); g.lineTo(px + r * 1.5, py + r * 1.5); g.stroke();
-    if (done) { g.strokeStyle = "#6FBF4A"; g.lineWidth = 3; g.beginPath(); g.moveTo(px - 4, py); g.lineTo(px - 1, py + 3); g.lineTo(px + 5, py - 4); g.stroke(); }
-    else { for (let k = 0; k < SPOT_STAGES; k++) { g.fillStyle = k < sp.stage ? "#F1C14A" : "rgba(0,0,0,.45)"; g.strokeStyle = "#F2E7C9"; g.lineWidth = 1.5; g.beginPath(); g.arc(px - 9 + k * 9, py - r - 8, 3.4, 0, 7); g.fill(); g.stroke(); } }
-    if (sp.prog > 0 && !done) { g.strokeStyle = "#F1C14A"; g.lineWidth = 4; g.beginPath(); g.arc(px, py, r + 5, -Math.PI / 2, -Math.PI / 2 + sp.prog * Math.PI * 2); g.stroke(); }
+    void now; const px = X(sp.x), top = groundY(sp.floor) - 26 * sc() / 2.4; const done = sp.done;
+    g.save(); g.globalAlpha = done ? 0.5 : 1;
+    if (done) { g.strokeStyle = "#6FBF4A"; g.lineWidth = 3; g.beginPath(); g.moveTo(px - 6, top - 6); g.lineTo(px - 1, top - 1); g.lineTo(px + 8, top - 12); g.stroke(); }
+    else {
+      for (let k = 0; k < SPOT_STAGES; k++) { g.fillStyle = k < sp.stage ? "#F1C14A" : "rgba(0,0,0,.45)"; g.strokeStyle = near ? "#FFFFFF" : "#F2E7C9"; g.lineWidth = 1.5; g.beginPath(); g.arc(px - 10 + k * 10, top - 6, 3.8, 0, 7); g.fill(); g.stroke(); }
+      if (sp.prog > 0) { const w = 34; g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(px - w / 2, top + 2, w, 5); g.fillStyle = "#F1C14A"; g.fillRect(px - w / 2, top + 2, w * sp.prog, 5); }
+    }
     g.restore();
   }
   const gy = (fl: number) => floorBottom(fl) - 10;     // fl float olabilir (merdivende)
@@ -157,7 +156,9 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       if (bowQ) drawQuad(g, bowQ, X(x), gy(fl), 20 * sc(), n.face === 1);
       else if (walkQ) drawQuad(g, walkQ, X(x), gy(fl), 20 * sc(), n.face === 1);
       else { const im = img(key); if (im) { const hh = 20 * sc(), w = hh * im.naturalWidth / im.naturalHeight; const bob = climbing ? Math.sin(fl * 16) * 3 : 0; g.save(); g.globalAlpha = climbing ? 0.85 : 1; g.translate(X(x), gy(fl) + bob); if (n.face === 1) g.scale(-1, 1); g.drawImage(im, -w / 2, -hh, w, hh); g.restore(); } }
-      if (n.searchId) { g.fillStyle = "#F1C14A"; g.font = `700 ${Math.max(14, sc() * 2)}px Caveat, cursive`; g.textAlign = "center"; g.fillText("aranıyor…", X(x), gy(fl) - 20 * sc() - 6); } }
+      { const w = 44, hx = X(x) - w / 2, hy = gy(fl) - 20 * sc() - 14; g.fillStyle = "rgba(20,16,10,.85)"; g.fillRect(hx - 1, hy - 1, w + 2, 8); g.fillStyle = n.hp / n.maxHp < 0.3 ? "#E0483A" : "#D9503A"; g.fillRect(hx, hy, w * Math.max(0, n.hp / n.maxHp), 6);
+        g.fillStyle = "#F2E7C9"; g.font = "700 11px sans-serif"; g.textAlign = "center"; g.fillText(`${Math.round(n.hp)}`, X(x), hy - 3); }
+      if (n.searchId) { g.fillStyle = "#F1C14A"; g.font = `700 ${Math.max(14, sc() * 2)}px Caveat, cursive`; g.textAlign = "center"; g.fillText("aranıyor…", X(x), gy(fl) - 20 * sc() - 28); } }
     for (const pj of n.proj) { const x = X(pj.x), y = gy(pj.floor) - 11 * sc(); const col = pj.kind === "buz" ? ["#BFE6FA", "#6BB6E0"] : pj.kind === "ates" ? ["#FFE08A", "#E8602A"] : pj.kind === "simsek" ? ["#FFFFFF", "#7FA8FF"] : ["#E4D3FF", "#8A6BE0"];
       for (let k = 4; k >= 1; k--) { g.globalAlpha = 0.14 * (5 - k); g.fillStyle = col[1]; g.beginPath(); g.arc(x - pj.dir * k * 6, y, 6 + (5 - k), 0, 7); g.fill(); }
       g.globalAlpha = 1; const gr = g.createRadialGradient(x, y, 1, x, y, 11); gr.addColorStop(0, col[0]); gr.addColorStop(1, col[1]); g.fillStyle = gr; g.beginPath(); g.arc(x, y, 10 + Math.sin(now / 60) * 1.5, 0, 7); g.fill(); }
@@ -179,7 +180,6 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   function hud() {
     q("#scMoney").textContent = `◉ ${n.money}`; const rs = Math.max(0, Math.ceil(n.raidT)); const rp = q("#scRaid"); rp.textContent = `BASKIN ${rs}`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`;
     q("#scDanger").textContent = `Tehlike ${danger(n)}`;
-    (q("#scHp") as HTMLElement).style.width = `${Math.max(0, n.hp / n.maxHp * 100)}%`; q("#scHpT").textContent = `${Math.round(n.hp)}/${n.maxHp}`;
     q("#scAmmo").textContent = `${n.weaponName}${n.bow ? ` · ok ${n.ammo}` : ""}`; q("#scBag").textContent = `Çanta ${bagUsed(n)}/${n.bagCap}${n.keys.length ? ` · 🔑${n.keys.length}` : ""}`;
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
     (q("#scSearch") as HTMLElement).hidden = true;
