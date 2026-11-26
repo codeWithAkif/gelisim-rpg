@@ -152,7 +152,7 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
       const d = ENEMIES[f.def]; const right = CX > f.x; const h = f.human ? 15 * (d.scale ?? 1) : 9.5 * (d.scale ?? 1);
       const key = f.human ? (artUrl("dusman_" + f.def) ? "dusman_" + f.def : f.atkCd > 1.5 ? "poz_kahraman_vurus" : "poz_kahraman_durus") : (f.atkCd > 1.5 ? "poz_kurt_atilma" : "dusman_kurt");
       const filt = (artUrl("dusman_" + f.def) && f.human) ? "none" : d.tint ?? "none";
-      const mv = f.stunT <= 0; const wq = mv ? quad(f.human ? "anim_kahraman_yuru" : "anim_kurt_yuru", walkFrame(now, f.id)) : null; const gt = gait(now, f.id, mv && !wq);
+      const mv = f.stunT <= 0; const wq = mv && !(f.human && artUrl("dusman_" + f.def)) ? quad(f.human ? "anim_kahraman_yuru" : "anim_kurt_yuru", walkFrame(now, f.id)) : null; const gt = gait(now, f.id, mv && !wq);
       if (wq) drawQuad(g, wq, X(f.x), Y(f.y), h * scale, right, filt, f.flee ? 0.6 : 1);
       else if (!figure(key, f.x, f.y + gt.dy * h * 0.25, h, f.human ? right : right, filt, f.flee ? 0.6 : 1)) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(f.x), Y(f.y), f.r * scale, 0, 7); g.fill(); }
       if (f.burnT > 0) { g.fillStyle = `rgba(240,140,40,${0.5 + Math.sin(now / 60) * 0.3})`; g.beginPath(); g.ellipse(X(f.x), Y(f.y) - h * scale * 0.5, scale * 1.4, scale * 2.6, 0, 0, 7); g.fill(); }

@@ -137,7 +137,7 @@ export function openStealth(cfg: Config, s: GameState, title: string, foes: stri
       const d = ENEMIES[w.def]; const right = Math.cos(w.dir) > 0;
       const h = w.human ? 13 * (d?.scale ?? 1) : 8 * (d?.scale ?? 1);
       const key = w.human ? (artUrl("dusman_" + w.def) ? "dusman_" + w.def : "poz_kahraman_durus") : "dusman_kurt";
-      const wmv = !w.wait || w.wait <= 0; const wq = wmv ? quad(w.human ? "anim_kahraman_yuru" : "anim_kurt_yuru", walkFrame(now, w.id)) : null; const wfil = artUrl("dusman_" + w.def) && w.human ? "none" : d?.tint ?? "none";
+      const wmv = !w.wait || w.wait <= 0; const wq = wmv && !(w.human && artUrl("dusman_" + w.def)) ? quad(w.human ? "anim_kahraman_yuru" : "anim_kurt_yuru", walkFrame(now, w.id)) : null; const wfil = artUrl("dusman_" + w.def) && w.human ? "none" : d?.tint ?? "none";
       if (wq) drawQuad(g, wq, X(w.x), Y(w.y), h * scale, right, wfil);
       else if (!figure(key, w.x, w.y + gait(now, w.id, wmv).dy * h * 0.2, h, right, wfil)) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(w.x), Y(w.y), 3 * scale, 0, 7); g.fill(); }
       if (w.sus > 0.05) { g.fillStyle = w.sus > 0.6 ? C("--red") : "#B07A1E"; g.font = `700 ${16 + w.sus * 10}px Caveat, cursive`; g.textAlign = "center"; g.fillText(w.sus > 0.6 ? "!" : "?", X(w.x), Y(w.y) - h * scale * 0.95); }

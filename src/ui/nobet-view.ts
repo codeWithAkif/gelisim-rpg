@@ -189,7 +189,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       const key = f.human ? (artUrl("dusman_" + f.def) ? "dusman_" + f.def : atk ? "poz_kahraman_vurus" : "poz_kahraman_durus") : atk ? "poz_kurt_atilma" : "dusman_kurt";
       const filt = artUrl("dusman_" + f.def) && f.human ? "none" : d.tint ?? "none";
       const moving = Math.hypot(TOWER.x - f.x, TOWER.y - f.y) > TOWER.r + f.r + 0.5 && f.root <= 0 && f.stun <= 0;
-      const sheetKey = f.human ? "anim_kahraman_yuru" : "anim_kurt_yuru"; const wq = moving ? quad(sheetKey, walkFrame(now, f.id)) : null; const gt = gait(now, f.id, moving && !wq);
+      const sheetKey = f.human ? "anim_kahraman_yuru" : "anim_kurt_yuru"; const wq = moving && !(f.human && artUrl("dusman_" + f.def)) ? quad(sheetKey, walkFrame(now, f.id)) : null; const gt = gait(now, f.id, moving && !wq);
       if (wq) drawQuad(g, wq, X(f.x), Y(f.y), h * scale, right, filt);
       else if (!figure(key, f.x, f.y + gt.dy * h * 0.25, h, right, filt)) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(f.x), Y(f.y), f.r * scale, 0, 7); g.fill(); }
       if (f.burn > 0) { g.fillStyle = `rgba(240,140,40,${0.45 + Math.sin(now / 60) * 0.25})`; g.beginPath(); g.ellipse(X(f.x), Y(f.y) - h * scale * 0.45, scale * 1.2, scale * 2.2, 0, 0, 7); g.fill(); }

@@ -2,6 +2,7 @@ import { test, expect } from "vitest";
 import { readdirSync, statSync } from "node:fs";
 import { NPCS, GAME_ITEMS, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR } from "../src/content/world";
 import "../src/content/gear";
+import "../src/content/engineering";
 import { PLACES } from "../src/content/map";
 import { INTRO, CHAPTERS } from "../src/content/story";
 import { HEROES } from "../src/content/estate";
