@@ -12,6 +12,7 @@ import type { GainReport } from "../engine/progression";
 import { artUrl } from "./art";
 import { esc } from "./sketch";
 import { sfx, buzz } from "./feel";
+import { quad, drawQuad, walkFrame, gait } from "./anim";
 import { chain, drawBolt, drawImpact, impact, type BoltFx, type Impact, type Pt } from "./lightning";
 
 const CX = ARENA.w / 2, CY = ARENA.h / 2;
@@ -37,6 +38,7 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
   const X = (x: number) => ox + x * scale, Y = (y: number) => oy + y * scale;
 
   const lbolts: BoltFx[] = []; const limpacts: Impact[] = []; let wflash = 0;
+  let bowSwing = 0;
   let armed: string | null = null; let petMode = false; let drag: { x: number; y: number; cx: number; cy: number; bow: boolean } | null = null;
   const pops: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = []; let shake = 0, flash = 0, swing = 0;
   const cs = getComputedStyle(document.documentElement); const C = (n: string) => cs.getPropertyValue(n).trim();
@@ -94,7 +96,7 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
     if (d.bow) {
       const dx = d.cx - CX, dy = d.cy - CY, L = Math.hypot(dx, dy);
       if (L > 4) { const r = canShoot(s, sg); if (r) { pops.push({ x: CX, y: CY - 8, t: performance.now(), text: r, color: C("--ink-soft") }); return; }
-        if (shoot(s, sg, Math.atan2(-dy, -dx), Math.min(1, L / 20))) { sfx("whoosh"); buzz("light"); renderPanel(); } }
+        if (shoot(s, sg, Math.atan2(-dy, -dx), Math.min(1, L / 20))) { sfx("whoosh"); buzz("light"); bowSwing = performance.now() + 180; renderPanel(); } }
       return;
     }
     const r = placeBarricade(s, sg, d.x, d.y, d.cx, d.cy);
@@ -137,7 +139,10 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
     // köpek
     if (sg.pet) {
       const p = sg.pet; if (sg.phase !== "fight") { g.strokeStyle = C("--blue"); g.setLineDash([3, 4]); g.beginPath(); g.arc(X(p.px), Y(p.py), 16 * scale, 0, 7); g.stroke(); g.setLineDash([]); }
-      if (!figure("dusman_kurt", p.x, p.y, 8, false, p.down ? "grayscale(1) opacity(.5)" : ENEMIES.kopek.tint ?? "none")) { g.fillStyle = "#6B4A2E"; g.beginPath(); g.ellipse(X(p.x), Y(p.y), scale * 2.5, scale * 1.4, 0, 0, 7); g.fill(); }
+      const pid = s.pet?.id ?? "kopek"; const own = !!artUrl("dusman_" + pid); const pmv = Math.hypot(p.x - p.px, p.y - p.py) > 1 || sg.phase === "fight"; const pq = !p.down && pmv ? quad(`anim_${pid}_yuru`, walkFrame(now, 3, 8)) : null;
+      const pf = p.down ? "grayscale(1) opacity(.5)" : own ? "none" : ENEMIES[pid]?.tint ?? "none";
+      if (pq) drawQuad(g, pq, X(p.x), Y(p.y), 8 * scale, p.x < CX, pf);
+      else if (!figure(own ? "dusman_" + pid : "dusman_kurt", p.x, p.y, 8, false, pf)) { g.fillStyle = "#6B4A2E"; g.beginPath(); g.ellipse(X(p.x), Y(p.y), scale * 2.5, scale * 1.4, 0, 0, 7); g.fill(); }
     }
     // adamlar
     for (const h of sg.helpers) { const tint = ENEMIES["h_" + h.role]?.tint ?? "none"; figure("poz_kahraman_durus", h.x, h.y, 13, h.x < CX, tint);
@@ -147,13 +152,17 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
       const d = ENEMIES[f.def]; const right = CX > f.x; const h = f.human ? 15 * (d.scale ?? 1) : 9.5 * (d.scale ?? 1);
       const key = f.human ? (artUrl("dusman_" + f.def) ? "dusman_" + f.def : f.atkCd > 1.5 ? "poz_kahraman_vurus" : "poz_kahraman_durus") : (f.atkCd > 1.5 ? "poz_kurt_atilma" : "dusman_kurt");
       const filt = (artUrl("dusman_" + f.def) && f.human) ? "none" : d.tint ?? "none";
-      if (!figure(key, f.x, f.y, h, f.human ? right : right, filt, f.flee ? 0.6 : 1)) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(f.x), Y(f.y), f.r * scale, 0, 7); g.fill(); }
+      const mv = f.stunT <= 0; const wq = mv ? quad(f.human ? "anim_kahraman_yuru" : "anim_kurt_yuru", walkFrame(now, f.id)) : null; const gt = gait(now, f.id, mv && !wq);
+      if (wq) drawQuad(g, wq, X(f.x), Y(f.y), h * scale, right, filt, f.flee ? 0.6 : 1);
+      else if (!figure(key, f.x, f.y + gt.dy * h * 0.25, h, f.human ? right : right, filt, f.flee ? 0.6 : 1)) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(f.x), Y(f.y), f.r * scale, 0, 7); g.fill(); }
       if (f.burnT > 0) { g.fillStyle = `rgba(240,140,40,${0.5 + Math.sin(now / 60) * 0.3})`; g.beginPath(); g.ellipse(X(f.x), Y(f.y) - h * scale * 0.5, scale * 1.4, scale * 2.6, 0, 0, 7); g.fill(); }
       if (f.stunT > 0) { g.fillStyle = C("--blue"); g.font = `${scale * 3}px serif`; g.fillText("✦", X(f.x), Y(f.y) - h * scale); }
       g.fillStyle = "rgba(234,224,200,.9)"; g.fillRect(X(f.x) - 12, Y(f.y) - h * scale * 0.95, 24, 4); g.fillStyle = C("--red"); g.fillRect(X(f.x) - 12, Y(f.y) - h * scale * 0.95, 24 * Math.max(0, f.hp / f.max), 4);
     }
     // oyuncu
-    if (!figure(swing > now ? "poz_kahraman_vurus" : "poz_kahraman_durus", CX, CY, 17, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(CX), Y(CY), PLAYER_R * scale, 0, 7); g.fill(); }
+    const pw = drag?.bow ? Math.min(1, Math.hypot(drag.cx - CX, drag.cy - CY) / 20) : 0; const bq = bowSwing > now ? quad("anim_kahraman_yay", 3) : drag?.bow ? quad("anim_kahraman_yay", pw < 0.3 ? 0 : pw < 0.75 ? 1 : 2) : null;
+    if (bq) drawQuad(g, bq, X(CX), Y(CY), 17 * scale, false);
+    else if (!figure(swing > now ? "poz_kahraman_vurus" : "poz_kahraman_durus", CX, CY, 17, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(CX), Y(CY), PLAYER_R * scale, 0, 7); g.fill(); }
     // ok
     g.strokeStyle = "#5B4630"; g.lineWidth = 2; for (const a of sg.arrows) { const L = Math.hypot(a.vx, a.vy) || 1; g.beginPath(); g.moveTo(X(a.x), Y(a.y)); g.lineTo(X(a.x - a.vx / L * 4), Y(a.y - a.vy / L * 4)); g.stroke(); }
     if (drag?.bow) {

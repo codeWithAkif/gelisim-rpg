@@ -151,8 +151,8 @@ export function afterBattle(s: GameState, ids: string[], result: "won" | "lost" 
 /* ---------- görev panosu ---------- */
 export function jobsFor(s: GameState): JobDef[] { return JOBS.filter(j => rankNo(s) >= j.minRank && (!j.needsQuest || done(s, j.needsQuest))); }
 export function successChance(h: Hero, j: JobDef): number {
-  const d = heroDef(h.id)!; const power = heroStats(h).power * (j.role.includes(d.role) ? 1.4 : 0.7) + h.lv;
-  return Math.max(0.1, Math.min(0.95, 0.3 + (power - j.diff) / 30 + (h.loyalty - 50) / 400));
+  const d = heroDef(h.id)!; const power = heroStats(h).power * (j.role.includes(d.role) ? 1.8 : 0.9) + h.lv * 1.5;
+  return Math.max(0.1, Math.min(0.95, 0.5 + (power - j.diff) / 25 + (h.loyalty - 50) / 400));
 }
 export function canAssign(s: GameState, jobId: string, heroId: string): Check {
   const j = jobDef(jobId); const h = heroOf(s, heroId); if (!j || !h) return { ok: false, reason: "Yok" };

@@ -12,6 +12,7 @@ import type { GainReport } from "../engine/progression";
 import { artUrl } from "./art";
 import { esc } from "./sketch";
 import { sfx, buzz } from "./feel";
+import { quad, drawQuad, walkFrame, gait } from "./anim";
 
 const imgCache = new Map<string, HTMLImageElement | null>();
 const img = (key: string) => { if (!imgCache.has(key)) { const u = artUrl(key); imgCache.set(key, u ? Object.assign(new Image(), { src: u }) : null); } const i = imgCache.get(key)!; return i && i.complete && i.naturalWidth ? i : null; };
@@ -136,12 +137,16 @@ export function openStealth(cfg: Config, s: GameState, title: string, foes: stri
       const d = ENEMIES[w.def]; const right = Math.cos(w.dir) > 0;
       const h = w.human ? 13 * (d?.scale ?? 1) : 8 * (d?.scale ?? 1);
       const key = w.human ? (artUrl("dusman_" + w.def) ? "dusman_" + w.def : "poz_kahraman_durus") : "dusman_kurt";
-      if (!figure(key, w.x, w.y, h, right, artUrl("dusman_" + w.def) && w.human ? "none" : d?.tint ?? "none")) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(w.x), Y(w.y), 3 * scale, 0, 7); g.fill(); }
+      const wmv = !w.wait || w.wait <= 0; const wq = wmv ? quad(w.human ? "anim_kahraman_yuru" : "anim_kurt_yuru", walkFrame(now, w.id)) : null; const wfil = artUrl("dusman_" + w.def) && w.human ? "none" : d?.tint ?? "none";
+      if (wq) drawQuad(g, wq, X(w.x), Y(w.y), h * scale, right, wfil);
+      else if (!figure(key, w.x, w.y + gait(now, w.id, wmv).dy * h * 0.2, h, right, wfil)) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(w.x), Y(w.y), 3 * scale, 0, 7); g.fill(); }
       if (w.sus > 0.05) { g.fillStyle = w.sus > 0.6 ? C("--red") : "#B07A1E"; g.font = `700 ${16 + w.sus * 10}px Caveat, cursive`; g.textAlign = "center"; g.fillText(w.sus > 0.6 ? "!" : "?", X(w.x), Y(w.y) - h * scale * 0.95); }
     }
     // oyuncu
     const hid = inBush(st);
-    if (!figure("poz_kahraman_durus", st.px, st.py, 12, false, "none", hid ? 0.55 : 1)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(st.px), Y(st.py), 2.6 * scale, 0, 7); g.fill(); }
+    const pm = !!st.target && holding; const pq = pm ? quad("anim_kahraman_yuru", walkFrame(now, 0, st.run ? 13 : 8)) : null;
+    if (pq) drawQuad(g, pq, X(st.px), Y(st.py), 12 * scale, false, "none", hid ? 0.55 : 1);
+    else if (!figure("poz_kahraman_durus", st.px, st.py + gait(now, 0, pm).dy * 2.5, 12, false, "none", hid ? 0.55 : 1)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(st.px), Y(st.py), 2.6 * scale, 0, 7); g.fill(); }
     if (st.target && holding) { g.setLineDash([3, 5]); g.strokeStyle = C("--ink-soft"); g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(st.px), Y(st.py)); g.lineTo(X(st.target.x), Y(st.target.y)); g.stroke(); g.setLineDash([]); }
     if (stoneMode) { g.strokeStyle = C("--blue"); g.setLineDash([4, 4]); g.beginPath(); g.arc(X(st.px), Y(st.py), 45 * scale, 0, 7); g.stroke(); g.setLineDash([]); }
     // gece: oyuncunun çevresi dışında karanlık

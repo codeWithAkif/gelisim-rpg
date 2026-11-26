@@ -13,6 +13,7 @@ import { esc } from "./sketch";
 import { GAME_ITEMS } from "../content/world";
 export const lootText = (l: Loot) => [l.money ? `${l.money} bakır` : "", ...Object.entries(l.items).map(([k, v]) => `${GAME_ITEMS[k]?.name ?? k}${v > 1 ? " ×" + v : ""}`)].filter(Boolean).join(", ");
 import { sfx, buzz } from "./feel";
+import { quad, drawQuad, walkFrame, bowFrame, gait } from "./anim";
 import { chain, skyBolt, drawBolt, drawImpact, impact, type BoltFx, type Impact } from "./lightning";
 
 const imgCache = new Map<string, HTMLImageElement | null>();
@@ -187,7 +188,10 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       const atk = Math.hypot(TOWER.x - f.x, TOWER.y - f.y) < TOWER.r + f.r + 0.5 && f.cd < 0.35;
       const key = f.human ? (artUrl("dusman_" + f.def) ? "dusman_" + f.def : atk ? "poz_kahraman_vurus" : "poz_kahraman_durus") : atk ? "poz_kurt_atilma" : "dusman_kurt";
       const filt = artUrl("dusman_" + f.def) && f.human ? "none" : d.tint ?? "none";
-      if (!figure(key, f.x, f.y, h, right, filt)) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(f.x), Y(f.y), f.r * scale, 0, 7); g.fill(); }
+      const moving = Math.hypot(TOWER.x - f.x, TOWER.y - f.y) > TOWER.r + f.r + 0.5 && f.root <= 0 && f.stun <= 0;
+      const sheetKey = f.human ? "anim_kahraman_yuru" : "anim_kurt_yuru"; const wq = moving ? quad(sheetKey, walkFrame(now, f.id)) : null; const gt = gait(now, f.id, moving && !wq);
+      if (wq) drawQuad(g, wq, X(f.x), Y(f.y), h * scale, right, filt);
+      else if (!figure(key, f.x, f.y + gt.dy * h * 0.25, h, right, filt)) { g.fillStyle = "#5E5850"; g.beginPath(); g.arc(X(f.x), Y(f.y), f.r * scale, 0, 7); g.fill(); }
       if (f.burn > 0) { g.fillStyle = `rgba(240,140,40,${0.45 + Math.sin(now / 60) * 0.25})`; g.beginPath(); g.ellipse(X(f.x), Y(f.y) - h * scale * 0.45, scale * 1.2, scale * 2.2, 0, 0, 7); g.fill(); }
       if (f.root > 0) { g.strokeStyle = "#3F6B2A"; g.lineWidth = 2; for (let v = 0; v < 4; v++) { const a = v * 1.6 + f.id; g.beginPath(); g.moveTo(X(f.x + Math.cos(a) * 3), Y(f.y + 1)); g.quadraticCurveTo(X(f.x + Math.cos(a + 1) * 2), Y(f.y - h * 0.3), X(f.x + Math.cos(a) * 0.8), Y(f.y - h * 0.55)); g.stroke(); } g.fillStyle = "#5E8A3A"; g.beginPath(); g.ellipse(X(f.x), Y(f.y) + 2, scale * 3.2, scale * 1.2, 0, 0, 7); g.globalAlpha = 0.5; g.fill(); g.globalAlpha = 1; }
       if (f.peck > 0) { g.strokeStyle = "#1E1C1A"; g.lineWidth = 2; for (let v = 0; v < 3; v++) { const a = now / 180 + v * 2.1 + f.id; const cx = X(f.x + Math.cos(a) * 4), cy = Y(f.y - h * 0.6 + Math.sin(a) * 2); g.beginPath(); g.moveTo(cx - 5, cy - 3); g.lineTo(cx, cy); g.lineTo(cx + 5, cy - 3); g.stroke(); } }
@@ -206,12 +210,16 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     for (const h of n.helpers) { const hx = TOWER.x + Math.cos(h.a) * 11, hy = TOWER.y + Math.sin(h.a) * 8 + 4; figure("poz_kahraman_durus", hx, hy, 9, Math.cos(h.a) < 0, ENEMIES["h_" + h.role]?.tint ?? "none"); }
     // kule ve sen
     tower();
-    if (!figure(n.fireCd > 1 / n.rate - 0.12 ? "poz_kahraman_vurus" : "poz_kahraman_durus", TOWER.x, TOWER.y - 1.5, 13, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y - 4), 2.5 * scale, 0, 7); g.fill(); }
+    const target = n.foes.some(f => Math.hypot(f.x - TOWER.x, f.y - TOWER.y) <= n.range); const bq = quad("anim_kahraman_yay", bowFrame(Math.max(0, Math.min(1, 1 - n.fireCd * n.rate)), target));
+    if (bq) drawQuad(g, bq, X(TOWER.x), Y(TOWER.y - 1.5), 13 * scale, false);
+    else if (!figure(n.fireCd > 1 / n.rate - 0.12 ? "poz_kahraman_vurus" : "poz_kahraman_durus", TOWER.x, TOWER.y - 1.5, 13, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y - 4), 2.5 * scale, 0, 7); g.fill(); }
     if (n.pet) {
       const pt = n.pet; const G = petGuard(n);
       g.setLineDash([3, 5]); g.strokeStyle = `rgba(46,76,122,${now - petMark < 1500 ? 0.7 : 0.3})`; g.lineWidth = 1.5; g.beginPath(); g.arc(X(pt.hx), Y(pt.hy), G * scale, 0, 7); g.stroke(); g.setLineDash([]);
       const moving = Math.hypot(pt.x - pt.hx, pt.y - pt.hy) > 1;
-      figure(moving && pt.cd > 0.6 ? "poz_kurt_atilma" : "dusman_kurt", pt.x, pt.y, 6, pt.x < TOWER.x, ENEMIES.kopek.tint ?? "none");
+      const pid = s.pet?.id ?? "kopek"; const own = !!artUrl("dusman_" + pid); const pq = moving ? quad(`anim_${pid}_yuru`, walkFrame(now, 3, 8)) : null; const ptint = own ? "none" : ENEMIES[pid]?.tint ?? "none";
+      if (pq) drawQuad(g, pq, X(pt.x), Y(pt.y), 6 * scale, pt.x < TOWER.x, ptint);
+      else figure(moving && pt.cd > 0.6 && !own ? "poz_kurt_atilma" : own ? "dusman_" + pid : "dusman_kurt", pt.x, pt.y + gait(now, 3, moving).dy * 1.5, 6, pt.x < TOWER.x, ptint);
     }
     // oklar
     g.strokeStyle = "#4A3826"; g.lineWidth = 2;
