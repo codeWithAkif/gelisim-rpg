@@ -1,7 +1,7 @@
 // Ekranlar. Bilgi sayfaları: Defter, Vücut. Karar sayfaları: Çanta, Çalış, İşler.
 // Her ekran HTML üretir; tıklamalar app.ts'deki data-act işleyicilerine gider.
 import type { Config } from "../engine/config";
-import { type GameState, clock, minutesLeft, minutesToDark, repOf } from "../engine/state";
+import { type GameState, clock, minutesLeft, minutesToDark, repOf, isNight } from "../engine/state";
 import { DEFERRED_CATEGORIES, type GainReport } from "../engine/progression";
 import { questList, npc } from "../engine/quests";
 import { maxHp } from "../engine/combat";
@@ -9,10 +9,11 @@ import { maxMana } from "../engine/derived";
 import { planSession, SESSION_OPTIONS, wounded, TIME_SCALE, fmtDur } from "../engine/session";
 import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount, pouchesOf, pouchSlots, inTab, INV_TABS, MAX_POUCHES, POUCH_SHARE, type InvTab } from "../engine/inventory";
 import { canSell, dayFactor, PARTNERS, stake, ITEM_VALUES } from "../engine/finance";
+import { STRUCTURES, yapiOf, levelOf, canBuild, canUpgrade, upgradeNeed, engLevel, REFUND } from "../engine/engineering";
 import { gearOf, slotsFor, weaponSet, totalArmor, totalDodge, gearBonus, wornIds, isTwoHanded, WEAR_SLOTS, SLOT_NAMES, type GearSlot } from "../engine/gear";
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, MARKETS, CRAFTS } from "../content/world";
-import { esc, inkBar, wolfSketch, humanSketch, bodySketch, VITAL_ICONS } from "./sketch";
+import { esc, inkBar, wolfSketch, humanSketch, bodySketch, VITAL_ICONS, ICONS, STRUCT_ICONS } from "./sketch";
 import { personPic, itemPic, placePic, motherPic, artUrl } from "./art";
 import { RELICS } from "../content/relics";
 import { REGION_NAMES } from "../content/map";
@@ -23,7 +24,7 @@ import { phase, PHASE_ICONS } from "./daylight";
 import { here, place, activityPlace } from "../engine/travel";
 import { NPC_PLACE, SHOP_PLACE, PLACES } from "../content/map";
 
-export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number; invTab?: InvTab }
+export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number; invTab?: InvTab; bagPage?: "envanter" | "techizat" | "elisi"; bodyTab?: string; diyarTab?: string }
 
 const fmt = (v: number) => (Math.abs(v) < 0.01 ? v.toFixed(3) : Math.abs(v) < 0.1 ? v.toFixed(2) : v.toFixed(1));
 const catColor = (cfg: Config, id?: string) => cfg.cat.get(id ?? "")?.color ?? "var(--pencil)";
@@ -74,7 +75,7 @@ export function statusBar(cfg: Config, s: GameState): string {
   const al = alerts(cfg, s);
   return `<header class="status">
     <div class="day">Gün ${s.day}<small>${clock(s)}${late ? " · gün bitti" : ""}</small><span class="phase" title="${phase(s.minute).name}">${PHASE_ICONS[phase(s.minute).icon]}<i>${phase(s.minute).name}</i></span></div>
-    <div class="money"><span class="coin">${VITAL_ICONS.coin}</span>${s.money} bakır</div>
+    <div class="money"><span class="coin">${VITAL_ICONS.coin}</span>${s.money} bakır<button class="sleepbtn ${isNight(s) || s.energy < 25 ? "hot" : ""}" data-act="sleep" aria-label="Uyu ya da dinlen" title="Uyu ya da dinlen">${ICONS.uyku}</button></div>
     <button class="where" data-act="show-place" data-id="${esc(s.journey ? s.journey.to : s.location)}">⌖ ${s.journey ? `Yolda → ${esc(place(s.journey.to)?.name ?? "")}` : esc(here(s).name)}</button>
     <div class="vitals">${g}</div>
     ${al.length ? `<div class="alert-strip ${al[0].level}" role="status"><b>!</b><span>${esc(al[0].text)}${al.length > 1 ? ` <i>(+${al.length - 1})</i>` : ""}</span></div>` : ""}
@@ -175,24 +176,25 @@ function storySection(_cfg: Config, s: GameState): string {
 }
 
 /* ---------------- Vücut (bilgi) ---------------- */
-export function vucutScreen(cfg: Config, s: GameState): string {
+export function vucutScreen(cfg: Config, s: GameState, ui: UiState = {}): string {
   const lv = (id: string) => s.attrs[id]?.level ?? 0;
   const pd = (id: string) => s.attrs[id]?.pending ?? 0;
   const nm = (id: string) => cfg.attr.get(id)?.name ?? id;
-  const groups = cfg.data.attributeCategories.map(c => {
-    const attrs = cfg.data.attributes.filter(a => a.cat === c.id);
-    if (!attrs.length) return "";
-    return `<section class="sec"><h3 style="color:${esc(c.color)}">${esc(c.name)}</h3><div class="attr-group">${attrs.map((a, i) => {
-      const st = s.attrs[a.id]; const max = a.max ?? 100;
-      return `<div class="attr"><span class="nm" title="${esc(a.desc ?? "")}">${esc(a.name)}</span><div class="bar">${inkBar(st.level / max, st.pending / max, i + 3)}</div>
-        <span class="v">${st.level.toFixed(1)}${st.pending > 0.01 ? `<br><span class="pend">+${st.pending.toFixed(1)}</span>` : ""}</span></div>`;
-    }).join("")}</div></section>`;
-  }).join("");
-  return `<div class="page">
+  const cats = cfg.data.attributeCategories.filter(c => cfg.data.attributes.some(a => a.cat === c.id));
+  const cur = cats.find(c => c.id === ui.bodyTab) ?? cats[0];
+  const pend = (c: { id: string }) => cfg.data.attributes.filter(a => a.cat === c.id).reduce((n, a) => n + (s.attrs[a.id]?.pending ?? 0), 0);
+  const tabs = `<div class="seg" role="tablist">${cats.map(c => `<button role="tab" class="${c.id === cur.id ? "on" : ""}" data-act="bodytab" data-id="${c.id}" aria-selected="${c.id === cur.id}">${esc(c.name)}${pend(c) > 0.01 ? ` <i class="dot"></i>` : ""}</button>`).join("")}</div>`;
+  const attrs = cfg.data.attributes.filter(a => a.cat === cur.id);
+  const list = `<section class="sec"><h3 style="color:${esc(cur.color)}">${esc(cur.name)}</h3><div class="attr-group">${attrs.map((a, i) => {
+    const st = s.attrs[a.id]; const max = a.max ?? 100;
+    return `<div class="attr"><span class="nm" title="${esc(a.desc ?? "")}">${esc(a.name)}</span><div class="bar">${inkBar(st.level / max, st.pending / max, i + 3)}</div>
+      <span class="v">${st.level.toFixed(1)}${st.pending > 0.01 ? `<br><span class="pend">+${st.pending.toFixed(1)}</span>` : ""}</span></div>`;
+  }).join("")}</div></section>`;
+  const body = cur.id === "fiziksel" ? `<div class="body-wrap">${bodySketch(lv, pd, nm, artUrl("vucut_insan"))}</div>` : "";
+  return `<div class="page">${tabs}
     <section class="sec"><h1>Vücut</h1><p class="lede">Kaslar çalıştıkça koyulaşır. Kesikli yeşil çizgi bu gece uykuda işlenecek gelişme.</p>
     ${wounded(cfg, s) ? `<p class="red" style="margin:0">Yaralısın: can ${s.hp}/${maxHp(cfg, s)}. Uyku yaraların çoğunu kapatır.</p>` : ""}</section>
-    <div class="body-wrap">${bodySketch(lv, pd, nm)}</div>
-    ${groups}
+    ${body}${list}
   </div>`;
 }
 
@@ -244,20 +246,25 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
       <div class="chips">${needs}${Object.entries(c.skill).map(([a, v]) => `<span class="chip">${esc(cfg.attr.get(a)?.name ?? a)} ${v}</span>`).join("")}</div>
       ${chk.ok ? `<div class="row" style="margin-top:6px"><button class="btn small" data-act="craft" data-id="${esc(c.id)}">Başla</button></div>` : `<div class="lock">${esc(chk.reason ?? "")}</div>`}</div></div></div>`;
   }).join("");
-  return `<div class="page">
-    <section class="sec"><div class="entry-head"><h1>Çanta</h1><span class="hand">${st.length}/${cap} göz</span></div>
-      <div class="purse"><span class="coin">${VITAL_ICONS.coin}</span><span>Kese: <b>${s.money} bakır</b></span></div>
+  const bp = ui.bagPage ?? "envanter";
+  const seg = `<div class="seg" role="tablist">${([["envanter", "Envanter"], ["techizat", "Teçhizat"], ["elisi", "El işi"]] as const).map(([id, n]) => `<button role="tab" class="${bp === id ? "on" : ""}" data-act="bagpage" data-id="${id}" aria-selected="${bp === id}">${n}</button>`).join("")}</div>`;
+  const header = (title: string, right: string) => `<section class="sec"><div class="entry-head"><h1>${title}</h1><span class="hand">${right}</span></div>
+      <div class="purse"><span class="coin">${VITAL_ICONS.coin}</span><span>Kese: <b>${s.money} bakır</b></span></div></section>`;
+  if (bp === "techizat") return `<div class="page">${seg}<section class="sec"><div class="entry-head"><h1>Teçhizat</h1><span class="hand">${st.length}/${cap} göz</span></div>
       ${(() => { const ws = weaponSet(cfg, s); const bonus = [...new Set(wornIds(s).flatMap(id => Object.keys(gearOf(id).bonus ?? {})))].map(a => `${cfg.attr.get(a)?.name ?? a} ${gearBonus(s, a) > 0 ? "+" : ""}${+gearBonus(s, a).toFixed(1)}`).join(", ");
         return `<div class="gear-sum"><span>Vuruş <b>${+ws.dmg.toFixed(1)}</b>${ws.dual ? " (çift)" : ws.twoHanded ? " (iki el)" : ""}</span><span>Koruma <b>${totalArmor(s)}</b></span><span>Kaçınma <b>${totalDodge(s) >= 0 ? "+" : ""}${totalDodge(s)}</b></span>${bonus ? `<span>${esc(bonus)}</span>` : ""}</div>`; })()}
       <h3 class="eq-h">Giyim</h3><div class="eq-row">${WEAR_SLOTS.map(k => slot(SLOT_NAMES[k], s.equipped[k], k)).join("")}</div>
       <h3 class="eq-h">Eller</h3><div class="eq-row">${slot("Sağ el", s.equipped.weapon, "weapon")}${isTwoHanded(s.equipped.weapon) ? `<div class="eq-slot two"><span class="muted tiny">iki elli</span><span class="eq-l">Sol el</span></div>` : slot("Sol el", s.equipped.offhand, "offhand")}${slot("Yay", s.equipped.bow, "bow")}</div>
       <h3 class="eq-h">Çanta</h3><div class="eq-row">${slot("Çanta", bagOf(s), "bag")}${Array.from({ length: MAX_POUCHES }, (_, i) => slot(`Ek ${i + 1}`, pouchesOf(s)[i], "pouch" + i)).join("")}</div>
       <p class="muted tiny" style="margin:0">${esc(itemInfo(cfg, bagOf(s)).name)} ${itemInfo(cfg, bagOf(s)).capacity} göz${pouchesOf(s).map(p => ` + ${esc(itemInfo(cfg, p).name)} ${pouchSlots(cfg, p)}`).join("")} = <b>${cap} göz</b>. Boştaki bir çantayı ana çantaya dikersen kendi gözünün ancak %${Math.round(POUCH_SHARE * 100)}'ını katar.</p></section>
+    <section class="sec">${detail}</section></div>`;
+  if (bp === "elisi") return `<div class="page">${seg}${header("El işi", "")}
+    ${craftingSection(cfg, s, crafts)}</div>`;
+  return `<div class="page">${seg}${header("Envanter", `${st.length}/${cap} göz`)}
     <div class="inv-tabs" role="tablist">${INV_TABS.map(x => { const n = x.id === "hepsi" ? st.length : st.filter(v => inTab(cfg, v.id, x.id)).length;
       return `<button role="tab" class="inv-tab ${tab === x.id ? "on" : ""}" data-act="invtab" data-id="${x.id}" aria-selected="${tab === x.id}">${x.name}<small>${n}</small></button>`; }).join("")}</div>
     <div class="grid">${cells || `<p class="muted tiny" style="grid-column:1/-1;margin:6px 0">Bu bölmede bir şey yok.</p>`}</div>
     <section class="sec">${detail}</section>
-    <section class="sec"><h2>El işi</h2><p class="muted tiny" style="margin:0">Malzemen ve becerin yetiyorsa kendin yap. Daha büyük çanta, daha çok göz.</p>${crafts}</section>
   </div>`;
 }
 
@@ -387,8 +394,7 @@ export function islerScreen(cfg: Config, s: GameState, ui: UiState = {}): string
     <section class="sec card"><div class="entry-head"><h2>Bugün</h2><span class="hand">${clock(s)}</span></div>
       <p style="margin:0">${(() => { const dark = minutesToDark(s); const hm = (m: number) => `${Math.floor(m / 60)} saat ${Math.round(m % 60)} dakika`;
         return dark > 0 ? `Hava kararmadan <b>${hm(dark)}</b> var.` : left > 0 ? `<b class="red">Gece.</b> Kurtlar avda, yollar tehlikeli; ama gece işi daha çok kazandırır. Uykusuzluk sınırına <b>${hm(left)}</b> var; geç yatarsan iyi dinlenemezsin.` : "Gecenin sonu. Uyumazsan yarın hiçbir şey yapamazsın."; })()}</p>
-      <div class="row"><button class="btn primary" data-act="sleep">Uyu ya da dinlen</button>
-      <span class="muted tiny">Nerede uyuduğun önemli: misafir olunan ev güvenli, açıkta uyumak tehlikeli. Dinlenmek enerji verir ama acıktırır.</span></div></section>
+</section>
     ${exploreCards(cfg, s)}
     <section class="sec"><h1>İşler</h1><p class="lede">${s.region && s.region !== "taspinar" ? "Önce bulunduğun yerin işleri; uzaktakiler aşağıda." : "Köylünün işi küçük, ödülü de küçük olur. Önemli bir iş, onun için değerli bir şey demektir."}</p></section>
     <section class="sec">${list || `<p class="muted" style="margin:0">Şu an açık bir iş yok. Köyü dolaş, insanlarla tanış.</p>`}
@@ -396,3 +402,27 @@ export function islerScreen(cfg: Config, s: GameState, ui: UiState = {}): string
     <section class="sec"><h2>${esc(market?.name ?? "Pazar")}</h2>${market ? `<h3>Al</h3><div>${shop}</div>${sellList(cfg, s)}` : `<p class="muted" style="margin:0">Burada pazar yok. ${s.region === "taspinar" ? "Köy pazarı meydanda." : s.region === "karacam" ? "Karaçam çarşısına git." : ""}</p>${s.region === "taspinar" ? `<div class="row"><button class="btn small blue" data-act="show-place" data-id="${SHOP_PLACE}">Haritada göster</button></div>` : ""}`}</section>
   </div>`;
 }
+
+/** El işi sayfasının gövdesi: mühendislik atölyesi (kalıcı yapılar) ve eşya yapımı. */
+function craftingSection(cfg: Config, s: GameState, craftsHtml: string): string {
+  const eng = engLevel(s);
+  const chips = (cost: Record<string, number>) => Object.entries(cost).filter(([, n]) => n > 0).map(([id, n]) => `<span class="chip ${freeCount(cfg, s, id) >= n ? "" : "miss"}">${n} ${esc(itemInfo(cfg, id).name)}</span>`).join("");
+  const structs = STRUCTURES.map(d => {
+    const y = yapiOf(s, d.id); const chk = canBuild(cfg, s, d.id); const need = upgradeNeed(s, d.id); const cu = canUpgrade(cfg, s, d.id);
+    const lv = levelOf(s, d.id);
+    return `<div class="entry struct"><div class="item-detail">${STRUCT_ICONS[d.icon]}<div style="flex:1;min-width:0">
+      <div class="entry-head"><span class="entry-title">${esc(d.name)}</span><span class="entry-meta">${y.n} adet · seviye ${lv}/${d.maxLv}</span></div>
+      <div class="muted tiny">${esc(d.desc)}</div><div class="tiny" style="margin:2px 0"><b>Şimdi:</b> ${esc(d.effect(lv))}</div>
+      <div class="chips">${chips(d.cost)}<span class="chip">${d.minutes} dk</span>${Object.entries(d.skill).map(([a, v]) => `<span class="chip ${(s.attrs[a]?.level ?? 0) >= v ? "" : "miss"}">${esc(cfg.attr.get(a)?.name ?? a)} ${v}</span>`).join("")}</div>
+      <div class="row" style="margin-top:6px"><button class="btn small" data-act="build" data-id="${d.id}" ${chk.ok ? "" : "disabled"}>Yap</button>
+        <button class="btn small" data-act="upgrade" data-id="${d.id}" ${cu.ok ? "" : "disabled"}>${need ? `Geliştir → ${need.lv + 1}` : "Tam seviye"}</button>
+        <button class="btn small red" data-act="dismantle" data-id="${d.id}" ${y.n > 0 ? "" : "disabled"}>Sök (%${Math.round(REFUND * 100)} geri)</button></div>
+      ${!chk.ok ? `<div class="tiny red">Yapmak için: ${esc(chk.reason ?? "")}</div>` : ""}
+      ${need ? `<div class="tiny muted">Geliştirme: ${chips(need.cost)} · mühendislik ${need.eng}${!cu.ok && y.n > 0 ? ` <span class="red">(${esc(cu.reason ?? "")})</span>` : ""}</div>` : ""}
+    </div></div></div>`;
+  }).join("");
+  return `<section class="sec"><h2>Mühendislik</h2><p class="muted tiny" style="margin:0">Yaptığın barikat ve tuzaklar tükenmez: kuşatmada ve savaş hazırlığında kullanılır, savaştan sonra yine senindir. Dilersen sökersin, malzemesi geri gelir; geliştirdiğin seviye türde kalır.
+    Gelecekte kuşatma silahları da burada yapılacak.</p><p class="hand blue" style="margin:0">Mühendislik düzeyi: <b>${eng.toFixed(1)}</b> <span class="muted tiny">(el becerisi, taktik, gözlem, güç)</span></p>${structs}</section>
+  <section class="sec"><h2>Eşya yapımı</h2><p class="muted tiny" style="margin:0">Malzemen ve becerin yetiyorsa kendin yap.</p>${craftsHtml}</section>`;
+}
+export function diyarScreen(_cfg: Config, _s: GameState, _ui: UiState): string { return `<div class="page"><section class="sec"><h1>Diyar</h1></section></div>`; }

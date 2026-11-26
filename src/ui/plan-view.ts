@@ -9,6 +9,7 @@ import {
 import { MAPS, MAP_CHARS, TERRAIN, ENEMIES } from "../content/world";
 import { esc } from "./sketch";
 import { MapRenderer } from "./battle-render";
+import { trapsOwned, owned, structure } from "../engine/engineering";
 
 const WEATHER_TR = { acik: "açık", yagmur: "yağmur", sis: "sis" } as const;
 
@@ -17,7 +18,10 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
   const sc = makeScenario(s, mapId, enemyIds, questId);
   const m = MAPS[mapId];
   const done = prepDone(s, questId);
-  const plan: Plan = { timing: "simdi", start: 0, scout: done.scout, readWind: done.readWind, traps: [], torch: false, paid: [] };
+  const plan: Plan = { timing: "simdi", start: 0, scout: done.scout, readWind: done.readWind, traps: [], trapTypes: [], torch: false, paid: [] };
+  let trapSel = trapsOwned(s)[0]?.id ?? "ilmik_tuzagi";
+  const remain = (id: string) => owned(s, id) - plan.trapTypes!.filter(x => x === id).length;
+  const maxTraps = () => trapsOwned(s).reduce((n, t) => n + t.n, 0);
   let trapMode = false;
   const tiles = m.rows.map(r => [...r].map(c => MAP_CHARS[c] ?? "cayir"));
   const spots = enemySpots(mapId, enemyIds.length, sc.seed);
@@ -42,7 +46,7 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
       unknown: plan.scout ? [] : [[3, 0] as XY],
       reach: trapMode ? new Set(tiles.flatMap((row, y) => row.map((t, x) => (!TERRAIN[t].blocks && !m.starts.some(st2 => st2.at[0] === x && st2.at[1] === y)) ? key(x, y) : "")).filter(Boolean)) : undefined,
     };
-    el.querySelector("#pNote")!.textContent = trapMode ? `Tuzak için altıgene dokun (${plan.traps.length}/2)` : "";
+    el.querySelector("#pNote")!.textContent = trapMode ? `${structure(trapSel)?.name}: altıgene dokun (${remain(trapSel)} kaldı)` : "";
   }
 
   function render() {
@@ -69,7 +73,7 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
           plan.scout ? `<span class="hand" style="color:var(--green)">✓</span>` : `<button class="btn small" data-p="scout">Keşfet</button>`)}
         ${prepRow("readWind", o("readWind").name, plan.readWind ? (sc.wind.strength === 0 ? "Hava durgun; koku pek taşınmıyor." : `Rüzgâr ${WIND_NAMES[sc.wind.dir]} esiyor (${sc.wind.strength === 2 ? "sert" : "hafif"}). Haritada ok.`) : o("readWind").ok ? o("readWind").desc + " 10 dk" : esc(o("readWind").reason ?? ""),
           plan.readWind ? `<span class="hand" style="color:var(--green)">✓</span>` : `<button class="btn small" data-p="readWind" ${o("readWind").ok ? "" : "disabled"}>Oku</button>`)}
-        ${prepRow("trap", `${o("trap").name} (${plan.traps.length}/2)`, o("trap").ok ? o("trap").desc + " Her biri 30 dk · enerji −6" : esc(o("trap").reason ?? ""),
+        ${prepRow("trap", `${o("trap").name} (${plan.traps.length}/${maxTraps()})`, o("trap").ok ? o("trap").desc + " Her biri 30 dk · enerji −6" + `<div class="chips" style="margin-top:4px">${trapsOwned(s).map(t => `<button class="chip ${trapSel === t.id ? "on" : ""}" data-trap="${t.id}">${esc(structure(t.id)!.name)} ${remain(t.id)}/${t.n}</button>`).join("")}</div>` : esc(o("trap").reason ?? ""),
           `<button class="btn small ${trapMode ? "primary" : ""}" data-p="trap" ${o("trap").ok ? "" : "disabled"}>${trapMode ? "Bitti" : "Yerleştir"}</button>`)}
         ${prepRow("torch", `${itemPic("mesale", 30)} ${o("torch").name}`, o("torch").desc + " 10 dk · 2 bakır",
           `<button class="btn small ${plan.torch ? "primary" : ""}" data-p="torch" ${o("torch").ok || plan.torch ? "" : "disabled"}>${plan.torch ? "Alındı" : "Al"}</button>`)}
@@ -82,12 +86,13 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
   panel.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b || b.disabled) return;
     if (b.dataset.t) { plan.timing = b.dataset.t as Plan["timing"]; }
-    else if (b.dataset.s) { plan.start = +b.dataset.s; plan.traps = plan.traps.filter(([x, y]) => !(m.starts[plan.start].at[0] === x && m.starts[plan.start].at[1] === y)); }
+    else if (b.dataset.s) { plan.start = +b.dataset.s; { const keep = plan.traps.map(([x, y], i) => ({ x, y, t: plan.trapTypes![i] })).filter(v => !(m.starts[plan.start].at[0] === v.x && m.starts[plan.start].at[1] === v.y)); plan.traps = keep.map(v => [v.x, v.y] as [number, number]); plan.trapTypes = keep.map(v => v.t); } }
     else if (b.dataset.p === "scout" || b.dataset.p === "readWind") { doPrep(cfg, s, questId, b.dataset.p); plan[b.dataset.p] = true; plan.paid!.push(b.dataset.p); persist(); }
+    else if (b.dataset.trap) { trapSel = b.dataset.trap; trapMode = true; }
     else if (b.dataset.p === "trap") trapMode = !trapMode;
     else if (b.dataset.p === "torch") plan.torch = !plan.torch;
     else if (b.dataset.x === "cancel") { close(); return; }
-    else if (b.dataset.x === "go") { close(); onStart(sc, { ...plan, paid: [...plan.paid!] }); return; }
+    else if (b.dataset.x === "go") { close(); onStart(sc, { ...plan, paid: [...plan.paid!], trapTypes: [...plan.trapTypes!] }); return; }
     render();
   });
   canvas.addEventListener("pointerup", e => {
@@ -95,8 +100,9 @@ export function openPlan(cfg: Config, s: GameState, questId: string, title: stri
     if (!trapMode) { const i = m.starts.findIndex(st => st.at[0] === hex[0] && st.at[1] === hex[1]); if (i >= 0) { plan.start = i; render(); } return; }
     const [x, y] = hex; if (TERRAIN[tiles[y][x]].blocks || m.starts.some(st => st.at[0] === x && st.at[1] === y)) return;
     const i = plan.traps.findIndex(([a, c]) => a === x && c === y);
-    if (i >= 0) plan.traps.splice(i, 1); else if (plan.traps.length < 2) plan.traps.push([x, y]);
-    if (plan.traps.length >= 2) trapMode = false;
+    if (i >= 0) { plan.traps.splice(i, 1); plan.trapTypes!.splice(i, 1); }
+    else if (remain(trapSel) > 0) { plan.traps.push([x, y]); plan.trapTypes!.push(trapSel); }
+    if (remain(trapSel) <= 0) { const nx = trapsOwned(s).find(t => remain(t.id) > 0); if (nx) trapSel = nx.id; else trapMode = false; }
     render();
   });
   // canlı önizleme: sık değişmeyen sahne, ama ot ve su kımıldasın

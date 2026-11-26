@@ -13,6 +13,7 @@ import { Rng } from "./rng";
 import { ENEMIES, GAME_ITEMS, CONFIG_WEAPON_DAMAGE } from "../content/world";
 import { weaponSet, totalArmor, hasBow } from "./gear";
 import { config } from "./config";
+import { barricadeCount, barricadeMul } from "./engineering";
 
 export const ARENA = { w: 100, h: 140 };
 const CX = ARENA.w / 2, CY = ARENA.h / 2;
@@ -43,10 +44,8 @@ export interface Siege {
 /* ---------- kurulum ---------- */
 /** Elindekilerin vuruşu (tek, çift ya da iki elli silah). */
 export function weaponPower(s: GameState): number { return weaponSet(config, s).dmg; }
-/** Kaç barikat kurabilirsin: el becerisi ve kol gücü. */
-export function barricadeBudget(s: GameState): number {
-  return 3 + Math.floor(((s.attrs.el_becerisi?.level ?? 10) - 10) / 6) + Math.floor(((s.attrs.ust_govde?.level ?? 10) - 10) / 10);
-}
+/** Kaç barikat kurabilirsin: iki geçici kazık + atölyede yaptıkların (engine/engineering.ts). */
+export function barricadeBudget(s: GameState): number { return barricadeCount(s); }
 export function createSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number): Siege {
   const mh = maxHp(cfg, s);
   if (s.mana < 0) s.mana = maxMana(cfg, s);
@@ -70,7 +69,7 @@ export function placeBarricade(s: GameState, sg: Siege, x1: number, y1: number, 
   if (L > BARRICADE_MAX_LEN) { const k = BARRICADE_MAX_LEN / L; x2 = x1 + (x2 - x1) * k; y2 = y1 + (y2 - y1) * k; L = BARRICADE_MAX_LEN; }
   const b = { x1, y1, x2, y2 };
   if (segDist(CX, CY, b) < PLAYER_R + 3) return { ok: false, reason: "Kendi üstüne kuramazsın" };
-  const max = kind === "buz" ? 40 : 26 + ((s.attrs.ust_govde?.level ?? 10) - 10) * 0.8 + ((s.attrs.el_becerisi?.level ?? 10) - 10) * 0.6;
+  const max = kind === "buz" ? 40 : (26 + ((s.attrs.ust_govde?.level ?? 10) - 10) * 0.8 + ((s.attrs.el_becerisi?.level ?? 10) - 10) * 0.6) * barricadeMul(s);
   sg.barricades.push({ id: sg.nextId++, ...b, hp: max, max, kind });
   if (kind === "kazik") { sg.budget--; sg.stats.built++; }
   return { ok: true };

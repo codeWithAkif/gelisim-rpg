@@ -5,6 +5,7 @@ import { type GameState, DAY_MINUTES, log } from "./state";
 import { applyGain, type GainReport } from "./progression";
 import { wornIds, equipGear, type GearSlot } from "./gear";
 import "../content/gear";
+import "../content/engineering";
 import { GAME_ITEMS, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, CONFIG_PRICES, MARKETS, CRAFTS, type ItemKind, type Craft } from "../content/world";
 
 export interface ItemInfo { id: string; name: string; kind: ItemKind; stack: number; desc: string; capacity?: number; satiety?: number; damage?: number; armor?: number; price?: number }

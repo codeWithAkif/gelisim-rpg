@@ -7,6 +7,7 @@ import { maxHp } from "../engine/combat";
 import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
 import { QUESTS, CRAFTS, ENEMIES } from "../content/world";
+import { build, upgrade, dismantle, structure } from "../engine/engineering";
 import { itemInfo, equip, unequip, drop, buy, bagOf, attachPouch, detachPouch, type InvTab } from "../engine/inventory";
 import type { GearSlot } from "../engine/gear";
 import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
@@ -17,7 +18,7 @@ import { startJourney, dueEvent, pauseJourney, resumeJourney, resolveEvent, fini
 import { makeScenario, DEFAULT_PLAN, foeWords, cap } from "../engine/combat";
 import { AMBUSH_MAP } from "../content/world";
 import { esc, ICONS } from "./sketch";
-import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
+import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, diyarScreen, gainList, alerts, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { openSiege } from "./siege-view";
@@ -43,9 +44,9 @@ import { itemPic, artUrl } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 
-type Tab = "defter" | "vucut" | "canta" | "harita" | "calis" | "isler";
+type Tab = "defter" | "vucut" | "canta" | "harita" | "isler" | "calis" | "diyar";
 // bilgi sayfaları solda, karar sayfaları sağda
-const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["canta", "Çanta"], ["harita", "Harita"], ["calis", "Çalış"], ["isler", "İşler"]];
+const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["canta", "Çanta"], ["harita", "Harita"], ["isler", "İşler"], ["calis", "Çalış"], ["diyar", "Diyar"]];
 
 export function startApp(root: HTMLElement) {
   let s: GameState = load(cfg);
@@ -86,8 +87,8 @@ export function startApp(root: HTMLElement) {
         onAct: (_k, qid) => { const q = QUESTS.find(x => x.id === qid)!; if (q.battle) doFight(qid); else doWalk(qid); },
       }, mapState);
     } else
-    main.innerHTML = tab === "defter" ? defterScreen(cfg, s, ui.page ?? 0) : tab === "vucut" ? vucutScreen(cfg, s) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : islerScreen(cfg, s, ui);
-    root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"));
+    main.innerHTML = tab === "defter" ? defterScreen(cfg, s, ui.page ?? 0) : tab === "vucut" ? vucutScreen(cfg, s, ui) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : tab === "diyar" ? diyarScreen(cfg, s, ui) : islerScreen(cfg, s, ui);
+    root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => { b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"); if (b.dataset.tab === tab) b.scrollIntoView({ block: "nearest", inline: "nearest" }); });
     if (keepScroll) main.scrollTop = y; else main.scrollTop = 0;
     if (tab === "defter") mountBook(keepScroll ? leafY : 0);
     vitalAlerts();
@@ -184,6 +185,7 @@ export function startApp(root: HTMLElement) {
 
   // üst şeritteki konum düğmesi haritayı açar
   root.querySelector("#statusSlot")!.addEventListener("click", e => {
+    if ((e.target as HTMLElement).closest("[data-act=sleep]")) { openSleep(); return; }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-act=show-place]"); if (!b) return;
     tab = "harita"; mapState = { view: { cx: place(s.location)!.x, cy: place(s.location)!.y + 55, w: 230 }, sel: s.location }; render(false);
   });
@@ -209,6 +211,11 @@ export function startApp(root: HTMLElement) {
       case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }
       case "unequip": { const r = unequip(cfg, s, id as GearSlot); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "sleep": openSleep(); break;
+      case "build": { const r = build(cfg, s, id); sfx(r.ok ? "thunk" : "bad"); if (r.ok) buzz("medium"); toast(r.ok ? `${structure(id)!.name} yapıldı.` : r.reason ?? ""); persist(); render(); break; }
+      case "upgrade": { const r = upgrade(cfg, s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? `${structure(id)!.name} geliştirildi.` : r.reason ?? ""); persist(); render(); break; }
+      case "dismantle": { const r = dismantle(cfg, s, id); sfx(r.ok ? "page" : "bad"); toast(r.ok ? `Söktün: ${Object.entries(r.back ?? {}).map(([k, n]) => `${n} ${itemName(cfg, k)}`).join(", ") || "malzeme kalmadı"}${r.lost ? ` (${r.lost} tanesi sığmadı)` : ""}.` : r.reason ?? ""); persist(); render(); break; }
+      case "bagpage": ui.bagPage = id as UiState["bagPage"]; ui.sel = undefined; sfx("page"); render(false); break;
+      case "bodytab": ui.bodyTab = id; sfx("page"); render(false); break;
       case "invtab": ui.invTab = id as InvTab; ui.sel = undefined; sfx("page"); render(); break;
       case "attach": { const r = attachPouch(cfg, s, id); sfx(r.ok ? "thunk" : "bad"); toast(r.ok ? `${itemInfo(cfg, id).name} ana çantaya dikildi: +${r.slots} göz.` : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "detach": { const r = detachPouch(cfg, s, +id); toast(r.ok ? "Ek bölmeyi söktün." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }

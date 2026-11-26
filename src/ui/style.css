@@ -478,3 +478,19 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .eq-row .eq-slot.two { opacity: .5; cursor: default; border-style: dashed; }
 .gear-sum { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--ink-soft); margin: 4px 0; }
 .gear-sum b { color: var(--ink); font-family: var(--f-hand); font-size: 18px; }
+/* alt menü: sığmayanlar yana kaydırılır */
+.tabs { display: flex; grid-template-columns: none; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button { flex: 0 0 20%; scroll-snap-align: start; }
+/* uyku düğmesi: her sayfada, üst şeritte */
+.sleepbtn { margin-left: 10px; width: 34px; height: 34px; border: 1.5px solid var(--ink); border-radius: 50%; background: var(--paper-2); color: var(--ink); display: inline-grid; place-items: center; cursor: pointer; vertical-align: middle; padding: 0; }
+.sleepbtn svg { width: 22px; height: 22px; }
+.sleepbtn.hot { color: var(--red); border-color: var(--red); box-shadow: 0 0 0 3px rgba(158,52,35,.18); }
+.seg { display: flex; gap: 6px; padding: 8px 12px 6px; border-bottom: 1.5px solid var(--ink); overflow-x: auto; scrollbar-width: none; }
+.seg button { flex: none; font-family: var(--f-hand); font-size: 19px; padding: 4px 14px; border: 1.5px solid var(--ink-soft); border-radius: 12px 14px 10px 14px; background: var(--paper-2); color: var(--ink-soft); cursor: pointer; }
+.seg button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+button.chip { background: none; cursor: pointer; font-family: inherit; }
+.chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.seg .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-left: 3px; vertical-align: 2px; }
+.chip.miss { color: var(--red); border-color: var(--red); }
+.struct .btn[disabled] { opacity: .45; }

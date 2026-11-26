@@ -22,8 +22,8 @@ function play(s: GameState, sg: Siege, opts: { bow?: boolean; magic?: boolean } 
 const ring = (s: GameState, sg: Siege, r: number) => { for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, b = (i + 1) / 8 * Math.PI * 2; placeBarricade(s, sg, CX + Math.cos(a) * r, CY + Math.sin(a) * r, CX + Math.cos(b) * r, CY + Math.sin(b) * r); } };
 
 test("barikat: bütçe kadar kurulur, kendi üstüne kurulmaz, insanları durdurur", () => {
-  const s = newGame(cfg, 1); const sg = createSiege(cfg, s, SIEGES.han, 3);
-  const budget = sg.budget; expect(budget).toBeGreaterThanOrEqual(3);
+  const s = newGame(cfg, 1); s.yapi = { kazik_barikat: { n: 4, lv: 1 } }; const sg = createSiege(cfg, s, SIEGES.han, 3);
+  const budget = sg.budget; expect(budget).toBe(2 + 4);
   expect(placeBarricade(s, sg, CX - 2, CY, CX + 2, CY + 1).ok).toBe(false);
   ring(s, sg, 14); expect(sg.barricades.length).toBe(budget); expect(sg.budget).toBe(0);
   startWave(sg); for (let t = 0; t < 220; t++) step(cfg, s, sg, 0.1);

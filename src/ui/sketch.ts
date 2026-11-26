@@ -101,7 +101,7 @@ export function humanSketch(opts: { marks: { name: string; at: [number, number] 
 }
 
 /** Vücut çizimi: kas grupları seviyesine göre koyulaşır, uykuda işlenecek kazanç kesikli yeşil çizilir. */
-export function bodySketch(lv: (id: string) => number, pend: (id: string) => number, names: (id: string) => string): string {
+export function bodySketch(lv: (id: string) => number, pend: (id: string) => number, names: (id: string) => string, imageUrl?: string | null): string {
   const s = 3;
   const fig = [
     roughEllipse(100, 40, 20, 25, 1.4, s),
@@ -147,7 +147,7 @@ export function bodySketch(lv: (id: string) => number, pend: (id: string) => num
     <path d="M214,94 L106,120" stroke="var(--pencil)" stroke-width=".7" fill="none"/><path d="M214,134 L117,118" stroke="var(--pencil)" stroke-width=".7" fill="none"/>`;
   parts += labelAt(266, 92, "r", names("kardiyo"), `${kv.toFixed(1)}${kp > 0.01 ? ` <tspan fill="var(--green)">+${kp.toFixed(1)}</tspan>` : ""}`);
   parts += labelAt(266, 132, "r", names("nefes"), `${nv.toFixed(1)}${np > 0.01 ? ` <tspan fill="var(--green)">+${np.toFixed(1)}</tspan>` : ""}`, "var(--blue)");
-  return `<svg viewBox="-70 0 340 360" role="img" aria-label="Vücut çizimi"><g fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-linecap="round">${fig.map(d => `<path d="${d}"/>`).join("")}</g>${parts}</svg>`;
+  return `<svg viewBox="-70 0 340 360" role="img" aria-label="Vücut çizimi">${imageUrl ? `<image href="${imageUrl}" x="-80" y="0" width="360" height="360" preserveAspectRatio="xMidYMid meet"/>` : ""}<g fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-linecap="round">${imageUrl ? "" : fig.map(d => `<path d="${d}"/>`).join("")}</g>${parts}</svg>`;
 }
 
 export const ICONS = {
@@ -156,6 +156,8 @@ export const ICONS = {
   defter: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4.5c3-.8 5.5-.5 8 1.2v14c-2.5-1.7-5-2-8-1.2z"/><path d="M20 4.5c-3-.8-5.5-.5-8 1.2v14c2.5-1.7 5-2 8-1.2z"/></svg>`,
   vucut: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="4.5" r="2.3"/><path d="M6 9.5c4-1.5 8-1.5 12 0M12 8.5v6.5M12 15l-3 6.5M12 15l3 6.5M8 9.8 6.5 14.5M16 9.8l1.5 4.7"/></svg>`,
   calis: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="14.5" cy="4.5" r="2"/><path d="M8 9.5l4-2 3 3-2 4 3 3v3M13 14.5l-4 1-2 4M15 10.5l3.5 1.5"/></svg>`,
+  uyku: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3.5a8.5 8.5 0 1 0 4.5 12.7A7.3 7.3 0 0 1 16 3.5z" fill="currentColor" fill-opacity=".12"/><path d="M5 5v3M3.5 6.5h3"/></svg>`,
+  diyar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5.5h4V20"/><path d="M17 5v3.5"/></svg>`,
   isler: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 3.5h11v15.5c0 1.2-1 2-2 2H5"/><path d="M6 3.5c-1.4 0-2 1-2 2s.6 2 2 2M8.5 8h6M8.5 11.5h6M8.5 15h4"/></svg>`,
 };
 
@@ -244,4 +246,13 @@ export const ACT_ICONS: Record<string, string> = {
   // açık kitap
   "session-pick": ai('<path d="M12 6c-2-1.5-5-2-8-1.5V19c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V4.5c-3-.5-6 0-8 1.5z"/><path d="M12 6v14.5"/>'),
   "show-place": ai('<path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/>', "var(--blue)"),
+};
+
+/** Mühendislik yapılarının mürekkep simgeleri. */
+const si = (d: string, c = "var(--ink)") => `<svg class="act-ic" viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+export const STRUCT_ICONS: Record<string, string> = {
+  barikat: si('<path d="M6 36h36" /><path d="M10 36V14l3-6 3 6v22M20 36V12l3-7 3 7v24M30 36V14l3-6 3 6v22" fill="rgba(139,106,69,.35)"/><path d="M6 28h36" stroke-dasharray="3 3"/>'),
+  ilmik: si('<ellipse cx="24" cy="30" rx="14" ry="6" fill="rgba(139,106,69,.2)"/><path d="M12 30c0-10 24-10 24 0M24 12c-8 4-8 12 0 14s8-10 0-14z" /><path d="M24 12V6"/>'),
+  cukur: si('<ellipse cx="24" cy="28" rx="16" ry="8" fill="rgba(42,39,34,.25)"/><path d="M14 28l3-10 3 10M22 28l3-12 3 12M30 28l3-9 3 9" fill="rgba(139,106,69,.35)"/>'),
+  ates: si('<path d="M24 6c2 7 10 9 10 19a10 10 0 0 1-20 0c0-5 3-7 5-10 1 3 3 4 4 2 1-3 0-6 1-11z" fill="rgba(217,104,42,.35)" stroke="#9E3423"/><path d="M24 40a5 5 0 0 1-5-5c0-4 5-6 5-10 3 3 5 6 5 10a5 5 0 0 1-5 5z" fill="rgba(240,180,60,.6)" stroke="#B07A1E"/>'),
 };

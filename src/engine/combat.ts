@@ -10,6 +10,7 @@ import { Rng } from "./rng";
 import { applyGain, realUse, summarize, type GainReport } from "./progression";
 import { attackTimingMods, dodgeMod } from "./timing";
 import { weaponSet, totalArmor, totalDodge, wornIds, hasBow } from "./gear";
+import { trapEffect, trapsOwned } from "./engineering";
 import { ENEMIES, GAME_ITEMS, MAPS, MAP_CHARS, TERRAIN, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, WOLF_WORDS, type Terrain, type WeakPoint, type FoeWords } from "../content/world";
 
 export type Weather = "acik" | "yagmur" | "sis";
@@ -50,6 +51,7 @@ export interface Battle {
   fire: Record<string, number>;   // "x,y" → kalan yanma turu
   walls: Record<string, number>;  // "x,y" → kalan buz duvarı turu
   traps: Record<string, number>;  // "x,y" → kurulu tuzak
+  trapInfo?: Record<string, { dmg: number; slow: number; fire: boolean }>; // tuzağın türüne göre etkisi
   torch: { has: boolean; thrown: boolean };
   flock: XY;
   questId?: string;
@@ -81,7 +83,7 @@ function windVec(dir: number) { const a = dir * Math.PI / 3; return { x: Math.co
 
 /* ---------- senaryo & hazırlık ---------- */
 export interface Scenario { mapId: string; enemies: string[]; weatherNow: Weather; weatherEvening: Weather; wind: { dir: number; strength: number }; seed: number }
-export interface Plan { timing: "simdi" | "aksam"; start: number; scout: boolean; readWind: boolean; traps: XY[]; torch: boolean; paid?: ("scout" | "readWind")[]; ambushed?: boolean; surprise?: boolean }
+export interface Plan { timing: "simdi" | "aksam"; start: number; scout: boolean; readWind: boolean; traps: XY[]; trapTypes?: string[]; torch: boolean; paid?: ("scout" | "readWind")[]; ambushed?: boolean; surprise?: boolean }
 export const DEFAULT_PLAN: Plan = { timing: "simdi", start: 0, scout: false, readWind: false, traps: [], torch: false };
 
 /** Savaş metinlerinde düşman nasıl anılır (kurtlar, haydutlar, muhafızlar…). */
@@ -104,7 +106,7 @@ export function prepOptions(cfg: Config, s: GameState): PrepOption[] {
   return [
     { id: "scout", name: "Araziyi keşfet", minutes: 30, energy: 4, money: 0, ok: true, desc: "Düşmanın nerede durduğunu ve kaç kişi olduğunu görürsün." },
     { id: "readWind", name: "Rüzgârı oku", minutes: 10, energy: 0, money: 0, ok: lv("koku") >= 8 || lv("analiz") >= 12, reason: "Koku 8 ya da gözlem 12 gerekir", desc: "Rüzgârın yönünü bilirsen kokunu ve sesini saklayabilirsin." },
-    { id: "trap", name: "Tuzak kur", minutes: 30, energy: 6, money: 0, ok: lv("el_becerisi") >= 10, reason: "El becerisi 10 gerekir", desc: "Haritada bir altıgene kazık-ilmek tuzağı (en çok 2)." },
+    { id: "trap", name: "Tuzak kur", minutes: 30, energy: 6, money: 0, ok: trapsOwned(s).length > 0, reason: "Atölyede tuzak yapmadın (Çanta → El işi)", desc: "Atölyende yaptığın tuzakları haritaya yerleştirirsin; savaştan sonra yine senindir." },
     { id: "torch", name: "Meşale hazırla", minutes: 10, energy: 0, money: 2, ok: s.money >= 2, reason: "2 bakır gerekir", desc: "Gece görüşün artar; bir kez fırlatıp otu tutuşturabilirsin." },
   ];
 }
@@ -228,13 +230,13 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
       .find(([x, y]) => inside({ w: m.rows[0].length, h: m.rows.length }, x, y) && m.rows[y][x] !== "=" && !units.some(u => u.x === x && u.y === y));
     if (d && free) { const hp = petHp(s); units.push({ uid: "pet", side: "ally", def: s.pet.id, name: s.pet.name, x: free[0], y: free[1], hp, maxHp: hp, moveLeft: 0, acted: false, slowed: 0 }); }
   }
-  const traps: Record<string, number> = {};
-  for (const [x, y] of plan.traps.slice(0, 2)) traps[key(x, y)] = 1;
+  const traps: Record<string, number> = {}; const trapInfo: NonNullable<Battle["trapInfo"]> = {};
+  plan.traps.forEach(([x, y], i) => { traps[key(x, y)] = 1; trapInfo[key(x, y)] = trapEffect(s, plan.trapTypes?.[i] ?? "ilmik_tuzagi"); });
   const b: Battle = {
     w: tiles[0].length, h: tiles.length, tiles, weather, night, wind: sc.wind, units, turn: 1, phase: "player",
     seed: rng.seed, log: [], events: [],
     stats: { attacks: 0, hits: 0, crits: 0, observed: 0, dmgTaken: 0, moves: 0, casts: 0, castMastery: {}, ambushes: 0, pushes: 0 }, questId,
-    fire: {}, walls: {}, traps, torch: { has: plan.torch, thrown: false }, flock: m.flock,
+    fire: {}, walls: {}, traps, trapInfo, torch: { has: plan.torch, thrown: false }, flock: m.flock,
   };
   startPlayerTurn(cfg, s, b);
   const W = foeWords(enemyIds);
@@ -443,7 +445,7 @@ export function playerPush(cfg: Config, s: GameState, b: Battle, target: Unit, q
     else if (pt.into === "dere") { target.slowed = 3; target.scared = true; text = `${target.name} dereye yuvarlandı; ıslak ve sersem.`; }
     else if (pt.into === "çamur") { target.slowed = 2; text = `${target.name} çamura saplandı.`; }
     const tk = key(target.x, target.y);
-    if (b.traps[tk]) { delete b.traps[tk]; target.hp = Math.max(0, target.hp - 5); target.slowed = Math.max(target.slowed, 2); b.events.push({ k: "trap", uid: target.uid, dmg: 5 }); text += " Tuzağa bastı!"; }
+    if (b.traps[tk]) { const te = springTrap(b, tk, target); text += ` Tuzağa bastı! ${te.dmg} hasar.`; }
     text += moraleCheck(b, target);
   }
   b.seed = rng.seed; b.log.unshift(text);
@@ -557,6 +559,15 @@ export function threatMap(cfg: Config, s: GameState, b: Battle): Map<string, num
   return out;
 }
 
+/** Tuzak tetiklenir: hasar, yavaşlama, ateş tuzağında çevre tutuşur. */
+function springTrap(b: Battle, tk: string, target: Unit) {
+  const te = b.trapInfo?.[tk] ?? { dmg: 5, slow: 2, fire: false };
+  delete b.traps[tk]; if (b.trapInfo) delete b.trapInfo[tk];
+  target.hp = Math.max(0, target.hp - te.dmg); target.slowed = Math.max(target.slowed, te.slow);
+  if (te.fire) { target.scared = true; b.fire[tk] = 3; for (const [nx, ny] of neighbors(b, target.x, target.y)) if (!TERRAIN[b.tiles[ny][nx]].blocks && TERRAIN[b.tiles[ny][nx]].env !== "su") b.fire[key(nx, ny)] = 2; }
+  b.events.push({ k: "trap", uid: target.uid, dmg: te.dmg });
+  return te;
+}
 /** Düşmanların turu. Olayları b.events'e yazar. */
 export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
   if (b.phase !== "player" && b.phase !== "enemy") return [];
@@ -591,8 +602,8 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
         const end = walked[walked.length - 1] ?? [e.x, e.y]; e.x = end[0]; e.y = end[1];
         const tk = key(e.x, e.y);
         if (b.traps[tk]) {
-          delete b.traps[tk]; e.hp = Math.max(0, e.hp - 5); e.slowed = Math.max(e.slowed, 2); e.alert = true;
-          b.events.push({ k: "trap", uid: e.uid, dmg: 5 }); out.push(`${e.name} tuzağa bastı! 5 hasar, topallıyor.` + moraleCheck(b, e));
+          const te = springTrap(b, tk, e); e.alert = true;
+          out.push(`${e.name} tuzağa bastı! ${te.dmg} hasar${te.fire ? ", alev saçıldı" : ", topallıyor"}.` + moraleCheck(b, e));
           if (e.fled || e.hp <= 0) continue;
         }
       }
