@@ -110,7 +110,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       g.lineWidth = 2; for (let y = yLow - 8; y > yHigh + 4; y -= 11) { g.beginPath(); g.moveTo(x - 9, y); g.lineTo(x + 9, y); g.stroke(); }
     }
   }
-  const FURN_ART: Record<string, [string, number]> = { "Sandık": ["sandik", 8], "Kömürleşmiş sandık": ["sandik", 8], "Kasa": ["sandik", 8], "Dolap": ["dolap", 17], "Fıçı": ["fici", 10], "Çuval": ["cuval", 9] };
+  const FURN_ART: Record<string, [string, number]> = { "Sandık": ["sandik", 8], "Kömürleşmiş sandık": ["sandik", 8], "Kasa": ["sandik", 8], "Dolap": ["dolap", 17], "Fıçı": ["fici", 10], "Çuval": ["cuval", 9], "Taş niş": ["tas_nis", 12], "Soba dibi": ["soba", 17] };
   function furniture(name: string, x: number, f: number, done: boolean) {
     const fa = FURN_ART[name]; const fim = fa ? img("harabe_" + fa[0]) : null;
     if (fim && fa) { const hh = fa[1] * sc(), ww = hh * fim.naturalWidth / fim.naturalHeight; g.save(); g.globalAlpha = done ? 0.55 : 1; g.drawImage(fim, X(x) - ww / 2, floorBottom(f) - 8 - hh, ww, hh); g.restore(); return; }
@@ -203,7 +203,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   function hud() {
     q("#scMoney").textContent = `◉ ${n.money}`; const rs = Math.max(0, Math.ceil(n.raidT)); const rp = q("#scRaid"); rp.textContent = `BASKIN ${rs}`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`;
     q("#scDanger").textContent = `Tehlike ${danger(n)}`;
-    q("#scAmmo").textContent = `${n.weaponName}${n.bow ? ` · ok ${n.ammo}` : ""}`; q("#scBag").textContent = `Çanta ${bagUsed(n)}/${n.bagCap}${n.keys.length ? ` · 🔑${n.keys.length}` : ""}`;
+    { const wa = n.weaponId && artUrl("harabe_silah_" + n.weaponId); q("#scAmmo").innerHTML = `${wa ? `<img class="sc-wicon" src="${wa}" alt="">` : ""}${esc(n.weaponName)}${n.bow ? ` · ok ${n.ammo}` : ""}`; } { const ka = artUrl("harabe_anahtar"); q("#scBag").innerHTML = `${n.keys.length ? (ka ? `<img class="sc-wicon" src="${ka}" alt="">×${n.keys.length} ` : `🔑${n.keys.length} `) : ""}Çanta ${bagUsed(n)}/${n.bagCap}`; }
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
     (q("#scSearch") as HTMLElement).hidden = true;
     const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", bagUsed(n) >= n.bagCap); }

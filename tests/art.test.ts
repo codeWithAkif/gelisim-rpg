@@ -21,7 +21,7 @@ test("her görsel bilinen bir kişi, yer ya da eşyaya ait ve küçük boyutlu",
     if (kind === "anim") expect(["kahraman_yuru", "kahraman_yay", "kurt_yuru", ...Object.keys(PET_TYPES).map(k => k + "_yuru")], f).toContain(id);
     if (kind === "yapi") expect(STRUCTURES.some(d => d.id === id), f).toBe(true);
     if (kind === "kule") expect(NOBET_SITES.some(d => d.place === id), f).toBe(true);
-    if (kind === "harabe") expect(/^(oda_(koru|karacam_sarnic|ardic_kul)|merdiven|kilit_kapi|kapi_acik|cikis|sandik|dolap|fici|cuval|raf|yatak|ocak|kasa|tas_nis|soba)$/.test(id), f).toBe(true);
+    if (kind === "harabe") expect(/^(oda_(koru|karacam_sarnic|ardic_kul)|merdiven|kilit_kapi|kapi_acik|cikis|sandik|dolap|fici|cuval|raf|yatak|ocak|kasa|tas_nis|soba|anahtar|silah_(pasli_kilic|eski_mizrak|civili_sopa|kemik_balta|avci_yayi|kisa_yay))$/.test(id), f).toBe(true);
     if (kind === "vucut") expect(id, f).toBe("insan");
     if (kind === "yer") expect(PLACES.some(p => p.id === id), f).toBe(true);
     if (kind === "esya") expect(items.has(id) || id === "mesale", f).toBe(true); // meşale savaş hazırlığında

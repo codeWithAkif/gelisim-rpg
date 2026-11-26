@@ -118,7 +118,7 @@ export interface Scav {
   px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
   spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number;
   bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
-  foundWeapons: string[]; armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[];
+  foundWeapons: string[]; weaponId: string; armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[];
   ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number };
 }
 const bagCount = (n: Scav) => Object.values(n.bag).reduce((a, b) => a + b, 0);
@@ -187,7 +187,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   return {
     site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4)), maxHp: Math.round(mh * 1.4),
     spots, searchId: 0, searchWait: 0, foes: [], nextId: 1, wave: 0, raidT: 15, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
-    atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
+    atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], weaponId: "", armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
     ground: [], gid: 1, proj: [], locks, keys: [], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
 }
@@ -277,8 +277,8 @@ function applyStage(n: Scav, sp: Spot, st: Stage) {
   if (st.kind === "money") { n.money += st.money ?? 0; n.fx.push({ k: "loot", text: `+${st.money} bakır`, ...at }); return; }
   if (st.kind === "weapon") {
     const w = FOUND_WEAPONS.find(x => x.id === st.weapon)!;
-    if (w.kind === "melee") { if (w.dmg > n.melee) { n.melee = w.dmg * (1 + (n.cards.keskin_el ?? 0) * 0.15); n.weaponName = w.name; } }
-    else if (!n.bow) { n.bow = true; n.dmg = Math.max(n.dmg, w.dmg); n.ammo += 6; n.weaponName = w.name; }
+    if (w.kind === "melee") { if (w.dmg > n.melee) { n.melee = w.dmg * (1 + (n.cards.keskin_el ?? 0) * 0.15); n.weaponName = w.name; n.weaponId = w.id; } }
+    else if (!n.bow) { n.bow = true; n.dmg = Math.max(n.dmg, w.dmg); n.ammo += 6; n.weaponName = w.name; n.weaponId = w.id; }
     else n.dmg = Math.max(n.dmg, w.dmg);
     n.foundWeapons.push(w.id); n.fx.push({ k: "weapon", name: w.name, ...at }); return;
   }

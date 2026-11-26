@@ -600,3 +600,4 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .sc-sup { position: relative; width: 44px; height: 44px; border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper); display: grid; place-items: center; padding: 0; cursor: pointer; }
 .sc-sup:disabled { opacity: .45; }
 .sc-sup i { position: absolute; right: -4px; bottom: -4px; font-style: normal; font-family: var(--f-hand); font-size: 14px; background: var(--ink); color: var(--paper); border-radius: 8px; padding: 0 5px; }
+.sc-wicon { width: 26px; height: 26px; object-fit: contain; vertical-align: middle; margin-right: 4px; }
