@@ -14,7 +14,7 @@ export const PET_TYPES: Record<string, PetType> = {
     perks: [{ bond: 0, text: "Savaşta kurda koşar ve ısırır" }, { bond: 10, text: "Kokuyla bulunan şeyleri daha sık bulur" }, { bond: 30, text: "Isırığı sertleşir" }, { bond: 50, text: "Nöbette daha geniş alanı kollar" }, { bond: 75, text: "Her gün fazladan bir bulgu getirir" }] },
   kedi: { id: "kedi", species: "Han kedisi", defaultName: "Pamuk", role: "Gölge", price: 25, shop: "karacam_han",
     desc: "Sessiz ve dikkatli. Gizlenirken seni ele vermez, etrafı ararken küçük şeyleri fark eder.", likes: ["peynir"],
-    perks: [{ bond: 0, text: "Gizlenirken kuşku daha yavaş dolar" }, { bond: 10, text: "Etrafı ararken bulma şansı artar" }, { bond: 30, text: "Gece pusuları önceden sezer" }, { bond: 50, text: "Fareleri kovar: depodaki malzeme bozulmaz" }, { bond: 75, text: "Gizlenmede kuşku iyice yavaşlar" }] },
+    perks: [{ bond: 0, text: "Gizlenirken kuşku daha yavaş dolar" }, { bond: 10, text: "Etrafı ararken bulma şansı artar" }, { bond: 30, text: "Gece pusuları önceden sezer" }, { bond: 50, text: "Fareleri kovar: işletmelerin üretimi %10 artar" }, { bond: 75, text: "Gizlenmede kuşku iyice yavaşlar" }] },
   sahin: { id: "sahin", species: "Dağ şahini", defaultName: "Ayaz", role: "Gözcü", price: 60, shop: "ayaz_gecit",
     desc: "Yukarıdan görür. Araziyi senin yerine tarar, nöbette menzilini uzatır.", likes: ["et"],
     perks: [{ bond: 0, text: "Arazi keşfi vakit almaz" }, { bond: 10, text: "Nöbette menzil uzar" }, { bond: 30, text: "Rüzgârı senin yerine okur" }, { bond: 50, text: "Yolculukta pusuları önceden haber verir" }, { bond: 75, text: "Uzak bir hedefe oku kılavuzlar: kritik şansı artar" }] },

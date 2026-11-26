@@ -15,7 +15,7 @@ import { gearOf, slotsFor, weaponSet, totalArmor, totalDodge, gearBonus, wornIds
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, MARKETS, CRAFTS } from "../content/world";
 import { esc, inkBar, wolfSketch, humanSketch, bodySketch, VITAL_ICONS, ICONS, STRUCT_ICONS } from "./sketch";
-import { personPic, itemPic, placePic, motherPic, artUrl, petArt } from "./art";
+import { personPic, itemPic, placePic, motherPic, artUrl, petArt, structPic } from "./art";
 import { RELICS } from "../content/relics";
 import { REGION_NAMES } from "../content/map";
 import { collected, seenCount, dailyRequests, searchInfo, canSearch } from "../engine/explore";
@@ -410,7 +410,7 @@ function craftingSection(cfg: Config, s: GameState, craftsHtml: string): string 
   const structs = STRUCTURES.map(d => {
     const y = yapiOf(s, d.id); const chk = canBuild(cfg, s, d.id); const need = upgradeNeed(s, d.id); const cu = canUpgrade(cfg, s, d.id);
     const lv = levelOf(s, d.id);
-    return `<div class="entry struct"><div class="item-detail">${STRUCT_ICONS[d.icon]}<div style="flex:1;min-width:0">
+    return `<div class="entry struct"><div class="item-detail">${structPic(d.id, 56) || STRUCT_ICONS[d.icon]}<div style="flex:1;min-width:0">
       <div class="entry-head"><span class="entry-title">${esc(d.name)}</span><span class="entry-meta">${y.n} adet · seviye ${lv}/${d.maxLv}</span></div>
       <div class="muted tiny">${esc(d.desc)}</div><div class="tiny" style="margin:2px 0"><b>Şimdi:</b> ${esc(d.effect(lv))}</div>
       <div class="chips">${chips(d.cost)}<span class="chip">${d.minutes} dk</span>${Object.entries(d.skill).map(([a, v]) => `<span class="chip ${(s.attrs[a]?.level ?? 0) >= v ? "" : "miss"}">${esc(cfg.attr.get(a)?.name ?? a)} ${v}</span>`).join("")}</div>

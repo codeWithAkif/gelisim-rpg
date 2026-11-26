@@ -424,8 +424,8 @@ export function startApp(root: HTMLElement) {
         }
         const base = q.battle!.enemies; const foes = rollFoes(s, base, id);
         const W = foeWords(foes); const big = foes.find(e => (ENEMIES[e]?.scale ?? 1) > 1);
-        const battleEnd = (o: BattleOutcome, bt?: { units: { uid: string }[] }) => {
-          let extra = heroLinesHtml(afterBattle(s, (bt?.units ?? []).filter(u => u.uid.startsWith("h:")).map(u => u.uid.slice(2)), o.result === "won" ? "won" : o.result === "fled" ? "fled" : "lost"));
+        const battleEnd = (o: BattleOutcome, bt?: { units: { uid: string; hp: number }[] }) => {
+          let extra = heroLinesHtml(afterBattle(s, (bt?.units ?? []).filter(u => u.uid.startsWith("h:")).map(u => u.uid.slice(2)), o.result === "won" ? "won" : o.result === "fled" ? "fled" : "lost", Object.fromEntries((bt?.units ?? []).filter(u => u.uid.startsWith("h:")).map(u => [u.uid.slice(2), u.hp]))));
           if (o.result === "won") {
             const r = completeQuest(cfg, s, id, bonusOf(s, base, foes));
             if (Object.keys(r.dropped).length) toast("Çantan doluydu; bazı ödülleri taşıyamadın.");
@@ -481,7 +481,7 @@ export function startApp(root: HTMLElement) {
           const endModal = (head: string, text: string, gains: Record<string, number>) => { persist(); render(); modal(`<h2>${esc(head)}</h2><p class="lede">${esc(text)}</p>${gainList(cfg, gains, 5)}`, [{ label: "Yola devam", cls: "primary", fn: cont }]); };
           const melee = (plan = { ...DEFAULT_PLAN, ambushed: true }) => {
             const sc = makeScenario(s, AMBUSH_MAP, foes, "pusu" + s.day + s.minute);
-            openBattle(cfg, s, sc, plan, undefined, (o, bt) => { const hl = afterBattle(s, bt.units.filter(u => u.uid.startsWith("h:")).map(u => u.uid.slice(2)), o.result === "won" ? "won" : o.result === "fled" ? "fled" : "lost");
+            openBattle(cfg, s, sc, plan, undefined, (o, bt) => { const hl = afterBattle(s, bt.units.filter(u => u.uid.startsWith("h:")).map(u => u.uid.slice(2)), o.result === "won" ? "won" : o.result === "fled" ? "fled" : "lost", Object.fromEntries(bt.units.filter(u => u.uid.startsWith("h:")).map(u => [u.uid.slice(2), u.hp])));
               endModal(o.result === "won" ? (foes.length > 1 ? "Sürü dağıldı" : "Kurt kaçtı") : o.result === "fled" ? "Sıyrıldın" : "Yaralandın",
               (o.result === "lost" ? "Kanayan kolunla yoluna devam ettin." : "Soluklanıp yoluna devam ettin.") + spoils(o.result === "won") + (hl.length ? " " + hl.join(" ") : ""), o.gains); }, persist);
           };

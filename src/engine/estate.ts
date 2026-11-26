@@ -3,7 +3,7 @@
 // gelmesi vakit alır. Evdekiler günlük işlere atanır; sonuç ertesi sabah belli olur.
 import type { Config } from "./config";
 import { type GameState, DAY_MINUTES, repOf, log } from "./state";
-import { addItem, removeItem, freeCount } from "./inventory";
+import { addItem, removeItem, freeCount, itemInfo } from "./inventory";
 import { route, MIN_PER_UNIT } from "./travel";
 import { Rng } from "./rng";
 import { QUESTS } from "../content/world";
@@ -137,10 +137,11 @@ export function callMany(s: GameState, ids: string[], place: string): { ok: bool
   const eta = etaTo(s, place); s.minute = Math.min(DAY_MINUTES, s.minute + eta); return { ok: true, minutes: eta };
 }
 /** Savaştan sonra: deneyim, yaralanma. */
-export function afterBattle(s: GameState, ids: string[], result: "won" | "lost" | "fled"): string[] {
+export function afterBattle(s: GameState, ids: string[], result: "won" | "lost" | "fled", hp?: Record<string, number>): string[] {
   const out: string[] = []; const rng = new Rng((s.seed * 31 + s.day * 977 + s.minute) | 0);
   for (const id of ids) {
     const h = heroOf(s, id); if (!h) continue;
+    if (hp?.[id] !== undefined) h.hp = Math.max(1, Math.min(heroStats(h).maxHp, Math.round(hp[id])));   // savaştan kalan can
     const up = gainXp(s, h, result === "won" ? 6 : 2); if (up) out.push(up);
     if (result !== "won" && rng.chance(result === "lost" ? 55 : 20)) { h.status = "yarali"; h.until = s.day + 2; h.hp = Math.max(1, Math.round(heroStats(h).maxHp * 0.3)); est(s).party = est(s).party!.filter(x => x !== id); out.push(`${heroDef(id)!.name} yaralandı.`); }
     else h.loyalty = Math.min(100, h.loyalty + (result === "won" ? 2 : 0));
@@ -197,6 +198,8 @@ export function collect(cfg: Config, s: GameState, id: string): { ok: boolean; g
 /* ---------- her gece ---------- */
 export function nightly(cfg: Config, s: GameState): string[] {
   const e = est(s); const out: string[] = []; const rng = new Rng((s.seed * 7 + s.day * 104729 + 13) | 0);
+  // Karabaş (bağ 75) her gün bir şey bulup getirir
+  if (s.pet?.id === "kopek" && (s.pet.bond ?? 0) >= 75) { const it = rng.chance(50) ? "kekik" : "odun"; if (addItem(cfg, s, it, 1) === 0) out.push(`${s.pet.name} ağzında bir ${itemInfo(cfg, it).name.toLowerCase()} getirdi.`); }
   if (!e.house && !e.heroes!.length) return out;
   // maaşlar
   let wages = 0; for (const h of e.heroes!) wages += heroDef(h.id)!.wage;
@@ -224,7 +227,7 @@ export function nightly(cfg: Config, s: GameState): string[] {
     if (!w || w.status !== "evde") continue; const up = d.upkeep * v.lv;
     if (s.money < up) { out.push(`${d.name}: bakım parası yok, iş durdu.`); continue; }
     s.money -= up; const hd = heroDef(w.id)!; const fit = hd.role === d.need ? 1 : 0.55;
-    v.acc += d.per * v.lv * fit * (0.7 + heroStats(w).power / 14); const k = Math.floor(v.acc); v.acc -= k; v.stock = Math.min(10 * v.lv, v.stock + k);
+    v.acc += d.per * v.lv * fit * (0.7 + heroStats(w).power / 14) * (s.pet?.id === "kedi" && (s.pet.bond ?? 0) >= 50 ? 1.1 : 1); const k = Math.floor(v.acc); v.acc -= k; v.stock = Math.min(10 * v.lv, v.stock + k);
     if (k) out.push(`${d.name}: +${k} ${d.makes}.`);
   }
   // sadakat bitmiş olanlar gider

@@ -3,19 +3,19 @@ import { test, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
 import { newGame, type GameState } from "../src/engine/state";
 import { Rng } from "../src/engine/rng";
-import { waveScale, milestoneReward, createNobet, stepNobet, buyUpgrade, pickCard, useSkill, finishNobet, buyPerm, upgradeCost, nobetSite, canStartNobet, nobetSave, type Nobet, type StatId } from "../src/engine/nobet";
+import { waveScale, milestoneReward, createNobet, stepNobet, buyUpgrade, pickCard, useSpell, startWaves, finishNobet, buyPerm, upgradeCost, nobetSite, canStartNobet, nobetSave, type Nobet, type StatId } from "../src/engine/nobet";
 
 function play(s: GameState, seed: number, bot: "bos" | "akilli", limit = 900): Nobet {
   const n = createNobet(cfg, s, nobetSite("yayla")!, seed);
   const order: StatId[] = ["dmg", "rate", "hp", "regen", "dmg", "range"]; let k = 0;
   for (let t = 0; t < limit / 0.05 && n.phase !== "over"; t++) {
     if (n.phase === "card") pickCard(s, n, n.offer[0]);
-    if (bot === "akilli") { while (buyUpgrade(n, order[k % order.length])) k++; useSkill(n); }
+    if (bot === "akilli") { while (buyUpgrade(n, order[k % order.length])) k++; for (const id of Object.keys(n.spells)) useSpell(n, id, 40, 40); }
     stepNobet(s, n, 0.05);
   }
   return n;
 }
-const fresh = () => { const s = newGame(cfg, 4); s.quests.kurt = { status: "bitti", count: 1 }; s.location = "yayla"; return s; };
+const fresh = () => { const s = newGame(cfg, 4); s.quests.kurt = { status: "bitti", count: 1 }; s.location = "yayla"; s.equipped.bow = "av_yayi"; s.inventory.av_yayi = 1; return s; };
 
 test("hiç güçlenmeyen erken düşer; akıllı oynayan çok daha ileri gider", () => {
   const w0: number[] = [], w1: number[] = [];

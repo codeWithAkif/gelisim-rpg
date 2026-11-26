@@ -108,7 +108,7 @@ export function prepOptions(cfg: Config, s: GameState): PrepOption[] {
   const lv = (a: string) => s.attrs[a]?.level ?? 0;
   return [
     { id: "scout", name: "Araziyi keşfet", minutes: 30, energy: 4, money: 0, ok: true, desc: "Düşmanın nerede durduğunu ve kaç kişi olduğunu görürsün." },
-    { id: "readWind", name: "Rüzgârı oku", minutes: 10, energy: 0, money: 0, ok: lv("koku") >= 8 || lv("analiz") >= 12, reason: "Koku 8 ya da gözlem 12 gerekir", desc: "Rüzgârın yönünü bilirsen kokunu ve sesini saklayabilirsin." },
+    { id: "readWind", name: "Rüzgârı oku", minutes: s.pet?.id === "sahin" && (s.pet.bond ?? 0) >= 30 ? 0 : 10, energy: 0, money: 0, ok: lv("koku") >= 8 || lv("analiz") >= 12 || (s.pet?.id === "sahin" && (s.pet.bond ?? 0) >= 30), reason: "Koku 8 ya da gözlem 12 gerekir", desc: "Rüzgârın yönünü bilirsen kokunu ve sesini saklayabilirsin." },
     { id: "trap", name: "Tuzak kur", minutes: 30, energy: 6, money: 0, ok: trapsOwned(s).length > 0, reason: "Atölyede tuzak yapmadın (Çanta → El işi)", desc: "Atölyende yaptığın tuzakları haritaya yerleştirirsin; savaştan sonra yine senindir." },
     { id: "torch", name: "Meşale hazırla", minutes: 10, energy: 0, money: 2, ok: s.money >= 2, reason: "2 bakır gerekir", desc: "Gece görüşün artar; bir kez fırlatıp otu tutuşturabilirsin." },
   ];
@@ -121,7 +121,7 @@ export function doPrep(cfg: Config, s: GameState, questId: string, what: "scout"
   if (today[what]) return;
   today[what] = true; s.prep[questId] = today;
   if (what === "scout") { if (s.pet?.id !== "sahin") { s.minute = Math.min(DAY_MINUTES, s.minute + 30); s.energy = Math.max(0, s.energy - 4); } applyGain(cfg, s, "analiz", 0.3, {}); applyGain(cfg, s, "mekansal", 0.2, {}); }
-  else { s.minute = Math.min(DAY_MINUTES, s.minute + 10); applyGain(cfg, s, "koku", 0.2, {}); }
+  else { if (!(s.pet?.id === "sahin" && (s.pet.bond ?? 0) >= 30)) s.minute = Math.min(DAY_MINUTES, s.minute + 10); applyGain(cfg, s, "koku", 0.2, {}); }
 }
 export function prepDone(s: GameState, questId: string): { scout: boolean; readWind: boolean } {
   const p = s.prep?.[questId]; return p && p.day === s.day ? { scout: !!p.scout, readWind: !!p.readWind } : { scout: false, readWind: false };
@@ -129,7 +129,7 @@ export function prepDone(s: GameState, questId: string): { scout: boolean; readW
 export function planCost(s: GameState, p: Plan): { minutes: number; energy: number; money: number } {
   const wait = p.timing === "aksam" ? Math.max(0, (20 - 6) * 60 - s.minute) : 0;
   return {
-    minutes: wait + (p.scout && !paid(p, "scout") ? 30 : 0) + (p.readWind && !paid(p, "readWind") ? 10 : 0) + p.traps.length * 30 + (p.torch ? 10 : 0),
+    minutes: wait + (p.scout && !paid(p, "scout") ? 30 : 0) + (p.readWind && !paid(p, "readWind") && !(s.pet?.id === "sahin" && (s.pet.bond ?? 0) >= 30) ? 10 : 0) + p.traps.length * 30 + (p.torch ? 10 : 0),
     energy: (p.scout && !paid(p, "scout") ? 4 : 0) + p.traps.length * 6,
     money: p.torch ? 2 : 0,
   };

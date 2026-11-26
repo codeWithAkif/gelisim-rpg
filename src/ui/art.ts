@@ -24,6 +24,12 @@ export function itemPic(id: string, size = 44): string {
   return `<img class="art-item" src="${url}" width="${size}" height="${size}" alt="" loading="lazy">`;
 }
 
+/** Yapı (barikat, tuzak) resmi: varsa çizimi, yoksa boş (çağıran eskizi kullanır). */
+export function structPic(id: string, size = 56): string {
+  const url = ART["yapi_" + id];
+  return url ? `<img class="art-item" src="${url}" width="${size}" height="${size}" alt="" loading="lazy">` : "";
+}
+
 /** Annenin portresi: "Annemin sayfaları" bölümünün başında, bir anı gibi soluk. */
 export function motherPic(): string {
   const url = ART["portre_anne"];

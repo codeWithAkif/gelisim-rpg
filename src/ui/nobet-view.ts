@@ -5,9 +5,12 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Nobet, type StatId, type NobetResult, NFIELD, TOWER, STAT_NAMES, CARDS, PERMS, createNobet, stepNobet, buyUpgrade, upgradeCost, statValue,
-  pickCard, useSpell, spellReady, placePet, petGuard, SPELL_NAMES, type SpellId, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave, waveScale, type Loot,
+  pickCard, useSpell, spellReady, placePet, petGuard, type SpellId, type SpellKind, placeBar, placeTrap, pickUp, startWaves, canPlaceNow, structLeft, BAR_LEN, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave, waveScale, type Loot,
 } from "../engine/nobet";
 import { ENEMIES } from "../content/world";
+import { hasBow } from "../engine/gear";
+import { structure, owned } from "../engine/engineering";
+import { spellOptions } from "../engine/magic";
 import { artUrl } from "./art";
 import { esc } from "./sketch";
 import { GAME_ITEMS } from "../content/world";
@@ -27,7 +30,7 @@ export function openNobetHub(cfg: Config, s: GameState, place: string, persist: 
   const draw = () => {
     const sv = nobetSave(s); const can = canStartNobet(s, place);
     bg.innerHTML = `<div class="modal nobet-hub" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">Nöbet</p><h2>${esc(site.name)}</h2>
-      <p style="margin:0">Kulenin tepesindesin; menziline gireni kendin vurursun. Düşenlerden kırıntı toplar, onunla güçlenirsin. Sayfa dolunca bir kart seçersin. Dalgalar bitmez; her dalgada daha hızlı ve daha sert gelirler. Her beş dalgada bir ödül var: ${site.purse.money} bakır ve yerin malından bir şey, ileride daha çok.</p>
+      <p style="margin:0">Kulenin tepesindesin. ${hasBow(s) ? "Yayınla menzilindekini vurursun" : "<b>Yayın yok: kule ok atmaz</b>; yalnız yanına gelene elindeki silahla vurursun"}. Büyülerinden bildiklerini kullanırsın: ${spellOptions(cfg, { ...s, mana: 999 } as GameState).filter(o => o.ok).map(o => o.spell.name).join(", ") || "henüz yok"}. Hazırladığın barikat ve tuzakları kurarsın. Düşenlerden kırıntı toplar, onunla güçlenirsin. Sayfa dolunca bir kart seçersin. Dalgalar bitmez; her dalgada daha hızlı ve daha sert gelirler. Her beş dalgada bir ödül var: ${site.purse.money} bakır ve yerin malından bir şey, ileride daha çok.</p>
       <div class="odds"><span>Rekor <b>${sv.best[place] ?? 0}. dalga</b></span><span>Nöbet izi <b>${sv.iz}</b></span><span>Enerji <b>−20</b></span></div>
       <h3 style="margin:4px 0 0">Kalıcı güçlenmeler</h3>
       <div class="perm-list">${PERMS.map(p => { const lv = permLevel(s, p.id); const c = permCost(p, lv); const max = lv >= p.max;
@@ -54,7 +57,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="nbTip"></div></div><div class="nb-spells" id="nbSpells"></div>
     <div class="nb-hp"><div class="gb"><div class="gf" id="nbHp" style="background:var(--red)"></div></div><span id="nbHpT"></span></div>
     <div class="nb-bar"><div class="nb-page" title="Defter sayfası"><div class="gf" id="nbPage"></div></div><span class="nb-coins" id="nbCoins"></span></div>
-    <div class="nb-ups" id="nbUps"></div><div class="nb-card" id="nbCard" hidden></div><div class="nb-card" id="nbPause" hidden></div>`;
+    <div class="nb-build" id="nbBuild" hidden></div><div class="nb-ups" id="nbUps"></div><div class="nb-card" id="nbCard" hidden></div><div class="nb-card" id="nbPause" hidden></div>`;
   document.body.appendChild(el);
   const cv = el.querySelector("canvas")!; const stage = el.querySelector<HTMLElement>(".siege-stage")!; const g = cv.getContext("2d")!;
   const ups = el.querySelector<HTMLElement>("#nbUps")!; const cardEl = el.querySelector<HTMLElement>("#nbCard")!; const pauseEl = el.querySelector<HTMLElement>("#nbPause")!;
@@ -74,11 +77,11 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
 
   const STATS: StatId[] = ["dmg", "rate", "hp", "regen", "range"];
   function renderUps() {
-    ups.innerHTML = STATS.map(id => { const c = upgradeCost(n.lv[id]);
-      return `<button class="nb-up" data-up="${id}" ${n.coins < c ? "disabled" : ""}><span class="nm">${STAT_NAMES[id]}</span><span class="val">${fmt(id, statValue(n, id))}</span><span class="cost">${c} ◉</span></button>`; }).join("");
+    ups.innerHTML = STATS.map(id => { const c = upgradeCost(n.lv[id]); const off = id === "range" && !n.bow;
+      return `<button class="nb-up" data-up="${id}" ${n.coins < c || off ? "disabled" : ""}><span class="nm">${STAT_NAMES[id]}</span><span class="val">${off ? "yay yok" : fmt(id, statValue(n, id))}</span><span class="cost">${c} ◉</span></button>`; }).join("");
   }
   function refreshUps() {
-    for (const id of STATS) { const b = ups.querySelector<HTMLButtonElement>(`[data-up="${id}"]`); if (!b) continue; b.disabled = n.coins < upgradeCost(n.lv[id]); }
+    for (const id of STATS) { const b = ups.querySelector<HTMLButtonElement>(`[data-up="${id}"]`); if (!b) continue; b.disabled = n.coins < upgradeCost(n.lv[id]) || (id === "range" && !n.bow); }
   }
   ups.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-up]"); if (!b || b.disabled) return;
@@ -106,16 +109,19 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     pauseEl.hidden = true; paused = false; if (b.dataset.p === "quit") { n.phase = "over"; }
   });
   const sv = (d: string) => `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
-  const SPELL_ICON: Record<SpellId, string> = {
+  const SPELL_ICON: Record<SpellKind, string> = {
     simsek: sv('<path d="M13 2 5 14h6l-2 8 9-13h-6z" fill="currentColor" fill-opacity=".25"/>'),
+    ates: sv('<path d="M12 3c1 4 6 6 6 11a6 6 0 0 1-12 0c0-3 2-4 3-6 1 2 2 2 3 0 .5-2 0-3 0-5z" fill="currentColor" fill-opacity=".3"/>'),
+    buz: sv('<path d="M12 2v20M4 7l16 10M20 7 4 17"/><path d="M9 4l3 2 3-2M9 20l3-2 3 2" />'),
+    camur: sv('<path d="M3 17c3-3 5-3 8 0s5 3 8 0M5 12c3-3 5-3 7 0s4 3 7 0" /><circle cx="8" cy="7" r="1.5"/><circle cx="14" cy="5" r="1"/>'),
     sarmasik: sv('<path d="M12 22c0-6-1-9-5-12M12 22c0-5 2-8 6-10"/><path d="M7 10c-3 0-4-2-4-4 3 0 4 2 4 4zM18 12c3-1 3-3 3-5-3 0-4 2-3 5zM12 15c-2-2-2-4 0-6 2 2 2 4 0 6z" fill="currentColor" fill-opacity=".3"/>'),
     karga: sv('<path d="M2 9c3-1 5 0 6 2 1-3 3-4 6-4M10 16c2-1 4 0 5 2 1-2 3-3 5-3"/><path d="M14 7c2-1 4-1 6 0"/>'),
     kilic: sv('<path d="M5 21 9 9l2 12M11 21l3-14 3 14M17 21l2-9 2 9"/><path d="M2 21h20"/>'),
   };
   const spellBar = el.querySelector<HTMLElement>("#nbSpells")!; let barKey = "";
   function renderSpells() {
-    const ids = Object.keys(n.spells) as SpellId[]; const k = ids.join(); if (k === barKey) return; barKey = k;
-    spellBar.innerHTML = ids.map(id => `<button class="nb-skill" data-spell="${id}" aria-label="${SPELL_NAMES[id]}"><span class="cdf"></span><span class="ic">${SPELL_ICON[id]}</span><small>${SPELL_NAMES[id]}</small></button>`).join("");
+    const ids = Object.keys(n.spells); const k = ids.join(); if (k === barKey) return; barKey = k;
+    spellBar.innerHTML = ids.map(id => `<button class="nb-skill" data-spell="${id}" aria-label="${esc(n.spells[id].name)}"><span class="cdf"></span><span class="ic">${SPELL_ICON[n.spells[id].kind]}</span><small>${esc(n.spells[id].name)}</small></button>`).join("");
   }
   spellBar.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-spell]"); if (!b) return;
@@ -124,24 +130,51 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     if (armed === id) { armed = null; sfx("tap"); }
     else if (spellReady(n, id)) { armed = id; sfx("tap"); buzz("light"); }
     else { sfx("bad"); return; }
-    tip.hidden = !armed; if (armed) tip.textContent = armed === "kilic" ? "Kılıçların yükseleceği yöne dokun" : `${SPELL_NAMES[armed]}: hedefe dokun`;
+    tip.hidden = !armed; if (armed) tip.textContent = n.spells[armed].kind === "kilic" ? "Kılıçların yükseleceği yöne dokun" : `${n.spells[armed].name}: hedefe dokun`;
     for (const x of spellBar.querySelectorAll<HTMLElement>("[data-spell]")) x.classList.toggle("armed", x.dataset.spell === armed);
   });
   let armed: SpellId | null = null; let aim: { x: number; y: number } | null = null;
   function castAt(x: number, y: number) {
     const id = armed!; armed = null; aim = null; tip.hidden = true;
     for (const b of spellBar.querySelectorAll<HTMLElement>("[data-spell]")) b.classList.remove("armed");
-    if (useSpell(n, id, x, y)) { sfx(id === "simsek" ? "spark" : id === "kilic" ? "clang" : id === "karga" ? "whoosh" : "thunk"); if (id !== "karga") sfx("crit"); buzz("heavy"); shake = id === "sarmasik" ? 4 : 10; } else sfx("bad");
+    const kd = n.spells[id].kind;
+    if (useSpell(n, id, x, y)) { sfx(kd === "simsek" ? "spark" : kd === "kilic" ? "clang" : kd === "karga" ? "whoosh" : kd === "ates" ? "fire" : kd === "buz" ? "splash" : "thunk"); if (kd !== "karga") sfx("crit"); buzz("heavy"); shake = kd === "sarmasik" || kd === "camur" ? 4 : 10; } else sfx("bad");
   }
   // köpeğin bekleyeceği yer: araziye dokun
   const tip = el.querySelector<HTMLElement>("#nbTip")!;
   tip.hidden = true;
-  if (n.pet) { tip.hidden = false; tip.textContent = `${s.pet!.name}'ın kollayacağı yere dokun`; setTimeout(() => { if (!armed) tip.hidden = true; }, 6000); }
+  if (n.pet && !n.prep) { tip.hidden = false; tip.textContent = `${s.pet!.name}'ın kollayacağı yere dokun`; setTimeout(() => { if (!armed) tip.hidden = true; }, 6000); }
   const at = (e: PointerEvent) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left - ox) / scale, y: (e.clientY - r.top - oy) / scale }; };
+  // kurulum paneli: elindeki barikat ve tuzaklar
+  const buildEl = el.querySelector<HTMLElement>("#nbBuild")!; let buildSel: string | null = null; let buildKey = "";
+  const hasStructs = () => { const l = structLeft(s, n); return l.barikat + n.bars.length > 0 || l.traps.some(t => t.n + n.traps.filter(x => x.type === t.id).length > 0); };
+  function renderBuild() {
+    const l = structLeft(s, n); const can = canPlaceNow(n);
+    const key = JSON.stringify([l, buildSel, n.prep, can, n.bars.length, n.traps.length]); if (key === buildKey) return; buildKey = key;
+    if (!hasStructs()) { buildEl.hidden = true; return; }
+    buildEl.hidden = false;
+    const tot = (id: string) => l.traps.find(t => t.id === id)!.n + n.traps.filter(x => x.type === id).length;
+    buildEl.innerHTML = `<div class="nb-brow"><b>Kur</b>
+      ${owned(s, "kazik_barikat") > 0 ? `<button class="chip ${buildSel === "bar" ? "on" : ""}" data-build="bar">Barikat ${l.barikat}/${owned(s, "kazik_barikat")}</button>` : ""}
+      ${l.traps.map(t => `<button class="chip ${buildSel === t.id ? "on" : ""}" data-build="${t.id}">${esc(structure(t.id)?.name ?? t.id)} ${t.n}/${tot(t.id)}</button>`).join("")}
+      ${n.prep ? `<button class="btn small primary" data-bstart>Dalgaları başlat</button>` : ""}</div>
+      <div class="tiny muted">${n.prep ? "Bir yapı seç, araziye dokun. Dokunduğun yapıyı geri alırsın. Hazırsan başlat." : can ? "Dalgalar arasında yeniden kurabilirsin." : "Dalga sürerken kurulamaz."}</div>`;
+  }
+  buildEl.addEventListener("click", e => {
+    if ((e.target as HTMLElement).closest("[data-bstart]")) { startWaves(n); buildSel = null; tip.hidden = true; sfx("beat"); renderBuild(); return; }
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-build]"); if (!b) return;
+    buildSel = buildSel === b.dataset.build ? null : b.dataset.build!; sfx("tap"); tip.hidden = !buildSel; if (buildSel) tip.textContent = "Kurmak istediğin yere dokun"; renderBuild();
+  });
+  if (n.prep) { tip.hidden = false; tip.textContent = "Hazırlık: yapılarını kur, sonra dalgaları başlat"; }
   cv.addEventListener("pointerdown", e => {
     if (n.phase !== "play") return;
     const p = at(e);
     if (armed) { aim = p; cv.setPointerCapture(e.pointerId); return; }   // parmağı kaldırınca atılır; sürükleyerek nişan düzeltilir
+    if (buildSel) {
+      if (!canPlaceNow(n)) { sfx("bad"); return; }
+      if (pickUp(n, p.x, p.y)) { sfx("tap"); renderBuild(); return; }
+      const ok = buildSel === "bar" ? placeBar(s, n, p.x, p.y) : placeTrap(s, n, buildSel, p.x, p.y); sfx(ok ? "thunk" : "bad"); if (ok) buzz("light"); renderBuild(); return;
+    }
     if (n.pet && placePet(n, p.x, p.y)) { sfx("tap"); petMark = performance.now(); }
   });
   cv.addEventListener("pointermove", e => { if (armed && aim) aim = at(e); });
@@ -159,6 +192,8 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   }
   function tower() {
     const x = X(TOWER.x), y = Y(TOWER.y), r = TOWER.r * scale;
+    const ta = artUrl("kule_" + site.place) ? img("kule_" + site.place) : null;   // çizilmiş kule varsa o, yoksa eskiz
+    if (ta) { const w = r * 3.2, h = w * ta.naturalHeight / ta.naturalWidth; g.drawImage(ta, x - w / 2, y - h * 0.78, w, h); return; }
     g.fillStyle = "rgba(42,39,34,.18)"; g.beginPath(); g.ellipse(x, y + r * 0.55, r * 1.25, r * 0.55, 0, 0, 7); g.fill();
     g.fillStyle = "#8A6A45"; g.strokeStyle = C("--ink"); g.lineWidth = 1.6;
     g.beginPath(); g.moveTo(x - r, y - r * 0.2); g.lineTo(x - r * 0.85, y + r * 0.55); g.lineTo(x + r * 0.85, y + r * 0.55); g.lineTo(x + r, y - r * 0.2); g.closePath(); g.fill(); g.stroke();
@@ -178,8 +213,21 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     for (let i = 0; i < 26; i++) { const side = i % 2, t = (i * 0.137) % 1; const x = side ? NFIELD.w - 3 - (i % 3) * 3 : 3 + (i % 3) * 3; const y = t * NFIELD.h;
       g.beginPath(); g.moveTo(X(x), Y(y) - 4 * scale); g.lineTo(X(x) - 2.6 * scale, Y(y) + 1.5 * scale); g.lineTo(X(x) + 2.6 * scale, Y(y) + 1.5 * scale); g.closePath(); g.fill(); g.stroke(); }
     // menzil
-    g.setLineDash([6, 6]); g.strokeStyle = "rgba(255,255,255,.85)"; g.lineWidth = 2; g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y), n.range * scale, 0, 7); g.stroke(); g.setLineDash([]);
-    g.fillStyle = "rgba(255,255,255,.08)"; g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y), n.range * scale, 0, 7); g.fill();
+    const rr = n.bow ? n.range : TOWER.r + 3;
+    g.setLineDash([6, 6]); g.strokeStyle = "rgba(255,255,255,.85)"; g.lineWidth = 2; g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y), rr * scale, 0, 7); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "rgba(255,255,255,.08)"; g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y), rr * scale, 0, 7); g.fill();
+    // kurulu tuzaklar ve barikatlar
+    for (const tr of n.traps) { const x = X(tr.x), y = Y(tr.y), r = 3.2 * scale; const art = artUrl("yapi_" + tr.type) ? "yapi_" + tr.type : "";
+      g.globalAlpha = tr.armed ? 1 : 0.45; g.strokeStyle = C("--ink"); g.lineWidth = 1.5;
+      if (tr.type === "ates_tuzagi") { g.fillStyle = "#C4552B"; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke(); g.beginPath(); g.moveTo(x - r * .5, y + r * .4); g.lineTo(x, y - r * .8); g.lineTo(x + r * .5, y + r * .4); g.stroke(); }
+      else if (tr.type === "kazik_cukuru") { g.fillStyle = "#3A2E22"; g.beginPath(); g.ellipse(x, y, r * 1.2, r * .7, 0, 0, 7); g.fill(); g.stroke(); for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + k * r * .6, y + r * .3); g.lineTo(x + k * r * .6, y - r * .6); g.stroke(); } }
+      else { g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke(); g.beginPath(); g.arc(x, y, r * .55, 0, 7); g.stroke(); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; g.beginPath(); g.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r); g.lineTo(x + Math.cos(a) * r * 1.5, y + Math.sin(a) * r * 1.5); g.stroke(); } }
+      if (art) { /* çizim varsa üstüne basılır */ const im = img(art); if (im) { g.drawImage(im, x - r * 1.6, y - r * 1.6, r * 3.2, r * 3.2); } }
+      g.globalAlpha = 1; }
+    for (const b of n.bars) { const dx = Math.cos(b.a) * b.len / 2, dy = Math.sin(b.a) * b.len / 2; const k = Math.max(0.25, b.hp / b.max);
+      g.strokeStyle = "#6B4A2E"; g.lineWidth = 2.2; g.globalAlpha = 0.4 + 0.6 * k;
+      const m = Math.max(4, Math.round(b.len / 2.2)); for (let i = 0; i <= m; i++) { const u = i / m - 0.5; const x = b.x + u * b.len * Math.cos(b.a), y = b.y + u * b.len * Math.sin(b.a); g.beginPath(); g.moveTo(X(x), Y(y) + 1.5 * scale); g.lineTo(X(x) , Y(y) - 2.6 * scale); g.stroke(); }
+      g.beginPath(); g.moveTo(X(b.x - dx), Y(b.y - dy)); g.lineTo(X(b.x + dx), Y(b.y + dy)); g.stroke(); g.globalAlpha = 1; }
     if (n.cards.buz) { g.fillStyle = `rgba(159,211,232,${0.08 + n.cards.buz * 0.04})`; g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y), 22 * scale, 0, 7); g.fill(); }
     if (n.cards.kazik) { g.strokeStyle = "#6B4A2E"; g.lineWidth = 2; for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; const x = TOWER.x + Math.cos(a) * (TOWER.r + 2.5), y = TOWER.y + Math.sin(a) * (TOWER.r + 2.5); g.beginPath(); g.moveTo(X(x), Y(y)); g.lineTo(X(x + Math.cos(a) * 2.2), Y(y + Math.sin(a) * 2.2) - scale); g.stroke(); } }
     // düşmanlar (arkadakiler önce)
@@ -211,8 +259,8 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     // kule ve sen
     tower();
     const tgt = n.foes.filter(f => Math.hypot(f.x - TOWER.x, f.y - TOWER.y) <= n.range).sort((a, b) => Math.hypot(a.x - TOWER.x, a.y - TOWER.y) - Math.hypot(b.x - TOWER.x, b.y - TOWER.y))[0]; const target = !!tgt; const faceR = tgt ? tgt.x > TOWER.x : false; const bq = quad("anim_kahraman_yay", bowFrame(Math.max(0, Math.min(1, 1 - n.fireCd * n.rate)), target));
-    if (bq) drawQuad(g, bq, X(TOWER.x), Y(TOWER.y - 1.5), 13 * scale, faceR);
-    else if (!figure(n.fireCd > 1 / n.rate - 0.12 ? "poz_kahraman_vurus" : "poz_kahraman_durus", TOWER.x, TOWER.y - 1.5, 13, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y - 4), 2.5 * scale, 0, 7); g.fill(); }
+    if (bq && n.bow) drawQuad(g, bq, X(TOWER.x), Y(TOWER.y - 1.5), 13 * scale, faceR);
+    else if (!figure(n.meleeFx > 0 || (n.bow && n.fireCd > 1 / n.rate - 0.12) ? "poz_kahraman_vurus" : "poz_kahraman_durus", TOWER.x, TOWER.y - 1.5, 13, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y - 4), 2.5 * scale, 0, 7); g.fill(); }
     if (n.pet) {
       const pt = n.pet; const G = petGuard(n);
       g.setLineDash([3, 5]); g.strokeStyle = `rgba(46,76,122,${now - petMark < 1500 ? 0.7 : 0.3})`; g.lineWidth = 1.5; g.beginPath(); g.arc(X(pt.hx), Y(pt.hy), G * scale, 0, 7); g.stroke(); g.setLineDash([]);
@@ -249,7 +297,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     const need = n.pageNeed * (1 - permLevel(s, "deste") * 0.08);
     (el.querySelector("#nbPage") as HTMLElement).style.width = `${Math.min(100, (n.page / need) * 100)}%`;
     el.querySelector("#nbCoins")!.textContent = `◉ ${n.coins} kırıntı`;
-    renderSpells();
+    renderSpells(); renderBuild();
     for (const [id, sp] of Object.entries(n.spells)) { const b = spellBar.querySelector<HTMLElement>(`[data-spell="${id}"]`); if (!b) continue;
       (b.querySelector(".cdf") as HTMLElement).style.height = `${(sp!.cd / sp!.max) * 100}%`; b.classList.toggle("ready", sp!.cd <= 0); }
     const w = Math.max(1, n.wave); const marks = [0, 1, 2, 3].map(i => w + i);
@@ -272,16 +320,20 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
         sfx("spark"); if (speed === 1) sfx("thunder");
       }
       if (f.k === "spell") {
-        if (f.id === "simsek") {
+        if (f.kind === "simsek") {
           const px = X(f.x), py = Y(f.y); bolts.push({ b: skyBolt([px, py], -10, (now | 0) % 9973), t0: now, delay: 0, dur: 520 }); impacts.push(impact(px, py, f.r * scale, (now | 0) % 997, now)); whiteFlash = 1; sfx("thunder");
           for (const id of f.hits.slice(0, 5)) { const t = n.foes.find(q => q.id === id); if (t) impacts.push(impact(X(t.x), Y(t.y), scale * 5, id, now + 60)); }
         }
-        else if (f.id === "kilic") blades.push({ x: f.x, y: f.y, x2: f.x2!, y2: f.y2!, t: now });
-        else if (f.id === "sarmasik") vines.push({ x: f.x, y: f.y, r: f.r, t: now });
-        else flocks.push({ x: f.x, y: f.y, r: f.r, t: now });
-        pops.push({ x: f.x, y: f.y - 10, t: now, text: SPELL_NAMES[f.id], color: C("--blue"), dur: 1000 });
+        else if (f.kind === "kilic") blades.push({ x: f.x, y: f.y, x2: f.x2!, y2: f.y2!, t: now });
+        else if (f.kind === "sarmasik" || f.kind === "camur") vines.push({ x: f.x, y: f.y, r: f.r, t: now });
+        else if (f.kind === "karga") flocks.push({ x: f.x, y: f.y, r: f.r, t: now });
+        else { impacts.push(impact(X(f.x), Y(f.y), f.r * scale, (now | 0) % 997, now)); shake = Math.max(shake, 5); }
+        pops.push({ x: f.x, y: f.y - 10, t: now, text: n.spells[f.id]?.name ?? "", color: C("--blue"), dur: 1000 });
       }
       if (f.k === "bite" && speed === 1) sfx("hit");
+      if (f.k === "melee") { if (speed === 1) sfx("hit"); pops.push({ x: f.x, y: f.y - 6, t: now, text: "vuruş", color: C("--ink") }); }
+      if (f.k === "trap") { sfx("thunk"); pops.push({ x: f.x, y: f.y - 8, t: now, text: "Tuzak!", color: C("--red"), dur: 900 }); }
+      if (f.k === "barbreak") { sfx("bad"); pops.push({ x: f.x, y: f.y - 8, t: now, text: "Barikat kırıldı", color: C("--red"), dur: 900 }); }
       if (f.k === "wave") { const sc = waveScale(f.n); pops.push({ x: TOWER.x, y: TOWER.y - 22, t: now, text: f.boss ? `${f.n}. dalga: lider geliyor!` : `${f.n}. dalga`, color: C("--red"), big: true, dur: 1400 });
         if (f.n > 1) pops.push({ x: TOWER.x, y: TOWER.y - 14, t: now + 150, text: `hız +%${Math.round((sc.speed - 1) * 100)} · güç +%${Math.round((sc.power - 1) * 100)}`, color: C("--ink-soft"), dur: 1600 }); sfx("beat"); if (f.boss) buzz("medium"); }
       if (f.k === "card") showCards();

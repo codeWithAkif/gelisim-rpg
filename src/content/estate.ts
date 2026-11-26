@@ -58,6 +58,11 @@ export const JOBS: JobDef[] = [
   { id: "j_han", name: "Han kapısı", desc: "Gece hanı haydutlardan koru.", role: ["savasci", "okcu"], diff: 26, days: 1, money: 14, items: { ok: 6 }, needsQuest: "han_gecesi", minRank: 2 },
   { id: "j_demir", name: "Hurda demir arama", desc: "Eski kervan yolunda demir parçası topla.", role: ["izci", "usta", "isci"], diff: 14, days: 1, money: 0, items: { demir_parca: 3 }, minRank: 2 },
   { id: "j_mutfak", name: "Mutfak kapısı", desc: "Kale mutfağını gece baskınlarından koru.", role: ["savasci", "okcu"], diff: 34, days: 1, money: 10, items: { ekmek: 2 }, needsQuest: "mutfak_kapisi", minRank: 3 },
+  // rütbe 4: kule nöbetlerini adamlarına devredersin (ödül nöbet yerinin kesesi kadar)
+  { id: "j_nb_yayla", name: "Yayla kulesi nöbeti", desc: "Yayla gözetleme kulesinde dalgaları sen yerine bir adam karşılar.", role: ["okcu", "savasci"], diff: 20, days: 1, money: 5, items: { deri: 1, ok: 3 }, needsQuest: "kurt", minRank: 4 },
+  { id: "j_nb_han", name: "Han kulesi nöbeti", desc: "Han kulesini haydutlara karşı tutarlar.", role: ["okcu", "savasci"], diff: 28, days: 1, money: 10, items: { ok: 5, ekmek: 1 }, needsQuest: "kervan", minRank: 4 },
+  { id: "j_nb_ayaz", name: "Ayazkale suru nöbeti", desc: "Kar kurtlarına karşı sur başında beklerler.", role: ["savasci", "okcu"], diff: 36, days: 1, money: 13, items: { deri: 2, ekmek: 1 }, needsQuest: "mutfak", minRank: 4 },
+  { id: "j_nb_kul", name: "Kül mahallesi dam nöbeti", desc: "Kül mahallesinin damında nöbet tutarlar.", role: ["okcu", "savasci", "izci"], diff: 42, days: 1, money: 16, items: { ok: 6, peynir: 1 }, needsQuest: "kul_ana", minRank: 4 },
 ];
 export const jobDef = (id: string) => JOBS.find(j => j.id === id);
 // yeni haritada çıkacak eşyaların tanımı yoksa sessiz geç
