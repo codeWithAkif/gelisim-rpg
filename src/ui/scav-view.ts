@@ -154,6 +154,9 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       else if (walkQ) drawQuad(g, walkQ, X(x), gy(fl), 20 * sc(), n.face === 1);
       else { const im = img(key); if (im) { const hh = 20 * sc(), w = hh * im.naturalWidth / im.naturalHeight; const bob = climbing ? Math.sin(fl * 16) * 3 : 0; g.save(); g.globalAlpha = climbing ? 0.85 : 1; g.translate(X(x), gy(fl) + bob); if (n.face === 1) g.scale(-1, 1); g.drawImage(im, -w / 2, -hh, w, hh); g.restore(); } }
       if (n.searchId) { g.fillStyle = "#F1C14A"; g.font = `700 ${Math.max(14, sc() * 2)}px Caveat, cursive`; g.textAlign = "center"; g.fillText("aranıyor…", X(x), gy(fl) - 20 * sc() - 6); } }
+    for (const pj of n.proj) { const x = X(pj.x), y = gy(pj.floor) - 11 * sc(); const col = pj.kind === "buz" ? ["#BFE6FA", "#6BB6E0"] : pj.kind === "ates" ? ["#FFE08A", "#E8602A"] : pj.kind === "simsek" ? ["#FFFFFF", "#7FA8FF"] : ["#E4D3FF", "#8A6BE0"];
+      for (let k = 4; k >= 1; k--) { g.globalAlpha = 0.14 * (5 - k); g.fillStyle = col[1]; g.beginPath(); g.arc(x - pj.dir * k * 6, y, 6 + (5 - k), 0, 7); g.fill(); }
+      g.globalAlpha = 1; const gr = g.createRadialGradient(x, y, 1, x, y, 11); gr.addColorStop(0, col[0]); gr.addColorStop(1, col[1]); g.fillStyle = gr; g.beginPath(); g.arc(x, y, 10 + Math.sin(now / 60) * 1.5, 0, 7); g.fill(); }
     for (const sh of [...shots]) { const a = Math.max(0, (now - sh.t) / 160); if (a > 1) { shots.splice(shots.indexOf(sh), 1); continue; } g.strokeStyle = `rgba(255,245,210,${1 - a})`; g.lineWidth = 2; g.beginPath(); g.moveTo(X(sh.a), gy(sh.floor) - 12 * sc()); g.lineTo(X(sh.b), gy(sh.floor) - 8 * sc()); g.stroke(); }
     for (const r of [...rings]) { const a = Math.max(0, (now - r.t) / 500); if (a > 1) { rings.splice(rings.indexOf(r), 1); continue; } g.strokeStyle = `${r.color}${(1 - a).toFixed(2)})`; g.lineWidth = 4; g.beginPath(); g.ellipse(X(r.x), gy(r.floor) - 8 * sc(), Math.max(0.1, r.r * sc() * a), Math.max(0.1, r.r * sc() * 0.5 * a), 0, 0, 7); g.stroke(); }
     for (const p of [...pops]) { const a = Math.max(0, (now - p.t) / 1100); if (a > 1) { pops.splice(pops.indexOf(p), 1); continue; } g.globalAlpha = 1 - a; g.fillStyle = p.color; g.strokeStyle = "rgba(0,0,0,.7)"; g.lineWidth = 3; g.font = `700 ${Math.max(16, sc() * 2.3)}px Caveat, cursive`; g.textAlign = "center";
@@ -187,6 +190,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       if (f.k === "trap") { rings.push({ x: f.x, floor: f.floor, t: now, r: 14, color: "rgba(241,193,74," }); sfx("thunk"); pops.push({ x: f.x, floor: f.floor, t: now, text: "Tuzak!", color: "#F1C14A" }); }
       if (f.k === "spell") { rings.push({ x: f.x, floor: f.floor, t: now, r: f.r, color: f.kind === "buz" ? "rgba(159,211,232," : f.kind === "ates" ? "rgba(230,110,50," : "rgba(160,140,255," }); sfx("crit"); buzz("heavy"); shake = 8; }
       if (f.k === "bite") sfx("hit");
+      if (f.k === "cast") buzz("light");
       if (f.k === "die") sfx("hit");
       if (f.k === "spot") sfx("good");
       if (f.k === "card") showCards();
@@ -225,7 +229,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     if (b.dataset.a === "pick") { const r = pickGround(n); if (r === "ok") sfx("coin"); else { sfx("bad"); if (r === "full") { tip.hidden = false; tip.textContent = "Çanta dolu: önce bir şey at"; setTimeout(() => { tip.hidden = true; }, 1500); } } }
     if (b.dataset.a === "search") { if (beginSearch(n)) { sfx("tap"); stickReset(); } else sfx("bad"); }
     if (b.dataset.a === "trap") { if (placeTrap(n)) sfx("thunk"); else sfx("bad"); }
-    if (b.dataset.a === "spell") { if (!castSpell(n)) { sfx("bad"); tip.hidden = false; tip.textContent = "Yakında düşman yok"; setTimeout(() => { tip.hidden = true; }, 1200); } }
+    if (b.dataset.a === "spell") { if (castSpell(n)) sfx("whoosh"); else sfx("bad"); }
   });
   const bagEl = el.querySelector<HTMLElement>("#scPause")!;
   let bagSel = "";

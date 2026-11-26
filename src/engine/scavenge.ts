@@ -105,8 +105,9 @@ export interface SFoe { id: number; def: string; x: number; floor: number; hp: n
 export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
   | { k: "hurt"; dmg: number } | { k: "raid"; n: number } | { k: "card" } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
-  | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
+  | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "cast"; kind: SpellKind; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
 export interface GItem { id: number; item: string; x: number; floor: number }
+export interface Proj { id: number; kind: SpellKind; x: number; floor: number; dir: 1 | -1; left: number; base: number; r: number }
 export interface TrapSlot { id: string; state: "hand" | "placed" | "cool"; x: number; floor: number; t: number }
 export interface Dog { x: number; floor: number; state: "yanda" | "av" | "don"; t: number; cd: number; moving: boolean; face: 1 | -1; lag: number }
 export interface Scav {
@@ -115,7 +116,7 @@ export interface Scav {
   spots: Spot[]; searchId: number; foes: SFoe[]; nextId: number; wave: number; raidT: number;
   bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
   foundWeapons: string[]; armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[];
-  ground: GItem[]; gid: number; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number };
+  ground: GItem[]; gid: number; proj: Proj[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number };
 }
 const bagCount = (n: Scav) => Object.values(n.bag).reduce((a, b) => a + b, 0);
 export const bagUsed = bagCount;
@@ -167,9 +168,9 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
     if (o && info) { const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0; spell = { id: load.id, kind: info.kind, name: o.spell.name, cd: 4, max: info.cd * Math.max(0.6, 1 - m / 120), mul: info.mul * (1 + m / 100), r: info.r }; } }
   return {
     site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, s.hp || mh), maxHp: mh,
-    spots, searchId: 0, foes: [], nextId: 1, wave: 0, raidT: 45, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
+    spots, searchId: 0, foes: [], nextId: 1, wave: 0, raidT: 15, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
     atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
-    ground: [], gid: 1, traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
+    ground: [], gid: 1, proj: [], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
 }
 
@@ -189,20 +190,25 @@ export function placeTrap(n: Scav): boolean {
 }
 export const trapsInHand = (n: Scav) => n.traps.filter(q => q.state === "hand").length;
 export const TRAP_RECHARGE = 25;
+/** Büyü: baktığın yöne (ya da aynı kattaki en yakın düşmana) bir top fırlatır; çarpınca patlar. */
 export function castSpell(n: Scav): boolean {
-  const sp = n.spell; if (!sp || sp.cd > 0 || n.phase !== "play") return false;
-  const R = sp.r * 2.4; const hits = n.foes.filter(f => f.floor === n.floor && f.climbT <= 0 && Math.abs(f.x - n.px) <= R);
-  if (!hits.length && sp.kind !== "kilic") return false;
-  sp.cd = sp.max; const base = n.dmg * sp.mul;
+  const sp = n.spell; if (!sp || sp.cd > 0 || n.phase !== "play" || n.climbing) return false;
+  const near = n.foes.filter(f => f.floor === n.floor && f.climbT <= 0 && Math.abs(f.x - n.px) <= 140).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
+  const dir: 1 | -1 = near ? (near.x > n.px ? 1 : -1) : n.face; n.face = dir;
+  sp.cd = sp.max; n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + dir * 5, floor: n.floor, dir, left: 150, base: n.dmg * sp.mul, r: sp.r * 1.3 });
+  n.fx.push({ k: "cast", kind: sp.kind, x: n.px, floor: n.floor }); return true;
+}
+function explode(n: Scav, pj: Proj) {
+  const hits = n.foes.filter(f => f.floor === pj.floor && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4);
   for (const f of hits) {
-    if (sp.kind === "ates") f.burn = Math.max(f.burn, 4);
-    if (sp.kind === "buz" || sp.kind === "sarmasik") f.root = Math.max(f.root, 3.5);
-    if (sp.kind === "camur") f.slow = Math.max(f.slow, 5);
-    if (sp.kind === "karga") f.root = Math.max(f.root, 2.5);
-    if (sp.kind === "kilic") f.root = Math.max(f.root, 2);
-    hurtFoe(n, f, base, false);
+    if (pj.kind === "ates") f.burn = Math.max(f.burn, 4);
+    if (pj.kind === "buz" || pj.kind === "sarmasik") f.root = Math.max(f.root, 3.5);
+    if (pj.kind === "camur") f.slow = Math.max(f.slow, 5);
+    if (pj.kind === "karga") f.root = Math.max(f.root, 2.5);
+    if (pj.kind === "kilic") f.root = Math.max(f.root, 2);
+    hurtFoe(n, f, pj.base, false);
   }
-  n.fx.push({ k: "spell", kind: sp.kind, x: n.px, floor: n.floor, r: R }); return true;
+  n.fx.push({ k: "spell", kind: pj.kind, x: pj.x, floor: pj.floor, r: pj.r * 2 });
 }
 
 export function rerollScav(n: Scav): boolean {
@@ -250,7 +256,7 @@ function spawnRaid(n: Scav) {
     const floor = n.rng.chance(60) ? n.floor : n.rng.int(0, n.site.floors - 1); const x = n.rng.chance(50) ? SW - 4 - n.rng.next() * 10 : 12 + n.rng.next() * 30;
     n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale, max: d.hp * scale, speed: 8 + (d.move ?? 4) * 1.6 + n.rng.next() * 3, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 0.8, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
-  n.raidT = Math.max(25, 48 - n.wave * 3); n.fx.push({ k: "raid", n: count });
+  n.raidT = Math.max(10, 15 - n.wave); n.fx.push({ k: "raid", n: count });
 }
 function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean, quiet = false) {
   f.hp -= dmg; f.hitT = 0.2; if (!quiet) n.fx.push({ k: "hit", x: f.x, floor: f.floor, dmg: Math.round(dmg), crit });
@@ -291,6 +297,12 @@ export function stepScav(n: Scav, dt: number) {
         if (sp.stage >= SPOT_STAGES) { sp.done = true; n.searchId = 0; n.searched++; if (n.searched >= n.nextCard) { n.nextCard += 3; offerCards(n); } }
       }
     }
+  }
+  // büyü topları
+  for (const pj of [...n.proj]) {
+    const st = 95 * dt; pj.x += pj.dir * st; pj.left -= st;
+    const hit = n.foes.some(f => f.floor === pj.floor && f.climbT <= 0 && Math.abs(f.x - pj.x) <= 5);
+    if (hit || pj.left <= 0 || pj.x < 0 || pj.x > SW) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); }
   }
   // tuzaklar
   for (const tr of n.traps) {

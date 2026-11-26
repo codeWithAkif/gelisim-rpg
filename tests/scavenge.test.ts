@@ -32,6 +32,11 @@ test("merdivende yavaş yavaş çıkılır, birden değil", () => {
   run(n, 4); expect(n.py).toBe(1); expect(n.floor).toBe(1); expect(n.climbing).toBe(false);
 });
 
+test("ilk baskın en geç 15 sn sonra gelir", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 4, { kind: "yumruk" }); run(n, 16); expect(n.wave).toBeGreaterThanOrEqual(1);
+  const t0 = n.wave; run(n, 16); expect(n.wave).toBeGreaterThan(t0);
+});
+
 test("baskın gelir; yaysız yumrukla bile vurulur", () => {
   const s = fresh(); const n = createScav(cfg, s, scavSite("koru")!, 5, { kind: "yumruk" }); expect(n.bow).toBe(false);
   n.raidT = 0.1; run(n, 1); expect(n.wave).toBe(1); expect(n.foes.length).toBeGreaterThan(0);
@@ -67,7 +72,7 @@ test("yalnız seçilen büyü kullanılır ve dolması beklenir", () => {
   const s = fresh(); s.knownElements = ["el_ates"]; s.mana = 100; for (const r of ["ardic_koku"]) grantRelic(cfg, s, r, {});
   const sp = loadoutOptions(cfg, s).find(o => o.kind === "spell"); if (!sp) return;
   const n = createScav(cfg, s, scavSite("koru")!, 9, { kind: "spell", id: sp.id }); n.raidT = 999; expect(n.spell).toBeTruthy(); n.spell!.cd = 0;
-  n.foes = [foe(n.px + 10)]; expect(castSpell(n)).toBe(true); expect(n.foes[0].hp).toBeLessThan(500); expect(castSpell(n)).toBe(false);
+  n.foes = [foe(n.px + 60)]; expect(castSpell(n)).toBe(true); expect(n.proj.length).toBe(1); run(n, 1.5); expect(n.foes[0].hp).toBeLessThan(500); expect(castSpell(n)).toBe(false);
 });
 
 test("kutudan silah çıkar, kullanılır; çıkışta yalnız parçası cebe girer", () => {
