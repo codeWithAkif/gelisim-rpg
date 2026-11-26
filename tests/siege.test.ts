@@ -2,7 +2,7 @@
 import { test, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
 import { newGame, type GameState } from "../src/engine/state";
-import { createSiege, placeBarricade, startWave, step, shoot, cast, siegeSpells, restBetween, finishSiege, SIEGES, ARENA, placePet, type Siege } from "../src/engine/siege";
+import { createSiege, placeBarricade, startWave, step, shoot, cast, siegeSpells, restBetween, finishSiege, SIEGES, ARENA, placePet, escalate, guardOf, MAX_ESCALATION, type Siege } from "../src/engine/siege";
 
 const CX = ARENA.w / 2, CY = ARENA.h / 2;
 /** Basit oyuncu: en yakın düşmana ok atar, büyü hazırsa kalabalığa atar. */
@@ -60,4 +60,30 @@ test("hazırlık ve beceri kazandırır: elle dövüşen acemi zorlanır, barika
   expect(ready).toBeGreaterThan(novice + 0.25);
   const s = newGame(cfg, 9); const sg = createSiege(cfg, s, SIEGES.agil, 1); play(s, sg, {});
   const r = finishSiege(cfg, s, sg); expect(Object.keys(r.gains).length).toBeGreaterThan(0);
+});
+
+test("tekrar eden savunma her gece zorlaşır; ilk gece aynıdır, tavanı vardır, lider en sonda gelir", () => {
+  const base = SIEGES.agil; const total = (d: typeof base) => d.waves.reduce((a, w) => a + w.foes.reduce((b, f) => b + f.count, 0), 0);
+  expect(escalate(base, 0)).toBe(base);
+  const n1 = escalate(base, 1), n2 = escalate(base, 2), n3 = escalate(base, 3);
+  expect(total(n1)).toBeGreaterThan(total(base)); expect(total(n2)).toBeGreaterThan(total(n1));
+  expect(n1.waves.length).toBe(base.waves.length); expect(n2.waves.length).toBe(base.waves.length + 1);
+  expect(n2.waves.some(w => w.foes.some(f => f.def === "akyele"))).toBe(false);
+  expect(n3.waves[n3.waves.length - 1].foes.some(f => f.def === "akyele")).toBe(true);
+  expect(escalate(base, 99)).toEqual(escalate(base, MAX_ESCALATION));
+  expect(base.waves[0].foes[0].count).toBe(3);   // asıl tanım bozulmaz
+});
+
+test("evcil hayvan yetenekleri kuşatmada işler: köpek alanı genişler, şahin ok menzilini uzatır", () => {
+  const s = newGame(cfg, 3); s.pet = { id: "kopek", name: "Karabaş", bond: 0 } as GameState["pet"];
+  expect(guardOf(s)).toBe(16); s.pet!.bond = 60; expect(guardOf(s)).toBe(22);
+  const fire = (st: GameState) => { st.inventory.av_yayi = 1; st.inventory.ok = 5; const sg = createSiege(cfg, st, SIEGES.agil, 1); sg.phase = "fight"; shoot(st, sg, 0, 1); return sg.arrows[0].life; };
+  const plain = newGame(cfg, 3); const hawk = newGame(cfg, 3); hawk.pet = { id: "sahin", name: "Ayaz", bond: 20 } as GameState["pet"];
+  expect(fire(hawk)).toBeCloseTo(fire(plain) * 1.2);
+});
+
+test("en zor gece (lider dahil) baştan sona oynanır, hata vermez", () => {
+  const s = newGame(cfg, 5); s.inventory.av_yayi = 1; s.inventory.ok = 99;
+  const sg = createSiege(cfg, s, escalate(SIEGES.agil, MAX_ESCALATION), 7); play(s, sg, { bow: true });
+  expect(["won", "lost"]).toContain(sg.phase);
 });

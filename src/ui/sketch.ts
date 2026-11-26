@@ -101,7 +101,8 @@ export function humanSketch(opts: { marks: { name: string; at: [number, number] 
 }
 
 /** Vücut çizimi: kas grupları seviyesine göre koyulaşır, uykuda işlenecek kazanç kesikli yeşil çizilir. */
-export function bodySketch(lv: (id: string) => number, pend: (id: string) => number, names: (id: string) => string, imageUrl?: string | null): string {
+/** grew: bu gece işlenen gelişme; olan kaslar sabah bir süre parlar. */
+export function bodySketch(lv: (id: string) => number, pend: (id: string) => number, names: (id: string) => string, imageUrl?: string | null, grew: (id: string) => number = () => 0): string {
   const s = 3;
   const fig = [
     roughEllipse(100, 40, 20, 25, 1.4, s),
@@ -130,7 +131,7 @@ export function bodySketch(lv: (id: string) => number, pend: (id: string) => num
     m.shapes.forEach(([cx, cy, rx, ry], i) => {
       const grow = 1 + v / 250;
       const d = roughEllipse(cx, cy, rx * grow, ry * grow, 0.8, 50 + mi * 10 + i, 10);
-      parts += `<path d="${d}" fill="rgba(158,52,35,${op.toFixed(2)})" stroke="var(--red)" stroke-width="${sw.toFixed(2)}"/>`;
+      parts += `<path class="${grew(m.id) > 0.01 ? "grew" : ""}" d="${d}" fill="rgba(158,52,35,${op.toFixed(2)})" stroke="var(--red)" stroke-width="${sw.toFixed(2)}"/>`;
       if (p > 0.01) parts += `<path d="${roughEllipse(cx, cy, rx * grow + 3, ry * grow + 3, 0.6, 90 + mi * 10 + i, 10)}" fill="none" stroke="var(--green)" stroke-width="1.4" stroke-dasharray="3 2"/>`;
     });
     const [lx, ly, side] = m.label;
@@ -245,11 +246,12 @@ export const ACT_ICONS: Record<string, string> = {
   "pet-adopt": ai('<path d="M12 20c-5-3-8-6-8-10a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 4-3 7-8 10z" fill="rgba(158,52,35,.18)"/>', "var(--red)"),
   hire: ai('<circle cx="12" cy="7" r="3.2" fill="rgba(46,76,122,.15)"/><path d="M5 20c0-4 3-7 7-7s7 3 7 7"/><path d="M17 5l2 2 3-3"/>', "var(--blue)"),
   house: ai('<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10" fill="rgba(139,106,69,.2)"/><path d="M10 20v-5.5h4V20"/>'),
-  nobet: ai('<path d="M6 21l2-11h8l2 11"/><path d="M5 10h14l-1-4H6z" fill="rgba(42,39,34,.1)"/><path d="M9 6V3M15 6V3M12 6V2M7 21l9-7M17 21l-9-7"/>'),
   // açık kitap
   "session-pick": ai('<path d="M12 6c-2-1.5-5-2-8-1.5V19c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V4.5c-3-.5-6 0-8 1.5z"/><path d="M12 6v14.5"/>'),
   "show-place": ai('<path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/>', "var(--blue)"),
 };
+ACT_ICONS.study = ACT_ICONS["session-pick"];
+
 
 /** Mühendislik yapılarının mürekkep simgeleri. */
 const si = (d: string, c = "var(--ink)") => `<svg class="act-ic" viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;

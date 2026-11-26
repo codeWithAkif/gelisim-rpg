@@ -71,3 +71,8 @@ export function walkQuest(cfg: Config, s: GameState, id: string): RewardReport |
 }
 
 export function itemName(cfg: Config, id: string) { return GAME_ITEMS[id]?.name ?? cfg.item.get(id)?.name ?? id; }
+
+/** Görevin türü: neyi takip edeceğin anlaşılsın. */
+export type QuestKind = "ana" | "hikaye" | "yan";
+export const questKind = (def: { importance: string; repeatable?: boolean }): QuestKind => def.importance === "hayati" ? "ana" : def.repeatable || def.importance === "basit" ? "yan" : "hikaye";
+export const KIND_ORDER: Record<QuestKind, number> = { ana: 0, hikaye: 1, yan: 2 };

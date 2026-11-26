@@ -14,7 +14,7 @@ export const NIGHT_START = 14 * 60;  // 20:00: gece başlar
 export interface AttrState {
   level: number;      // işlenmiş seviye
   pending: number;    // dinlenince işlenecek kazanç (fiziksel)
-  peak: number;       // ulaşılan en yüksek seviye (körelme tabanı için)
+  peak: number;       // ulaşılan en yüksek seviye (körelme kapalı; yalnız kayıt için)
   lastUsedDay: number;
 }
 export interface LogEntry { day: number; minute: number; text: string; kind?: "gain" | "quest" | "battle" | "info" | "warn" }
@@ -51,6 +51,7 @@ export interface GameState {
   session?: Session;
   journey?: Journey;                           // süren yolculuk                           // süren gerçek zamanlı çalışma
   alerts?: Record<string, boolean>;            // gösterilmiş uyarılar (tekrar etmesin)
+  nightGains?: { day: number; gains: Record<string, number> }; // son uykuda işlenen gelişme (sabah Vücut'ta parlar)
   prep?: Record<string, { day: number; scout?: boolean; readWind?: boolean }>; // savaş öncesi yapılmış keşifler
   seen?: string[];                             // haritada açılmış yerler (yoksa hepsi açık: eski kayıt)
   collection?: Record<string, number>;         // defterdeki koleksiyon: bulunan → ilk bulunduğu gün
@@ -62,7 +63,6 @@ export interface GameState {
   market?: { day: number; sold: Record<string, number> };          // bugün ne sattın (fiyat düşer)
   partners?: Record<string, { amount: number; since: number; earned: number; acc?: number }>; // acc: henüz bütün bakıra varmamış pay // ortaklıklar
   yapi?: Record<string, { n: number; lv: number }>; // mühendislik: kalıcı yapılar (engine/engineering.ts)
-  nobet?: { iz: number; best: Record<string, number>; perm: Record<string, number>; runs: number }; // nöbet: kalıcı iz ve rekorlar
   ledger?: { day: number; text: string; amount: number }[];         // hesap defteri
   log: LogEntry[];
 }

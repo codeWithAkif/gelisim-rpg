@@ -41,3 +41,10 @@ test("eski kayıt: elde tutulan yay yay yuvasına geçer", () => {
   const s = newGame(cfg, 3); s.inventory.av_yayi = 1; s.equipped.weapon = "av_yayi";
   migrate(cfg, s); expect(s.equipped.bow).toBe("av_yayi"); expect(s.equipped.weapon).toBeUndefined();
 });
+
+test("demircilik silahın ağzını bakımlı tutar: vuruş artar, yumruk değişmez", async () => {
+  const { honeMul } = await import("../src/engine/gear");
+  const s = g(); expect(equip(cfg, s, "hancer", "weapon").ok).toBe(true); const d0 = weaponSet(cfg, s).dmg;
+  s.attrs.demircilik.level = 100; expect(honeMul(s)).toBeCloseTo(1.25); expect(weaponSet(cfg, s).dmg).toBeCloseTo(d0 * 1.25);
+  const bare = newGame(cfg, 3); delete bare.equipped.weapon; bare.attrs.demircilik.level = 100; expect(weaponSet(cfg, bare).dmg).toBe(2);
+});

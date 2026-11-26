@@ -3,7 +3,8 @@ import { test, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
 import { newGame, type GameState } from "../src/engine/state";
 import { grantRelic } from "../src/engine/relics";
-import { createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, castSpell, leave, atExit, finishScav, pickScavCard, rerollScav, scavSite, canStartScav, loadoutOptions, bagUsed, trapsInHand, LADDER_XS, FOUND_WEAPONS, SPOT_STAGES, type Scav, type SFoe } from "../src/engine/scavenge";
+import { createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, castSpell, leave, atExit, finishScav, scavSite, scavTraits, canStartScav, loadoutOptions, bagUsed, trapsInHand, LADDER_XS, FOUND_WEAPONS, SPOT_STAGES, type Scav, type SFoe } from "../src/engine/scavenge";
+import { maxHp } from "../src/engine/combat";
 
 const fresh = () => { const s = newGame(cfg, 4); s.quests.kurt = { status: "bitti", count: 1 }; s.location = "koru"; s.energy = 90; return s; };
 const run = (n: Scav, sec: number) => { for (let t = 0; t < sec / 0.05 && n.phase === "play"; t++) stepScav(n, 0.05); };
@@ -95,8 +96,6 @@ test("çıkışta kazanç cebe girer, ölünce çanta gider; çanta dolunca fazl
   d.foes = [foe(d.px + 1, { hp: 999, max: 999, dmg: 50, cd: 0 })]; run(d, 3); expect(d.result).toBe("dead");
   finishScav(cfg, s2, d); expect(s2.inventory.deri ?? 0).toBe(0); expect(s2.hp).toBeGreaterThan(0);
   const c = createScav(cfg, s, scavSite("koru")!, 13, { kind: "yumruk" }); c.bag = { deri: c.bagCap }; expect(bagUsed(c)).toBe(c.bagCap);
-  c.phase = "card"; c.offer = ["genis_cep", "cevik_el", "keskin_el"]; const old = [...c.offer]; expect(rerollScav(c)).toBe(true); expect(c.offer.some(x => !old.includes(x))).toBe(true);
-  c.offer = ["genis_cep"]; const cap = c.bagCap; expect(pickScavCard(c, "genis_cep")).toBe(true); expect(c.bagCap).toBe(cap + 3);
   void ({} as GameState);
 });
 
@@ -175,6 +174,18 @@ test("bazı odalarda bekçi düşmanlar vardır: yaklaşınca uyanır, uzakta uy
   run(n, 3); expect(n.foes.every(f => f.idle)).toBe(true);                                   // giriş odası boş, uyuyanlar hareket etmez
   const g = n.foes.find(f => f.floor === 0)!; n.px = g.x - 30; run(n, 0.3); expect(g.idle).toBe(false);   // yaklaşınca uyanır
   const s2 = fresh(); s2.knownElements = ["el_ates"]; s2.mana = 100; const sp = loadoutOptions(cfg, s2).find(o => o.kind === "spell");
-  if (sp) { const m = createScav(cfg, s2, scavSite("koru")!, 62, { kind: "spell", id: sp.id }); m.spell!.cd = 0; m.cards.buyu_cift = 2; expect(m.spell!.max).toBeLessThanOrEqual(5); cs(m); expect(m.spellQ.length).toBe(3);
+  if (sp) { const m = createScav(cfg, s2, scavSite("koru")!, 62, { kind: "spell", id: sp.id }); m.spell!.cd = 0; m.tr.spellShots = 3; expect(m.spell!.max).toBeLessThanOrEqual(5); cs(m); expect(m.spellQ.length).toBe(3);
     m.raidT = 999; for (let i = 0; i < 40; i++) stepScav(m, 0.05); expect(m.proj.length + m.spellQ.length).toBeGreaterThan(0); }
+});
+
+test("harabede kart yok: hız, arama, dayanma ve büyü özelliklerden gelir", () => {
+  const s = fresh(); const t0 = scavTraits(cfg, s);
+  expect(t0.walk).toBe(1); expect(t0.search).toBe(1); expect(t0.spellShots).toBe(1); expect(t0.firstRaid).toBe(40);
+  const n0 = createScav(cfg, s, scavSite("koru")!, 31, { kind: "yumruk" });
+  const s2 = fresh(); for (const a of ["bacak", "esneklik", "el_becerisi", "analiz", "agri", "core", "isitme", "cevresel", "odak"]) s2.attrs[a].level = 70;
+  const t1 = scavTraits(cfg, s2); const n1 = createScav(cfg, s2, scavSite("koru")!, 31, { kind: "yumruk" });
+  expect(t1.walk).toBeCloseTo(1.24); expect(t1.search).toBeCloseTo(0.5625); expect(t1.spellShots).toBe(2); expect(t1.firstRaid).toBe(60);
+  expect(n1.maxHp).toBeGreaterThan(n0.maxHp); expect(n1.raidT).toBe(60);
+  // harabeden çıkınca can, gerçek en çok canı aşmaz
+  n1.raidT = 999; walkTo(n1, 6); leave(n1); finishScav(cfg, s2, n1); expect(s2.hp).toBeLessThanOrEqual(maxHp(cfg, s2));
 });

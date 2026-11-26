@@ -11,13 +11,13 @@ export interface PetType {
 export const PET_TYPES: Record<string, PetType> = {
   kopek: { id: "kopek", species: "Çoban köpeği", defaultName: "Karabaş", role: "Dövüşçü", price: 0,
     desc: "Cesur ve sadık. Savaşta koşup ısırır, gece kampını korur, burnuyla iz bulur.", likes: ["ekmek", "peynir"],
-    perks: [{ bond: 0, text: "Savaşta kurda koşar ve ısırır" }, { bond: 10, text: "Kokuyla bulunan şeyleri daha sık bulur" }, { bond: 30, text: "Isırığı sertleşir" }, { bond: 50, text: "Nöbette daha geniş alanı kollar" }, { bond: 75, text: "Her gün fazladan bir bulgu getirir" }] },
+    perks: [{ bond: 0, text: "Savaşta kurda koşar ve ısırır" }, { bond: 10, text: "Kokuyla bulunan şeyleri daha sık bulur" }, { bond: 30, text: "Isırığı sertleşir" }, { bond: 50, text: "Kuşatmada daha geniş alanı kollar" }, { bond: 75, text: "Her gün fazladan bir bulgu getirir" }] },
   kedi: { id: "kedi", species: "Han kedisi", defaultName: "Pamuk", role: "Gölge", price: 25, shop: "karacam_han",
     desc: "Sessiz ve dikkatli. Gizlenirken seni ele vermez, etrafı ararken küçük şeyleri fark eder.", likes: ["peynir"],
     perks: [{ bond: 0, text: "Gizlenirken kuşku daha yavaş dolar" }, { bond: 10, text: "Etrafı ararken bulma şansı artar" }, { bond: 30, text: "Gece pusuları önceden sezer" }, { bond: 50, text: "Fareleri kovar: işletmelerin üretimi %10 artar" }, { bond: 75, text: "Gizlenmede kuşku iyice yavaşlar" }] },
   sahin: { id: "sahin", species: "Dağ şahini", defaultName: "Ayaz", role: "Gözcü", price: 60, shop: "ayaz_gecit",
-    desc: "Yukarıdan görür. Araziyi senin yerine tarar, nöbette menzilini uzatır.", likes: ["et"],
-    perks: [{ bond: 0, text: "Arazi keşfi vakit almaz" }, { bond: 10, text: "Nöbette menzil uzar" }, { bond: 30, text: "Rüzgârı senin yerine okur" }, { bond: 50, text: "Yolculukta pusuları önceden haber verir" }, { bond: 75, text: "Uzak bir hedefe oku kılavuzlar: kritik şansı artar" }] },
+    desc: "Yukarıdan görür. Araziyi senin yerine tarar, kuşatmada okunun menzilini uzatır.", likes: ["et"],
+    perks: [{ bond: 0, text: "Arazi keşfi vakit almaz" }, { bond: 10, text: "Kuşatmada ok menzili uzar" }, { bond: 30, text: "Rüzgârı senin yerine okur" }, { bond: 50, text: "Yolculukta pusuları önceden haber verir" }, { bond: 75, text: "Uzak bir hedefe oku kılavuzlar: kritik şansı artar" }] },
 };
 // savaş birimleri
 ENEMIES.kedi = { ...ENEMIES.kopek, id: "kedi", name: "Pamuk", hp: 10, damage: [1, 3], accuracy: 60, evasion: 30, scale: 0.6, tint: "sepia(.5) saturate(1.2) brightness(1.2)", desc: "Han kedisi." };

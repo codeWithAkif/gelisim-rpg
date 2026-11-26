@@ -90,12 +90,14 @@ export function rhythmScore(beats: number[], taps: number[], winMs: number): num
 /* ---------- çalışma oturumu verimi ---------- */
 /** Uzun oturumda her oyun saati için bir odak turu oynanabilir. */
 export function sessionRounds(gameMs: number): number { return Math.max(1, Math.ceil(gameMs / 3_600_000 - 1e-9)); }
+/** Odak turlarının en çok ekleyebileceği verim: bekleyerek çalışan geride kalmasın diye ×1,5 tavan. */
+export const MAX_FOCUS_BONUS = 0.5;
 /**
- * Mini oyunlar verimi artırır: hiç oynamamak ×1 (bekleyerek çalışma), her tur en çok +1/tur sayısı.
- * Kötü oynamak cezalandırılmaz; sadece ek kazanç gelmez.
+ * Mini oyunlar verimi artırır: hiç oynamamak ×1 (bekleyerek çalışma), en iyi oyunla ×1,5.
+ * Kötü oynamak cezalandırılmaz; sadece ek kazanç gelmez. Odak turu isteğe bağlı bir ikramdır.
  */
 export function sessionBoost(scores: number[] | undefined, gameMs: number): number {
   const n = sessionRounds(gameMs);
   const best = [...(scores ?? [])].sort((a, b) => b - a).slice(0, n);
-  return 1 + best.reduce((a, b) => a + Math.max(0, Math.min(1, b)), 0) / n;
+  return 1 + MAX_FOCUS_BONUS * best.reduce((a, b) => a + Math.max(0, Math.min(1, b)), 0) / n;
 }

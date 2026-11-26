@@ -9,6 +9,11 @@ import { applyGain, type GainReport } from "./progression";
 export const healOf = (cfg: Config, id: string) => itemInfo(cfg, id).heal ?? 0;
 /** İlk yardım ne kadar yüksekse sargı ve merhem o kadar çok can verir (seviye 50'de iki kat). */
 export const aidMul = (s: GameState) => 1 + (s.attrs.ilk_yardim?.level ?? 0) / 50;
+/** Otlardan yapılan ilaçlar (merhem) simya ve botanik bilgisiyle güçlenir (seviye 100'de iki kat). */
+export const HERBAL = new Set(["yara_merhemi"]);
+export const herbMul = (s: GameState, id: string) => HERBAL.has(id) ? 1 + (s.attrs.simya?.level ?? 0) / 100 : 1;
+/** Bir yara bakım eşyasının gerçek gücü: eşya × ilk yardım × (merhemse) simya. */
+export const healPower = (cfg: Config, s: GameState, id: string) => healOf(cfg, id) * aidMul(s) * herbMul(s, id);
 /** Uykuda yaraların kapanma payı (maxHp oranı): ilk yardımla artar. */
 export const restHealBonus = (s: GameState) => (s.attrs.ilk_yardim?.level ?? 0) / 400;
 /** Çantadaki bir yara bakım eşyasını kullanır: can artar, birkaç dakika geçer. */
@@ -17,6 +22,6 @@ export function useHeal(cfg: Config, s: GameState, id: string): { ok: boolean; r
   if (!s.inventory[id]) return { ok: false, reason: "Yok" };
   const mh = maxHp(cfg, s); const cur = s.hp || mh; if (cur >= mh) return { ok: false, reason: "Yaran yok" };
   s.inventory[id]--; if (s.inventory[id] <= 0) delete s.inventory[id];
-  const nv = Math.min(mh, cur + h * aidMul(s)); s.hp = Math.round(nv); const gains: GainReport = {}; applyGain(cfg, s, "ilk_yardim", 0.3, gains); s.minute = Math.min(DAY_MINUTES, s.minute + 10);
+  const nv = Math.min(mh, cur + healPower(cfg, s, id)); s.hp = Math.round(nv); const gains: GainReport = {}; applyGain(cfg, s, "ilk_yardim", 0.3, gains); s.minute = Math.min(DAY_MINUTES, s.minute + 10);
   return { ok: true, healed: Math.round(nv - cur), gains };
 }

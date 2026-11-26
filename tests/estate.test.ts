@@ -4,12 +4,11 @@ import { config as cfg } from "../src/engine/config";
 import { newGame, type GameState } from "../src/engine/state";
 import {
   rankOf, canBuyHouse, buyHouse, canHire, hire, heroLimit, toggleParty, partyHeroes, callable, callMany, etaTo, jobsFor, assign, canAssign, nightly, found, setWorker, collect,
-  heroOf, heroStats, successChance, afterBattle, est, houseOf, homeBed, dismiss, canFound,
+  heroOf, heroStats, successChance, afterBattle, est, houseOf, homeBed, dismiss, canFound, diyarOpen, venturesOpen,
 } from "../src/engine/estate";
 import { jobDef } from "../src/content/estate";
 import { createBattle, allies } from "../src/engine/combat";
 import { createSiege } from "../src/engine/siege";
-import { createNobet, nobetSite } from "../src/engine/nobet";
 import { sleepAt, sleepOptions } from "../src/engine/rest";
 
 function rich(): GameState {
@@ -43,7 +42,6 @@ test("yanında gezen adamlar savaşta müttefik olur; en çok iki; evde değilke
   expect(partyHeroes(s).length).toBe(2);
   const b = createBattle(cfg, s, "mera", ["kurt"], 3); expect(allies(b).filter(a => a.uid.startsWith("h:")).length).toBe(2);
   expect(createSiege(cfg, s, { id: "x", name: "x", ground: "cayir", waves: [] }, 1).helpers.length).toBe(2);
-  expect(createNobet(cfg, s, nobetSite("yayla")!, 1).helpers.length).toBe(2);
   s.location = "yayla"; toggleParty(s, "kirpi"); expect(est(s).party!.length).toBe(1); // eve gönderilir (her yerden)
 });
 test("haber salmak vakit alır; yetişemezse olmaz", () => {
@@ -74,4 +72,12 @@ test("maaş ödenmezse sadakat düşer, çok düşünce adam gider; gece uykuda 
   const t = rich(); buyHouse(cfg, t); hire(t, "bora"); const r = sleepAt(cfg, t, "lodging"); expect("error" in r).toBe(false);
   if (!("error" in r)) expect(r.estate.join(" ")).toMatch(/maaş/);
   dismiss(t, "bora"); expect(est(t).heroes!.length).toBe(0); expect(heroStats({ id: "bora", lv: 3, xp: 0, loyalty: 60, hp: 1, status: "evde" }).power).toBeGreaterThan(4);
+});
+
+test("Diyar Köy dostu olunca açılır; işletme ve görev panosu Karaçam'da (Bölüm 2) gelir", () => {
+  const s = newGame(cfg, 8); expect(diyarOpen(s)).toBe(false); expect(venturesOpen(s)).toBe(false);
+  const r = rich(); expect(diyarOpen(r)).toBe(true); expect(venturesOpen(r)).toBe(false);
+  r.story.reached.push("k_varis"); expect(venturesOpen(r)).toBe(true);
+  // eski kayıt: önceden kurulmuş işletmesi olan panoyu görmeye devam eder
+  const old = newGame(cfg, 8); est(old).ventures!.agil = { lv: 1 } as never; expect(venturesOpen(old)).toBe(true);
 });

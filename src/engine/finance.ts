@@ -92,10 +92,17 @@ export const PARTNERS: Partner[] = [
 export const partner = (id: string) => PARTNERS.find(p => p.id === id);
 export function partnerAt(placeId: string) { return PARTNERS.filter(p => NPC_PLACE[p.npc] === placeId); }
 export function stake(s: GameState, id: string) { return s.partners?.[id]?.amount ?? 0; }
+/** Ortaklık fikri tüccar şehri Karaçam'da gelir (Bölüm 2); daha önce kurulmuş paylar işlemeye devam eder. */
+export const FINANCE_GATE = "k_varis";
+export const financeOpen = (s: GameState) => s.story.reached.includes(FINANCE_GATE);
+export function partnerLock(s: GameState, p: Partner): string | null {
+  if (!financeOpen(s) && !stake(s, p.id)) return "Ortaklığı Karaçam'ın tüccarlarından öğrenirsin";
+  return p.unlock(s);
+}
 
 export function invest(s: GameState, id: string, amount: number): { ok: boolean; reason?: string } {
   const p = partner(id); if (!p) return { ok: false, reason: "Böyle bir ortaklık yok" };
-  const lock = p.unlock(s); if (lock) return { ok: false, reason: lock };
+  const lock = partnerLock(s, p); if (lock) return { ok: false, reason: lock };
   if (s.location !== NPC_PLACE[p.npc]) return { ok: false, reason: "Ortağının yanında olmalısın" };
   const cur = stake(s, id);
   if (cur + amount < p.min) return { ok: false, reason: `En az ${p.min} bakır` };

@@ -34,7 +34,8 @@ function hourglass(p: number): string {
 }
 
 /** Süren oturumun ekranı. Kapanınca onDone sonucu verir. */
-export function openSessionRun(cfg: Config, s: GameState, onDone: (r: SessionResult) => void, persist: () => void, onShift?: () => void) {
+/** onHide verilirse ekran "Arka plana al" ile kapanır; oturum işlemeye devam eder (bitince onDone yine çağrılır, çağıran izler). */
+export function openSessionRun(cfg: Config, s: GameState, onDone: (r: SessionResult) => void, persist: () => void, onShift?: () => void, onHide?: () => void) {
   const ss = s.session; if (!ss) return;
   const title = ss.kind === "craft" ? `${itemInfo(cfg, CRAFTS.find(c => c.id === ss.id)!.product).name} yapıyorsun` : ss.label;
   const el = document.createElement("div");
@@ -58,16 +59,18 @@ export function openSessionRun(cfg: Config, s: GameState, onDone: (r: SessionRes
       <div class="gb big"><div class="gf" style="width:${(p * 100).toFixed(2)}%;background:var(--green)"></div></div>
       ${mini ? (() => { const n = roundsLeft(s.session!); const b = boostOf(s.session!);
         return `<div class="card focus-card"><div class="entry-head"><span class="entry-title">Odak turu · ${MINI_NAMES[mini]}</span><span class="entry-meta">verim ×${b.toFixed(1)}</span></div>
-        <p class="tiny" style="margin:0">${n > 0 ? `Beklemek yerine çalışmaya katıl: iyi oynarsan bu çalışmadan ${n > 1 ? "her turda" : ""} daha çok kazanırsın (en çok ×2). Oynarken süre durur.` : "Bu çalışmanın odak turlarını oynadın."}</p>
+        <p class="tiny" style="margin:0">${n > 0 ? `Beklemek yerine çalışmaya katıl: iyi oynarsan bu çalışmadan ${n > 1 ? "her turda" : ""} daha çok kazanırsın (en çok ×1,5). Oynarken süre durur.` : "Bu çalışmanın odak turlarını oynadın."}</p>
         ${n > 0 ? `<div class="row"><button class="btn primary" data-x="mini">Oyna${n > 1 ? ` (${n} tur kaldı)` : ""}</button></div>` : ""}</div>`; })() : ""}
       ${soFar ? `<h3>Şimdiye kadar</h3>${soFar}` : ""}
-      <p class="muted tiny">Çalışırken başka bir şey yapamazsın. Uygulamayı kapatabilirsin; süre işlemeye devam eder.</p>
+      <p class="muted tiny">Uygulamayı kapatabilirsin; bitince haber veririm. Bu arada defterine, vücuduna ve haritana bakabilirsin.</p>
+      ${onHide ? `<div class="row" style="justify-content:center"><button class="btn primary" data-x="hide">Arka plana al</button></div>` : ""}
       <div class="row" style="justify-content:center">${confirm
         ? `<span class="red">Yarıda bırakırsan geçen süre kadar kazanırsın.</span><button class="btn red" data-x="stop">Evet, bırak</button><button class="btn" data-x="no">Devam et</button>`
         : `<button class="btn" data-x="ask">Yarıda bırak</button>`}</div></div>`;
   };
   el.addEventListener("click", e => {
     const x = (e.target as HTMLElement).closest<HTMLElement>("[data-x]")?.dataset.x;
+    if (x === "hide" && onHide) { clearInterval(timer); document.removeEventListener("visibilitychange", vis); el.remove(); persist(); onHide(); return; }
     if (x === "ask") { confirm = true; draw(); }
     if (x === "no") { confirm = false; draw(); }
     if (x === "stop") close(finishSession(cfg, s, Date.now(), true));

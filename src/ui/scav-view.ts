@@ -2,8 +2,8 @@
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
-  type Scav, type Spot, type Loadout, SW, EXIT_X, LADDER_XS, SPOT_STAGES, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, rerollScav, pickScavCard, finishScav, scavSite, canStartScav,
-  SCARDS, bagUsed, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
+  type Scav, type Spot, type Loadout, SW, EXIT_X, LADDER_XS, SPOT_STAGES, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
+  traitLines, bagUsed, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
 import { ENEMIES } from "../content/world";
@@ -28,6 +28,8 @@ export function openScavHub(cfg: Config, s: GameState, place: string, persist: (
       <h3 style="margin:4px 0 0">Yanına ne alırsın? <span class="tiny muted">(yalnız bir tane)</span></h3>
       <div class="load-list">${opts.map((o, i) => `<button class="load-opt ${isSel(o) ? "on" : ""}" data-i="${i}"><b>${esc(o.label)}</b><span>${esc(o.note)}</span></button>`).join("")}
         <button class="load-opt ${sel.kind === "yumruk" ? "on" : ""}" data-i="-1"><b>Yumruk</b><span>hiçbir şey almazsın</span></button></div>
+      <details class="tiny"><summary>Vücudun burada ne yapar?</summary><p class="muted" style="margin:2px 0">Harabede ayrıca güçlenmezsin; ne kadar hızlı, dayanıklı ve becerikliysen o kadarsın.</p>
+        <div class="trait-list">${traitLines(cfg, s, sel.kind === "spell", sel.kind === "bow").map(l => `<span><b>${esc(l.name)}</b> ${esc(l.value)} <i class="muted">· ${esc(l.from)}</i></span>`).join("")}</div></details>
       <div class="odds"><span>Kat <b>${site.floors}</b></span><span>Enerji <b>−${SCAV_ENERGY}</b></span><span>Süre <b>~30 dk</b></span></div>
       ${can.ok ? "" : `<p class="tiny red" style="margin:0">${esc(can.reason ?? "")}</p>`}
       <div class="row"><button class="btn" data-x="close">Kapat</button><span style="flex:1"></span><button class="btn primary" data-x="go" ${can.ok ? "" : "disabled"}>Gir</button></div></div>`;
@@ -49,10 +51,10 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       <div class="sc-heal" id="scHeal"></div><div class="sc-stick" id="scStick"><i id="scKnob"></i></div>
       <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="pick" id="scPick" hidden></button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act aim" data-a="shoot" id="scShoot" hidden></button><button class="sc-act aim" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
     <div class="sc-bar"><span id="scAmmo"></span><button class="btn small" id="scBag" data-c="bag"></button></div>
-    <div class="nb-card" id="scCard" hidden></div><div class="nb-card" id="scPause" hidden></div>`;
+    <div class="nb-card" id="scPause" hidden></div>`;
   document.body.appendChild(el);
   const cv = el.querySelector("canvas")!; const stage = el.querySelector<HTMLElement>(".siege-stage")!; const g = cv.getContext("2d")!;
-  const cardEl = el.querySelector<HTMLElement>("#scCard")!; const pauseEl = el.querySelector<HTMLElement>("#scPause")!; const tip = el.querySelector<HTMLElement>("#scTip")!;
+  const pauseEl = el.querySelector<HTMLElement>("#scPause")!; const tip = el.querySelector<HTMLElement>("#scTip")!;
   let W = 300, H = 400, paused = false, raf = 0, ended = false, last = performance.now(); let shake = 0; let walkT = 0; let lastLockedMsg = 0;
   const rings: { x: number; floor: number; t: number; r: number; color: string }[] = []; const pops: { x: number; floor: number; t: number; text: string; color: string }[] = []; const shots: { a: number; b: number; floor: number; t: number }[] = [];
   const F = site.floors; const VIEW = 110;
@@ -239,24 +241,8 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       if (f.k === "locked") { if (now - lastLockedMsg > 1500) { lastLockedMsg = now; tip.hidden = false; tip.textContent = "Kilitli: başka bir odada anahtar var"; setTimeout(() => { tip.hidden = true; }, 1400); sfx("bad"); } }
       if (f.k === "die") sfx("hit");
       if (f.k === "spot") sfx("good");
-      if (f.k === "card") showCards();
     }
   }
-  function showCards() {
-    cardEl.hidden = false; sfx("perfect"); buzz("medium"); setInput(n, 0, 0); stickReset();
-    const owned = Object.entries(n.cards).filter(([, v]) => v > 0);
-    cardEl.innerHTML = `<p class="hand" style="margin:0;font-size:26px">Bir şey öğrendin</p><p class="tiny muted" style="margin:0">Birini seç; bu aramada seninle.</p>
-      ${owned.length ? `<div class="nb-owned">${owned.map(([id, v]) => `<span class="nb-own"><b>${esc(SCARDS.find(c => c.id === id)?.name ?? id)}</b><i>${v}</i></span>`).join("")}</div>` : ""}
-      ${n.offer.map(id => { const c = SCARDS.find(x => x.id === id)!; const lv = n.cards[id] ?? 0; const stars = Array.from({ length: c.max }, (_, k) => `<i class="${k <= lv ? "on" : ""}">★</i>`).join("");
-        return `<button class="choice" data-card="${id}"><b>${esc(c.name)}${lv ? ` ${"I".repeat(lv + 1)}` : ""}</b><span>${esc(c.desc)}</span><em class="nb-stars">${stars}</em></button>`; }).join("")}
-      <button class="btn small" data-reroll ${n.rerolls > 0 ? "" : "disabled"}>Yeniden dene (${n.rerolls}/2)</button>`;
-  }
-  cardEl.addEventListener("click", e => {
-    if ((e.target as HTMLElement).closest("[data-reroll]")) { if (rerollScav(n)) { sfx("page"); showCards(); } else sfx("bad"); return; }
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-card]"); if (!b) return;
-    if (pickScavCard(n, b.dataset.card!)) { cardEl.hidden = true; sfx("page"); }
-  });
-
   /* ---------- joystick ve düğmeler ---------- */
   const stick = q("#scStick"), knob = q("#scKnob"); let stickId = -1;
   const stickReset = () => { stickId = -1; knob.style.transform = "translate(0,0)"; setInput(n, 0, 0); };

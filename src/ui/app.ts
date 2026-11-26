@@ -9,11 +9,11 @@ import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
 import { QUESTS, CRAFTS, ENEMIES } from "../content/world";
 import { build, upgrade, dismantle, structure } from "../engine/engineering";
-import { callable, callMany, heroDef, ROLE_NAMES, afterBattle, hire as hireHero, buyHouse, found as foundVenture, upVenture, setWorker, collect as collectVenture, toggleParty, dismiss, assign as assignJob, recall as recallHero, VENTURES } from "../engine/estate";
+import { callable, callMany, heroDef, ROLE_NAMES, afterBattle, hire as hireHero, buyHouse, found as foundVenture, upVenture, setWorker, collect as collectVenture, toggleParty, dismiss, assign as assignJob, recall as recallHero, VENTURES, diyarOpen } from "../engine/estate";
 import { feed as petFeed, caress as petCaress, play as petPlay, rename as petRename, release as petRelease, sendHome as petSendHome, swapWithHome as petSwap, adopt as petAdopt, petType } from "../engine/pet";
 import { itemInfo, equip, unequip, drop, buy, bagOf, attachPouch, detachPouch, type InvTab } from "../engine/inventory";
 import type { GearSlot } from "../engine/gear";
-import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
+import { startSession, startCraft, finishSession, fmtDur, sessionProgress, type SessionResult } from "../engine/session";
 import { openSessionSheet, openSessionRun } from "./session-view";
 import { mountMap } from "./map-view";
 import { place, here } from "../engine/travel";
@@ -21,19 +21,18 @@ import { startJourney, dueEvent, pauseJourney, resumeJourney, resolveEvent, fini
 import { makeScenario, DEFAULT_PLAN, foeWords, cap } from "../engine/combat";
 import { AMBUSH_MAP } from "../content/world";
 import { esc, ICONS } from "./sketch";
-import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
+import { statusBar, defterScreen, vucutScreen, calisScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { openSiege } from "./siege-view";
 import { openStealth } from "./stealth-view";
 import { diyarScreen } from "./diyar-screen";
-import { openNobetHub, lootText } from "./nobet-view";
 import { openScavHub } from "./scav-view";
 import { rollFoes, bonusOf, modeOptions, stealthGoal, siegeFromFoes, groundOf, type Mode, type Context } from "../engine/encounter";
 import { addItem } from "../engine/inventory";
 import { isNight } from "../engine/state";
 import type { BattleOutcome } from "../engine/combat";
-import { SIEGES } from "../engine/siege";
+import { SIEGES, escalate } from "../engine/siege";
 import { showIntro } from "./intro";
 import { applyDaylight } from "./daylight";
 import { notifyAt, clearNotify } from "../notify";
@@ -43,20 +42,23 @@ import { sfx, buzz, ambience, unlockAudio } from "./feel";
 import { darkness } from "./daylight";
 import { beginSearch, collectFind, deliverRequest } from "../engine/explore";
 import { openSeek } from "./seek-view";
-import { sell, partner, stake, invest, withdraw, nightlyFinance } from "../engine/finance";
+import { sell, partner, partnerLock, stake, invest, withdraw, nightlyFinance } from "../engine/finance";
 import { sleepOptions, sleepAt, rest, type SleepKind } from "../engine/rest";
 import { minutesLeft } from "../engine/state";
 import { itemPic, artUrl } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
+import { newUnlocks } from "../engine/unlocks";
+import { crossedThresholds } from "../engine/thresholds";
 
-type Tab = "defter" | "vucut" | "canta" | "harita" | "isler" | "calis" | "diyar";
-// bilgi sayfaları solda, karar sayfaları sağda
-const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["canta", "Çanta"], ["harita", "Harita"], ["isler", "İşler"], ["calis", "Çalış"], ["diyar", "Diyar"]];
+// "calis" alt çubukta yok: Harita'daki yer kartından açılır, geri düğmesiyle haritaya döner.
+type Tab = "defter" | "vucut" | "canta" | "harita" | "calis" | "diyar";
+// bilgi sayfaları solda, karar sayfaları sağda; görevler Defter'de
+const TABS: [Tab, string][] = [["defter", "Defter"], ["vucut", "Vücut"], ["canta", "Çanta"], ["harita", "Harita"], ["diyar", "Diyar"]];
 
 export function startApp(root: HTMLElement) {
   let s: GameState = load(cfg);
-  let tab: Tab = (() => { try { return (localStorage.getItem("gelisim-sekme") as Tab) || "defter"; } catch { return "defter"; } })();
+  let tab: Tab = (() => { try { const t = localStorage.getItem("gelisim-sekme") as Tab; return TABS.some(([id]) => id === t) ? t : "defter"; } catch { return "defter"; } })();
   const ui: UiState = {};
   let mapState: ReturnType<ReturnType<typeof mountMap>["state"]> | undefined;
   let mapApi: ReturnType<typeof mountMap> | undefined;
@@ -73,7 +75,14 @@ export function startApp(root: HTMLElement) {
   window.addEventListener("gelisim-ayar", syncAmbience);
   document.addEventListener("visibilitychange", syncAmbience);
   function toast(t: string) { const el = root.querySelector("#toast")!; el.textContent = t; el.classList.add("on"); clearTimeout((toast as any).t); (toast as any).t = setTimeout(() => el.classList.remove("on"), 2400); }
+  /** Diyar sekmesi "Köy dostu" olunca belirir (tanıtımı storyTick'te "Yeni sayfa" olarak). */
+  function syncTabs() {
+    const open = diyarOpen(s);
+    root.querySelector<HTMLButtonElement>('[data-tab="diyar"]')!.hidden = !open;
+    if (!open && tab === "diyar") tab = "defter";
+  }
   function render(keepScroll = true) {
+    syncTabs();
     const y = main.scrollTop;
     applyDaylight(s.minute); syncAmbience();
     root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
@@ -85,6 +94,7 @@ export function startApp(root: HTMLElement) {
       main.innerHTML = `<div class="map-host"></div>`;
       mapApi = mountMap(main.querySelector<HTMLElement>(".map-host")!, cfg, s, {
         onTravel: to => {
+          if (busy()) return;
           const r = startJourney(cfg, s, to, Date.now());
           if (!r.ok) { toast(r.reason ?? "Yola çıkamadın"); return; }
           persist(); mapState = { view: mapApi!.state().view, sel: to }; mapApi = undefined; render(); journeyTick();
@@ -93,8 +103,8 @@ export function startApp(root: HTMLElement) {
         onAct: (_k, qid) => { const q = QUESTS.find(x => x.id === qid)!; if (q.battle) doFight(qid); else doWalk(qid); },
       }, mapState);
     } else
-    main.innerHTML = tab === "defter" ? defterScreen(cfg, s, ui.page ?? 0) : tab === "vucut" ? vucutScreen(cfg, s, ui) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : tab === "diyar" ? diyarScreen(cfg, s, ui) : islerScreen(cfg, s, ui);
-    root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => { b.setAttribute("aria-current", b.dataset.tab === tab ? "page" : "false"); if (b.dataset.tab === tab) b.scrollIntoView({ block: "nearest", inline: "nearest" }); });
+    main.innerHTML = tab === "defter" ? defterScreen(cfg, s, ui.page ?? 0, ui) : tab === "vucut" ? vucutScreen(cfg, s, ui) : tab === "canta" ? cantaScreen(cfg, s, ui) : tab === "calis" ? calisScreen(cfg, s, ui) : diyarScreen(cfg, s, ui);
+    root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(b => { const on = b.dataset.tab === (tab === "calis" ? "harita" : tab); b.setAttribute("aria-current", on ? "page" : "false"); if (on) b.scrollIntoView({ block: "nearest", inline: "nearest" }); });
     if (keepScroll) main.scrollTop = y; else main.scrollTop = 0;
     if (tab === "defter") mountBook(keepScroll ? leafY : 0);
     vitalAlerts();
@@ -147,16 +157,36 @@ export function startApp(root: HTMLElement) {
       ${r.wounded ? `<p class="red" style="margin:0">Yaralıydın; bedensel kazanç düştü.</p>` : ""}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
     sfx(r.early ? "page" : "win"); buzz("medium");
   }
+  /* çalışma arka plandayken: üst şeritte sayaç, bitince sonuç; çakışan eylemler beklenir */
+  let sessWatch = 0;
+  function watchSession() {
+    clearInterval(sessWatch);
+    sessWatch = window.setInterval(() => {
+      if (!s.session || document.querySelector(".session-screen")) { clearInterval(sessWatch); return; }
+      if (sessionProgress(s, Date.now()) >= 1) { clearInterval(sessWatch); const r = finishSession(cfg, s, Date.now()); if (r) sessionDone(r); return; }
+      const t = root.querySelector<HTMLElement>("#sessLeft"); if (t) t.textContent = fmtDur(s.session.durMs - (Date.now() - s.session.startMs));
+    }, 1000);
+  }
+  function showSession() { openSessionRun(cfg, s, sessionDone, persist, scheduleNotify, () => { render(); watchSession(); toast("Çalışman sürüyor; bitince haber veririm."); }); }
   function resumeSession() {
     if (!s.session) return false;
     const r = finishSession(cfg, s, Date.now());
     if (r) { sessionDone(r); return true; }
-    openSessionRun(cfg, s, sessionDone, persist, scheduleNotify);
+    showSession();
     return true;
   }
-  /** Yeni kilometre taşlarını sırayla "Yeni sayfa" olarak gösterir. */
+  /** Çalışırken yalnız bakmak serbest; bir şey yapmak (yola çıkmak, savaşmak, uyumak...) bitmesini bekler. */
+  const VIEW_ONLY = new Set(["pick", "bagpage", "bodytab", "invtab", "diyartab", "jobtab", "show-place", "back-map", "study", "menu", "market"]);
+  function busy(): boolean {
+    if (!s.session) return false;
+    toast("Çalışıyorsun. Bitmesini bekle ya da çalışmayı açıp yarıda bırak."); sfx("bad"); return true;
+  }
+  /** Yeni kilometre taşlarını ve ilk kez açılan sistemleri sırayla "Yeni sayfa" olarak gösterir. */
   function storyTick(after?: () => void) {
-    const fresh = advanceStory(s);
+    const fresh: { id: string; title: string; text: string }[] = [...advanceStory(s), ...newUnlocks(s)];
+    // aşılan eşikler tek sayfada: "Artık …"
+    const th = crossedThresholds(cfg, s);
+    if (th.length) fresh.push({ id: "esik", title: "Artık yapabildiğin", text: th.map(t => "Artık " + t.text + ".").join(" ") });
     if (!fresh.length) { after?.(); return; }
     persist(); render();
     // birden fazla sayfa birden açıldıysa (eski kayıt, art arda olaylar) tek özet pencere
@@ -191,25 +221,27 @@ export function startApp(root: HTMLElement) {
 
   // üst şeritteki konum düğmesi haritayı açar
   root.querySelector("#statusSlot")!.addEventListener("click", e => {
-    if ((e.target as HTMLElement).closest("[data-act=sleep]")) { openSleep(); return; }
+    if ((e.target as HTMLElement).closest("[data-act=session-open]")) { if (s.session) showSession(); return; }
+    if ((e.target as HTMLElement).closest("[data-act=sleep]")) { if (busy()) return; openSleep(); return; }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-act=show-place]"); if (!b) return;
     tab = "harita"; mapState = { view: { cx: place(s.location)!.x, cy: place(s.location)!.y + 55, w: 230 }, sel: s.location }; render(false);
   });
   main.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-act]"); if (!b || b.disabled) return;
     const id = b.dataset.id ?? "";
+    if (!VIEW_ONLY.has(b.dataset.act ?? "") && busy()) return;
     switch (b.dataset.act) {
       case "session-pick":
         openSessionSheet(cfg, s, id, ms => {
           const p = startSession(cfg, s, id, ms, Date.now());
           if (!p.ok) { toast(p.reason ?? "Başlayamadın"); return; }
-          persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist, scheduleNotify);
+          persist(); render(); scheduleNotify(); showSession();
         });
         break;
       case "craft": {
         const r = startCraft(cfg, s, id, Date.now());
         if (!r.ok) { toast(r.reason ?? "Başlayamadın"); break; }
-        persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist, scheduleNotify); break;
+        persist(); render(); scheduleNotify(); showSession(); break;
       }
       case "pick": ui.sel = ui.sel === id ? undefined : id; render(); break;
       case "heal": { const r = useHeal(cfg, s, id); if (!r.ok) { toast(r.reason ?? ""); break; } sfx("good"); toast(`${itemInfo(cfg, id).name}: +${r.healed} can${r.gains && r.gains.ilk_yardim ? " · ilk yardım gelişti" : ""}`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); break; }
@@ -276,9 +308,10 @@ export function startApp(root: HTMLElement) {
         sfx("coin"); buzz("light"); toast(`${itemInfo(cfg, id).name} sattın: +${r.price} bakır`); persist(); render(); break;
       }
       case "partner": openPartner(id); break;
-      case "nobet": doNobet(id); break;
       case "scav": doScav(id); break;
       case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;
+      case "study": tab = "calis"; sfx("page"); render(false); break;
+      case "back-map": tab = "harita"; sfx("page"); render(false); break;
       case "jobtab": ui.jobTab = id as UiState["jobTab"]; sfx("page"); render(false); break;
       case "deliver": {
         const r = deliverRequest(cfg, s, id);
@@ -288,7 +321,7 @@ export function startApp(root: HTMLElement) {
     }
   });
 
-  /** Nöbet: önce kalıcı güçlenmeler, sonra sonsuz dalgalar; bitince sonuç. */
+  /** Harabe araması; bitince sonuç. */
   function doScav(id: string) {
     openScavHub(cfg, s, id, persist, r => {
       persist(); render();
@@ -301,17 +334,6 @@ export function startApp(root: HTMLElement) {
         ${lost.length ? `<p class="tiny red" style="margin:0">Kaybolan: ${esc(lost.join(", "))}</p>` : ""}
         ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
         <h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
-    });
-  }
-  function doNobet(id: string) {
-    openNobetHub(cfg, s, id, persist, r => {
-      persist(); render();
-      modal(`<p class="hand muted" style="margin:0">Nöbet bitti</p><h2>${r.wave}. dalgaya kadar dayandın${r.best ? " · yeni rekor!" : ""}</h2>
-        <p class="lede">Kule düştü ama her nöbet bir iz bırakır.</p>
-        <div class="odds"><span>Nöbet izi <b>+${r.iz}</b></span><span>Geçen süre <b>${r.minutes} dk</b></span></div>
-        ${r.loot.money || Object.keys(r.loot.items).length ? `<p class="hand blue" style="margin:0">Ödül: ${esc(lootText(r.loot))}</p>` : `<p class="tiny muted" style="margin:0">Ödül beşinci dalgadan sonra başlar.</p>`}
-        ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
-        <h3>Nöbette gelişen</h3>${gainList(cfg, r.gains, 6)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }, { label: "Kuleye dön", fn: () => doNobet(id) }]);
     });
   }
   /** Uyu ya da dinlen: nerede uyuyacağın dinlenmeyi ve gecenin tehlikesini belirler. */
@@ -348,7 +370,7 @@ export function startApp(root: HTMLElement) {
   }
   /** Ortaklık: şartlar, payın, yatır ya da çek. */
   function openPartner(id: string) {
-    const p = partner(id)!; const st = stake(s, id); const lock = p.unlock(s);
+    const p = partner(id)!; const st = stake(s, id); const lock = partnerLock(s, p);
     const steps = [10, 25, 50].map(n => Math.max(n, st ? 0 : p.min)).filter((n, i, a) => a.indexOf(n) === i && st + n <= p.max && n <= s.money);
     const risk = p.risk * (p.safer?.(s) ? 0.5 : 1);
     const btns: { label: string; cls?: string; fn: () => void }[] = steps.map(n => ({ label: `${n} yatır`, cls: "primary", fn: () => { const r = invest(s, id, n); toast(r.ok ? `${p.name}: ${n} bakır yatırdın.` : r.reason ?? ""); if (r.ok) sfx("coin"); persist(); render(); } }));
@@ -435,7 +457,7 @@ export function startApp(root: HTMLElement) {
         };
         if (q.siege) {
           const cl = callable(s, q.at);
-          const go = (called: string[]) => openSiege(cfg, s, SIEGES[q.siege!], (s.seed + s.day * 31) | 0, (won, gains, hs) => siegeEnd(won, gains, undefined, hs), persist, called);
+          const go = (called: string[]) => openSiege(cfg, s, escalate(SIEGES[q.siege!], s.quests[id]?.count ?? 0), (s.seed + s.day * 31) | 0, (won, gains, hs) => siegeEnd(won, gains, undefined, hs), persist, called);
           if (!cl.length) { go([]); return; }
           const pickd = new Set<string>();
           modal(`<p class="hand muted" style="margin:0">Savunma</p><h2>${esc(q.title)}</h2><p style="margin:0">Evdeki adamlara haber salmak ister misin? Yetişmeleri <b>${cl[0].eta} dk</b> sürer.</p><div class="chips">${cl.map(c => `<button class="chip" data-hid="${c.hero.id}" ${c.ok ? "" : "disabled"}>${esc(heroDef(c.hero.id)!.name)} · ${ROLE_NAMES[heroDef(c.hero.id)!.role]}</button>`).join("")}</div>`,

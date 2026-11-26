@@ -41,15 +41,20 @@ button { font: inherit; color: inherit; }
 
 /* üst şerit */
 .status {
-  padding: calc(var(--safe-top) + 8px) 16px 8px;
-  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: end;
+  padding: calc(var(--safe-top) + 6px) 16px 8px;
+  display: flex; flex-direction: column; gap: 4px;
   border-bottom: 1.5px solid var(--ink); background: var(--paper);
   position: relative;
 }
 .status::after { content: ""; position: absolute; left: 10px; right: 14px; bottom: -5px; border-bottom: 1px solid var(--ink-soft); opacity: .5; }
-.status .day { font-family: var(--f-hand); font-size: 26px; line-height: 1; font-weight: 700; }
-.status .day small { font-size: 19px; font-weight: 500; color: var(--ink-soft); margin-left: 6px; }
-.status .money { font-family: var(--f-hand); font-size: 21px; text-align: right; }
+/* 1. satır: gün ve saat · konum · para ve uyku */
+.st-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.status .day { font-family: var(--f-hand); font-size: 22px; line-height: 1; font-weight: 700; white-space: nowrap; display: flex; align-items: center; flex-shrink: 0; }
+.status .day small { font-size: 17px; font-weight: 500; color: var(--ink-soft); margin-left: 5px; }
+.status .tnote { font-family: var(--f-hand); font-size: 16px; line-height: 1; color: #A35A12; }
+.status .tnote.red { color: var(--red); }
+.status .money { font-family: var(--f-hand); font-size: 20px; text-align: right; margin-left: auto; white-space: nowrap; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .meters { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin-top: 6px; }
 .meter { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--ink-soft); letter-spacing: .02em; }
 .meter b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -124,7 +129,7 @@ h3 { font-size: 22px; }
 
 /* alt sekmeler */
 .tabs {
-  display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1.5px solid var(--ink); background: var(--paper-2);
+  display: grid; border-top: 1.5px solid var(--ink); background: var(--paper-2);
   padding-bottom: var(--safe-bottom);
 }
 .tabs button { border: 0; background: none; padding: 8px 0 9px; display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer; color: var(--ink-soft); min-height: 56px; }
@@ -221,10 +226,10 @@ h3 { font-size: 22px; }
 .big-text #app, .big-text .modal, .big-text .battle-panel, .big-text .plan-panel { zoom: 1.12; }
 
 /* göstergeler */
-.vitals { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; margin-top: 6px; }
+.vitals { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; }
 .gauge { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px; align-items: center; }
 .gauge .gi svg { width: 22px; height: 22px; display: block; }
-.gauge .gl { display: flex; justify-content: space-between; gap: 4px; font-size: 11px; color: var(--ink-soft); line-height: 1.1; }
+.gauge .gl { display: flex; justify-content: flex-end; gap: 4px; font-size: 14px; color: var(--ink-soft); line-height: 1.1; }
 .gauge .gl b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 500; }
 .gb { height: 8px; border: 1.2px solid var(--ink); border-radius: 5px 3px 5px 3px; background: rgba(255,255,255,.35); overflow: hidden; margin-top: 2px; }
 .gb.big { height: 14px; }
@@ -266,7 +271,7 @@ h3 { font-size: 22px; }
 .choice .tiny { font-size: 12px; }
 
 /* harita */
-.where { grid-column: 1; justify-self: start; border: 0; background: none; padding: 0; font-family: var(--f-hand); font-size: 18px; color: var(--blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; background: none; padding: 0; font-family: var(--f-hand); font-size: 18px; color: var(--blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 main.map-mode { padding: 0; overflow: hidden; position: relative; }
 .map-host, .map-wrap { position: absolute; inset: 0; }
 .map-svg { width: 100%; height: 100%; display: block; touch-action: none; background: #B9CDD0; }
@@ -291,7 +296,6 @@ main.map-mode { padding: 0; overflow: hidden; position: relative; }
 body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .session-screen, .intro { transition: background-color 1.2s ease, color 1.2s ease; }
 .day .phase { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; vertical-align: 3px; }
 .day .phase svg { width: 20px; height: 20px; }
-.day .phase i { font-style: normal; font-family: var(--f-hand); font-size: 16px; font-weight: 500; color: var(--ink-soft); }
 .night .alert-strip.amber { background: rgba(217,165,58,.18); color: #F0C878; }
 .night .alert-strip.red { background: rgba(232,144,126,.16); color: #F2A898; }
 .night .gauge .gl b { color: var(--ink); }
@@ -374,6 +378,12 @@ body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .sessio
 /* ---------- Defter: yana çevrilen sayfalar ---------- */
 main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .book { display: flex; flex-direction: column; width: 100%; min-height: 0; }
+.next-card { flex: none; display: flex; align-items: center; gap: 10px; margin: 8px 10px 0; padding: 8px 10px; border: 1.5px dashed var(--blue); border-radius: 10px 6px 12px 7px; background: rgba(255,255,255,.25); }
+.next-card .nc-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.next-card .nc-kind { font-family: var(--f-hand); font-size: 14px; color: var(--blue); }
+.next-card b { font-family: var(--f-hand); font-size: 20px; line-height: 1.1; }
+.next-card .nc-sub { font-size: 14px; color: var(--ink-soft); line-height: 1.25; }
+.next-card .btn { flex: none; }
 .book-tabs { display: flex; gap: 2px; overflow-x: auto; padding: 8px 10px 0; border-bottom: 1.5px solid var(--ink); scrollbar-width: none; flex: none; }
 .book-tabs::-webkit-scrollbar { display: none; }
 .book-tabs button { flex: none; font-family: var(--f-hand); font-size: 18px; padding: 4px 12px 2px; border: 1.5px solid var(--ink-soft); border-bottom: none; border-radius: 10px 10px 0 0; background: var(--paper-2); color: var(--ink-soft); cursor: pointer; }
@@ -455,6 +465,7 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .perm-list { display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow-y: auto; }
 .perm { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--pencil); padding-bottom: 5px; }
 .nb-card[hidden] { display: none; }
+.tabs button[hidden] { display: none; }
 .nb-spells { display: flex; justify-content: center; gap: 14px; padding: 6px 12px; border-top: 1.5px solid var(--ink); }
 .nb-spells:empty { display: none; }
 .nb-spells .nb-skill { position: relative; left: auto; bottom: auto; transform: none; width: 70px; height: 60px; border-radius: 14px 18px 12px 16px; overflow: hidden; align-content: center; gap: 1px; display: grid; place-items: center; font-size: 0; }
@@ -478,10 +489,9 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .eq-row .eq-slot.two { opacity: .5; cursor: default; border-style: dashed; }
 .gear-sum { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--ink-soft); margin: 4px 0; }
 .gear-sum b { color: var(--ink); font-family: var(--f-hand); font-size: 18px; }
-/* alt menü: sığmayanlar yana kaydırılır */
-.tabs { display: flex; grid-template-columns: none; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
-.tabs::-webkit-scrollbar { display: none; }
-.tabs button { flex: 0 0 20%; scroll-snap-align: start; }
+/* alt menü: en çok beş sekme, eşit genişlikte (kaydırma yok) */
+.tabs { display: flex; grid-template-columns: none; }
+.tabs button { flex: 1 1 0; min-width: 0; }
 /* uyku düğmesi: her sayfada, üst şeritte */
 .sleepbtn { margin-left: 10px; width: 34px; height: 34px; border: 1.5px solid var(--ink); border-radius: 50%; background: var(--paper-2); color: var(--ink); display: inline-grid; place-items: center; cursor: pointer; vertical-align: middle; padding: 0; }
 .sleepbtn svg { width: 22px; height: 22px; }
@@ -516,9 +526,6 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .name-input { font: 22px var(--f-hand); padding: 6px 10px; border: 1.5px solid var(--ink); border-radius: 8px; background: var(--paper); color: var(--ink); width: 100%; }
 
 /* durum çubuğu: kararmaya kalan süre, uyku düğmesinin altında */
-.darkleft { grid-column: 2; text-align: right; font-family: var(--f-hand); font-size: 16px; color: var(--ink-soft); line-height: 1.1; align-self: center; }
-.darkleft b { font-weight: 700; color: var(--ink); }
-.darkleft b.red { color: var(--red); }
 
 /* işler: tür etiketleri ve takip kartı */
 .kind-chip { display: inline-block; font-family: var(--f-hand); font-size: 16px; line-height: 1; padding: 3px 9px; border-radius: 10px 12px 9px 12px; border: 1.5px solid var(--ink-soft); background: var(--paper-2); white-space: nowrap; }
@@ -578,6 +585,7 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .sc-act.go { background: var(--blue); color: var(--paper); }
 .sc-act[hidden] { display: none; }
 .load-list { display: flex; flex-direction: column; gap: 6px; max-height: 38vh; overflow-y: auto; }
+.trait-list { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
 .load-opt { text-align: left; display: flex; flex-direction: column; gap: 1px; padding: 8px 12px; border: 1.5px solid var(--ink-soft); border-radius: 10px 14px 9px 14px; background: var(--paper-2); color: var(--ink); cursor: pointer; font-family: var(--f-body); }
 .load-opt b { font-family: var(--f-hand); font-size: 20px; font-weight: 700; }
 .load-opt span { font-size: 14px; color: var(--ink-soft); }
@@ -602,3 +610,14 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .sc-sup i { position: absolute; right: -4px; bottom: -4px; font-style: normal; font-family: var(--f-hand); font-size: 14px; background: var(--ink); color: var(--paper); border-radius: 8px; padding: 0 5px; }
 .sc-wicon { width: 26px; height: 26px; object-fit: contain; vertical-align: middle; margin-right: 4px; }
 .raid-pill.calm { background: #4A5568; font-size: 20px; }
+
+/* Vücut: özelliğin sıradaki eşiği */
+.attr .next-th { grid-column: 1 / -1; font-size: 13px; color: var(--blue); font-style: italic; margin-top: -2px; }
+/* gelişim: sabah, gece işlenen kaslar ve satırlar bir süre parlar */
+.growth { display: flex; flex-direction: column; gap: 2px; }
+.body-wrap path.grew { animation: grewGlow 1.4s ease-in-out 4; }
+@keyframes grewGlow { 0%, 100% { filter: none; } 50% { filter: drop-shadow(0 0 4px var(--green)) brightness(1.25); } }
+.attr.grew { background: linear-gradient(90deg, rgba(90,140,70,.16), transparent 70%); border-radius: 6px; }
+.more-attrs { margin-top: 6px; }
+.more-attrs summary { font-size: 14px; cursor: pointer; }
+.sess-pill { align-self: flex-start; border: 1.5px dashed var(--green); border-radius: 12px 8px 12px 9px; background: rgba(90,140,70,.12); padding: 2px 10px; font-family: var(--f-hand); font-size: 17px; color: var(--ink); cursor: pointer; }

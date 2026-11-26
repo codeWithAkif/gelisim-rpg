@@ -30,6 +30,11 @@ export function rankOf(s: GameState): { rank: RankDef; next?: RankDef; score: nu
   return { rank, next, score: sc, frac: next ? (sc - rank.at) / (next.at - rank.at) : 1 };
 }
 export const rankNo = (s: GameState) => rankOf(s).rank.id;
+/** Diyar sekmesi "Köy dostu" olunca açılır (eski kayıtta evi ya da adamı olan için de açık). */
+export const diyarOpen = (s: GameState) => { const e = est(s); return rankNo(s) >= 1 || !!e.house || e.heroes!.length > 0; };
+/** İşletme ve görev panosu Bölüm 2'de (Karaçam) açılır; önceden kurulmuş olan görünmeye devam eder. */
+export const VENTURE_GATE = "k_varis";
+export const venturesOpen = (s: GameState) => { const e = est(s); return s.story.reached.includes(VENTURE_GATE) || Object.keys(e.ventures!).length > 0 || e.missions!.length > 0; };
 
 /* ---------- ev ---------- */
 export interface Check { ok: boolean; reason?: string }

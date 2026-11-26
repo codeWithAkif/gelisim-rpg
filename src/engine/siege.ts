@@ -46,6 +46,8 @@ export interface Siege {
 
 /* ---------- kurulum ---------- */
 /** Elindekilerin vuruşu (tek, çift ya da iki elli silah). */
+/** Köpeğin kolladığı alan: bağ 50 olunca genişler. */
+export const guardOf = (s: GameState) => s.pet?.id === "kopek" && s.pet.bond >= 50 ? 22 : 16;
 export function weaponPower(s: GameState): number { return weaponSet(config, s).dmg; }
 /** Kaç barikat kurabilirsin: iki geçici kazık + atölyede yaptıkların (engine/engineering.ts). */
 export function barricadeBudget(s: GameState): number { return barricadeCount(s); }
@@ -121,7 +123,7 @@ export function shoot(s: GameState, sg: Siege, angle: number, power: number): bo
   const wob = (rng.next() - 0.5) * Math.max(0.02, 0.22 - okc * 0.006);
   const crit = rng.chance(4 + okc * 0.6);
   const dmg = Math.round((4 + okc / 8 + p * 5) * (crit ? 1.8 : 1));
-  sg.arrows.push({ x: CX, y: CY, vx: Math.cos(angle + wob) * sp, vy: Math.sin(angle + wob) * sp, dmg, crit, life: 0.6 + p * 0.5 });
+  sg.arrows.push({ x: CX, y: CY, vx: Math.cos(angle + wob) * sp, vy: Math.sin(angle + wob) * sp, dmg, crit, life: (0.6 + p * 0.5) * (s.pet?.id === "sahin" && s.pet.bond >= 10 ? 1.2 : 1) });   // şahin gözcülüğü: menzil uzar
   sg.bowCd = BOW_COOLDOWN; sg.stats.shots++; sg.fx.push({ k: "shoot" });
   return true;
 }
@@ -249,7 +251,7 @@ export function step(cfg: Config, s: GameState, sg: Siege, dt: number) {
   }
   if (sg.pet && !sg.pet.down) {
     const pt = sg.pet; pt.cd = Math.max(0, pt.cd - dt);
-    const t = sg.foes.filter(f => f.hp > 0 && !f.flee && Math.hypot(f.x - pt.px, f.y - pt.py) < 16).sort((a, b) => Math.hypot(a.x - pt.x, a.y - pt.y) - Math.hypot(b.x - pt.x, b.y - pt.y))[0];
+    const t = sg.foes.filter(f => f.hp > 0 && !f.flee && Math.hypot(f.x - pt.px, f.y - pt.py) < guardOf(s)).sort((a, b) => Math.hypot(a.x - pt.x, a.y - pt.y) - Math.hypot(b.x - pt.x, b.y - pt.y))[0];
     const gx = t ? t.x : pt.px, gy = t ? t.y : pt.py; const d = Math.hypot(gx - pt.x, gy - pt.y);
     if (t && d < t.r + 3) { if (pt.cd <= 0) { const bond = s.pet?.bond ?? 0; damage(sg, t, Math.max(1, Math.round((2 + Math.floor(bond / 25) + rng.int(0, 2)) * petMul(s))), "kopek"); sg.stats.petHits++; t.slowT = Math.max(t.slowT, 0.6); pt.cd = 1; } }
     else if (d > 0.5) { const v = 14 * dt; pt.x += (gx - pt.x) / d * Math.min(v, d); pt.y += (gy - pt.y) / d * Math.min(v, d); }
@@ -302,6 +304,23 @@ export function finishSiege(cfg: Config, s: GameState, sg: Siege): { gains: Gain
   s.mana = sg.mana;
   if (s.pet) s.pet.bond = Math.min(100, s.pet.bond + 1 + sg.stats.petHits * 0.3);
   return { gains, minutes, won: sg.phase === "won" };
+}
+
+/* ---------- tekrar eden savunmalar ---------- */
+// Eski "nöbet" burada yaşar: aynı gece görevi her tekrarda zorlaşır; sonsuz dalga ve ayrı güçlenme yok.
+// Güç yalnızca karakterden gelir; tekrarlar yalnızca düşmanı artırır. times: o görevi kaç kez kazandığın.
+export const SIEGE_LEADER: Record<string, string> = { agil: "akyele", han: "muhafiz", mutfak: "muhafiz" };
+export const MAX_ESCALATION = 4;
+export function escalate(def: SiegeDef, times: number): SiegeDef {
+  const t = Math.max(0, Math.min(MAX_ESCALATION, Math.floor(times)));
+  if (!t) return def;
+  const k = 1 + t * 0.2;
+  const waves: SiegeWave[] = def.waves.map(w => ({ interval: Math.max(1.2, w.interval * (1 - t * 0.06)), foes: w.foes.map(f => ({ def: f.def, count: Math.round(f.count * k) })) }));
+  // ikinci tekrardan sonra bir dalga daha; üçüncüden sonra son dalgaya bir lider katılır
+  if (t >= 2) { const lastW = waves[waves.length - 1]; waves.push({ interval: Math.max(1.2, lastW.interval * 0.9), foes: lastW.foes.map(f => ({ def: f.def, count: f.count + 1 })) }); }
+  const leader = SIEGE_LEADER[def.id];
+  if (t >= 3 && leader) waves[waves.length - 1].foes.push({ def: leader, count: 1 });
+  return { ...def, name: `${def.name} · ${t + 1}. gece`, waves };
 }
 
 /* ---------- kuşatmalar ---------- */

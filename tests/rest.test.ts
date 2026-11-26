@@ -31,3 +31,14 @@ test("dinlenmek: enerji artar, tokluk düşer, zaman geçer", () => {
   expect(s.energy).toBeGreaterThan(45); expect(s.satiety).toBeLessThan(50); expect(s.minute).toBe(m + 120);
   s.minute = DAY_MINUTES - 5; expect("error" in rest(cfg, s, 60)).toBe(true);
 });
+
+test("uyku geceki gelişmeyi sabaha kaydeder; ertesi gün silinmiş sayılır; başlangıçtan fark hesaplanır", async () => {
+  const { sleep, applyGain, lastNight, sinceStart } = await import("../src/engine/progression");
+  const { config: c } = await import("../src/engine/config");
+  const { newGame: ng } = await import("../src/engine/state");
+  const s = ng(c, 3); applyGain(c, s, "bacak", 2, {});
+  expect(lastNight(s)).toEqual({});
+  sleep(c, s, 1); expect(lastNight(s).bacak).toBeGreaterThan(0);
+  expect(sinceStart(c, s)[0].id).toBe("bacak");
+  s.day += 1; expect(lastNight(s)).toEqual({});
+});
