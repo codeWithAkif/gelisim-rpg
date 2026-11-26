@@ -19,8 +19,12 @@ let veil: HTMLElement | null = null;
 const updates = () => checkForUpdates({
   onDownloading(v) {
     veil = document.createElement("div"); veil.className = "modal-bg"; veil.style.alignItems = "center";
-    veil.innerHTML = `<div class="modal" style="text-align:center"><h2>Defterin yeni sayfaları geliyor</h2><p class="lede">Sürüm ${v.replace(/[^0-9.]/g, "")} indiriliyor. Kaydın korunur.</p></div>`;
+    veil.innerHTML = `<div class="modal" style="text-align:center"><h2>Defterin yeni sayfaları geliyor</h2><p class="lede">Sürüm ${v.replace(/[^0-9.]/g, "")} indiriliyor. Kaydın korunur.</p><div class="gb big"><div class="gf" id="upPct" style="width:0%;background:var(--green)"></div></div><p class="muted tiny" id="upTxt" style="margin:0">Bağlanıyor…</p></div>`;
     document.body.appendChild(veil);
+  },
+  onProgress(p) {
+    const bar = document.getElementById("upPct"), txt = document.getElementById("upTxt");
+    if (bar) bar.style.width = `${Math.max(0, Math.min(100, p))}%`; if (txt) txt.textContent = `%${Math.round(p)}`;
   },
   onDone() { veil?.remove(); veil = null; },
   onNativeUpdate(v, url) {

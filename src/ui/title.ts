@@ -3,7 +3,7 @@ import { art } from "./intro";
 import { esc } from "./sketch";
 import { settings, saveSettings, type Settings, type BoolSetting } from "./settings";
 import { sfx } from "./feel";
-import { APP_VERSION, APK_URL, lastUpdateStatus } from "../update";
+import { APP_VERSION, APK_URL, lastUpdateStatus, updateLog } from "../update";
 import { currentBackup, decodeBackup, restoreBackup, type BackupInfo } from "../engine/save";
 
 export interface TitleOpts { hasSave: boolean; summary: string; onContinue: () => void; onNew: () => void }
@@ -29,7 +29,7 @@ export function showTitle(o: TitleOpts) {
         <button class="btn" data-x="settings">Ayarlar</button>
         ${o.hasSave ? `<button class="btn" data-x="backup">Kaydı yedekle</button>` : `<button class="btn" data-x="restore">Yedekten yükle</button>`}
       </div>
-      ${(() => { const u = lastUpdateStatus(); return u && !u.ok ? `<p class="tiny red" style="text-align:center;margin:0">Güncelleme: ${esc(u.text)}</p>` : ""; })()}
+      ${(() => { const u = lastUpdateStatus(); return u ? `<p class="tiny ${u.ok ? "muted" : "red"}" style="text-align:center;margin:0">Güncelleme: ${esc(u.text)}</p>` : ""; })()}
       <p class="muted tiny" style="text-align:center;margin-top:auto">Sürüm ${esc(APP_VERSION)}</p></div>`;
     if (view === "ayarlar") el.innerHTML = `<div class="intro-page">
       <h1>Ayarlar</h1>
@@ -47,6 +47,8 @@ export function showTitle(o: TitleOpts) {
         <p class="muted tiny" style="margin:0">Uygulamayı silersen kaydın da silinir. Önce yedek kodunu al ve bir yere (not, WhatsApp'ta kendine mesaj) yapıştır; yeniden kurunca geri yükle.</p>
         <div class="row"><button class="btn small" data-x="backup" ${o.hasSave ? "" : "disabled"}>Yedek kodu al</button><button class="btn small" data-x="restore">Yedekten yükle</button></div></section>
       <section class="sec"><h3>Güncelleme</h3>${(() => { const u = lastUpdateStatus(); return u ? `<p class="${u.ok ? "" : "red"}" style="margin:0">${esc(u.text)}</p><p class="muted tiny" style="margin:0">${new Date(u.at).toLocaleString("tr-TR")}</p>` : `<p class="muted" style="margin:0">Henüz denetlenmedi.</p>`; })()}
+        <details class="update-log"><summary class="tiny muted">Güncelleme günlüğü (sorun olursa bunun ekran görüntüsünü gönder)</summary>
+          ${updateLog().map(l => `<div class="tiny"><span class="muted">${new Date(l.at).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span> ${esc(l.text)}</div>`).join("") || `<div class="tiny muted">Henüz kayıt yok.</div>`}</details>
         <div class="row"><button class="btn small" data-x="check">Güncellemeleri denetle</button><a class="btn small" href="${APK_URL}">Son APK'yı indir</a></div>
         <p class="muted tiny" style="margin:0">APK'yı kurarken eski uygulamayı <b>silme</b>; üstüne kur. Böylece kaydın yerinde kalır.</p></section>
       <div class="intro-foot"><span class="muted tiny">Sürüm ${esc(APP_VERSION)}</span><button class="btn primary" data-x="back">Geri</button></div></div>`;

@@ -399,3 +399,4 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .ledger-row small { color: var(--pencil); font-family: var(--f-hand); }
 .ledger-row b { font-family: var(--f-hand); font-size: 18px; font-variant-numeric: tabular-nums; }
 .ledger-row b.green { color: var(--green); } .ledger-row b.red { color: var(--red); }
+.update-log { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; -webkit-user-select: text; user-select: text; }
