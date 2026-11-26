@@ -2,7 +2,8 @@
 import { test, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
 import { newGame, type GameState } from "../src/engine/state";
-import { createNobet, stepNobet, buyUpgrade, pickCard, useSkill, finishNobet, buyPerm, upgradeCost, nobetSite, canStartNobet, nobetSave, type Nobet, type StatId } from "../src/engine/nobet";
+import { Rng } from "../src/engine/rng";
+import { waveScale, milestoneReward, createNobet, stepNobet, buyUpgrade, pickCard, useSkill, finishNobet, buyPerm, upgradeCost, nobetSite, canStartNobet, nobetSave, type Nobet, type StatId } from "../src/engine/nobet";
 
 function play(s: GameState, seed: number, bot: "bos" | "akilli", limit = 900): Nobet {
   const n = createNobet(cfg, s, nobetSite("yayla")!, seed);
@@ -46,4 +47,22 @@ test("kilitli yerde ve yorgunken nöbet tutulmaz", () => {
   const s = newGame(cfg, 4); expect(canStartNobet(s, "yayla").ok).toBe(false);
   s.quests.kurt = { status: "bitti", count: 1 }; s.energy = 90; expect(canStartNobet(s, "yayla").ok).toBe(true);
   s.energy = 5; expect(canStartNobet(s, "yayla").ok).toBe(false);
+});
+
+test("dalgalar hızlanır ve sertleşir", () => {
+  expect(waveScale(10).speed).toBeGreaterThan(waveScale(1).speed);
+  expect(waveScale(10).power).toBeGreaterThan(waveScale(5).power);
+  expect(waveScale(1).speed).toBe(1);
+});
+
+test("her beş dalgada ödül; köyde köy kadar, nöbet bitince cebe girer", () => {
+  const s = fresh(); const money0 = s.money;
+  const n = play(s, 2, "akilli");
+  expect(n.wave).toBeGreaterThan(5);
+  expect(n.loot.money).toBeGreaterThanOrEqual(3);
+  const r = finishNobet(cfg, s, n);
+  expect(s.money - money0).toBe(r.loot.money);
+  const yayla = milestoneReward(nobetSite("yayla")!, 5, new Rng(1)), sehir = milestoneReward(nobetSite("ardic_kul")!, 5, new Rng(1));
+  expect(sehir.money).toBeGreaterThan(yayla.money);
+  expect(milestoneReward(nobetSite("yayla")!, 15, new Rng(1)).money).toBeGreaterThan(yayla.money);
 });

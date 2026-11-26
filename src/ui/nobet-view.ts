@@ -5,11 +5,13 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Nobet, type StatId, type NobetResult, NFIELD, TOWER, STAT_NAMES, CARDS, PERMS, createNobet, stepNobet, buyUpgrade, upgradeCost, statValue,
-  pickCard, useSkill, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave,
+  pickCard, useSkill, finishNobet, nobetSite, nobetSave, permLevel, permCost, buyPerm, canStartNobet, isBossWave, waveScale, type Loot,
 } from "../engine/nobet";
 import { ENEMIES } from "../content/world";
 import { artUrl } from "./art";
 import { esc } from "./sketch";
+import { GAME_ITEMS } from "../content/world";
+export const lootText = (l: Loot) => [l.money ? `${l.money} bakır` : "", ...Object.entries(l.items).map(([k, v]) => `${GAME_ITEMS[k]?.name ?? k}${v > 1 ? " ×" + v : ""}`)].filter(Boolean).join(", ");
 import { sfx, buzz } from "./feel";
 
 const imgCache = new Map<string, HTMLImageElement | null>();
@@ -23,7 +25,7 @@ export function openNobetHub(cfg: Config, s: GameState, place: string, persist: 
   const draw = () => {
     const sv = nobetSave(s); const can = canStartNobet(s, place);
     bg.innerHTML = `<div class="modal nobet-hub" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">Nöbet</p><h2>${esc(site.name)}</h2>
-      <p style="margin:0">Kulenin tepesindesin; menziline gireni kendin vurursun. Düşenlerden kırıntı toplar, onunla güçlenirsin. Sayfa dolunca bir kart seçersin. Dalgalar bitmez; ne kadar dayanabilirsin?</p>
+      <p style="margin:0">Kulenin tepesindesin; menziline gireni kendin vurursun. Düşenlerden kırıntı toplar, onunla güçlenirsin. Sayfa dolunca bir kart seçersin. Dalgalar bitmez; her dalgada daha hızlı ve daha sert gelirler. Her beş dalgada bir ödül var: ${site.purse.money} bakır ve yerin malından bir şey, ileride daha çok.</p>
       <div class="odds"><span>Rekor <b>${sv.best[place] ?? 0}. dalga</b></span><span>Nöbet izi <b>${sv.iz}</b></span><span>Enerji <b>−20</b></span></div>
       <h3 style="margin:4px 0 0">Kalıcı güçlenmeler</h3>
       <div class="perm-list">${PERMS.map(p => { const lv = permLevel(s, p.id); const c = permCost(p, lv); const max = lv >= p.max;
@@ -63,7 +65,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   };
   const X = (x: number) => ox + x * scale, Y = (y: number) => oy + y * scale;
   const cs = getComputedStyle(document.documentElement); const C = (v: string) => cs.getPropertyValue(v).trim();
-  const pops: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = [];
+  const pops: { x: number; y: number; t: number; text: string; color: string; big?: boolean; dur?: number }[] = [];
   const zaps: { pts: [number, number][]; t: number }[] = []; const blasts: { x: number; y: number; r: number; t: number }[] = [];
   let shake = 0, flash = 0;
 
@@ -159,7 +161,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     for (let i = blasts.length - 1; i >= 0; i--) { const b = blasts[i]; const k = (now - b.t) / 500; if (k > 1) { blasts.splice(i, 1); continue; }
       g.fillStyle = `rgba(160,190,255,${0.5 * (1 - k)})`; g.beginPath(); g.arc(X(b.x), Y(b.y), b.r * scale * (0.6 + k * 0.5), 0, 7); g.fill();
       g.strokeStyle = `rgba(255,255,255,${1 - k})`; g.lineWidth = 3; g.beginPath(); g.moveTo(X(b.x), 0); g.lineTo(X(b.x + 2), Y(b.y) * 0.5); g.lineTo(X(b.x - 2), Y(b.y) * 0.7); g.lineTo(X(b.x), Y(b.y)); g.stroke(); }
-    for (let i = pops.length - 1; i >= 0; i--) { const p = pops[i]; const k = (now - p.t) / 800; if (k > 1) { pops.splice(i, 1); continue; } g.globalAlpha = 1 - k; g.fillStyle = p.color; g.font = `700 ${p.big ? 26 : 16}px Caveat, cursive`; g.textAlign = "center"; g.fillText(p.text, X(p.x), Y(p.y) - k * 22); g.globalAlpha = 1; }
+    for (let i = pops.length - 1; i >= 0; i--) { const p = pops[i]; const k = Math.max(0, (now - p.t) / (p.dur ?? 800)); if (k > 1) { pops.splice(i, 1); continue; } g.globalAlpha = 1 - k; g.fillStyle = p.color; g.font = `700 ${p.big ? 26 : 16}px Caveat, cursive`; g.textAlign = "center"; g.fillText(p.text, X(p.x), Y(p.y) - k * 22); g.globalAlpha = 1; }
     g.restore();
     if (flash > 0) { g.fillStyle = `rgba(158,52,35,${flash * 0.25})`; g.fillRect(0, 0, r.width, r.height); }
   }
@@ -186,8 +188,10 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       if (f.k === "hurt") { shake = Math.max(shake, 4); flash = 0.7; if (speed === 1) sfx("hurt"); buzz("light"); }
       if (f.k === "zap") { zaps.push({ pts: f.pts, t: now }); sfx("spark"); }
       if (f.k === "skill") blasts.push({ x: f.x, y: f.y, r: f.r, t: now });
-      if (f.k === "wave") { pops.push({ x: TOWER.x, y: TOWER.y - 22, t: now, text: f.boss ? `${f.n}. dalga: lider geliyor!` : `${f.n}. dalga`, color: C("--red"), big: true }); sfx("beat"); if (f.boss) buzz("medium"); }
+      if (f.k === "wave") { const sc = waveScale(f.n); pops.push({ x: TOWER.x, y: TOWER.y - 22, t: now, text: f.boss ? `${f.n}. dalga: lider geliyor!` : `${f.n}. dalga`, color: C("--red"), big: true, dur: 1400 });
+        if (f.n > 1) pops.push({ x: TOWER.x, y: TOWER.y - 14, t: now + 150, text: `hız +%${Math.round((sc.speed - 1) * 100)} · güç +%${Math.round((sc.power - 1) * 100)}`, color: C("--ink-soft"), dur: 1600 }); sfx("beat"); if (f.boss) buzz("medium"); }
       if (f.k === "card") showCards();
+      if (f.k === "reward") { pops.push({ x: TOWER.x, y: TOWER.y + 16, t: now + 300, text: `Ödül: ${lootText(f.loot)}`, color: "#8A5A10", dur: 2600 }); sfx("win"); buzz("medium"); }
     }
     shake = Math.max(0, shake - real * 30); flash = Math.max(0, flash - real * 3);
     if ((tick += real) > 0.2) { tick = 0; refreshUps(); hud(); }

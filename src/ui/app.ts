@@ -21,7 +21,7 @@ import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { openSiege } from "./siege-view";
 import { openStealth } from "./stealth-view";
-import { openNobetHub } from "./nobet-view";
+import { openNobetHub, lootText } from "./nobet-view";
 import { rollFoes, bonusOf, modeOptions, stealthGoal, siegeFromFoes, groundOf, type Mode, type Context } from "../engine/encounter";
 import { addItem } from "../engine/inventory";
 import { isNight } from "../engine/state";
@@ -243,6 +243,8 @@ export function startApp(root: HTMLElement) {
       modal(`<p class="hand muted" style="margin:0">Nöbet bitti</p><h2>${r.wave}. dalgaya kadar dayandın${r.best ? " · yeni rekor!" : ""}</h2>
         <p class="lede">Kule düştü ama her nöbet bir iz bırakır.</p>
         <div class="odds"><span>Nöbet izi <b>+${r.iz}</b></span><span>Geçen süre <b>${r.minutes} dk</b></span></div>
+        ${r.loot.money || Object.keys(r.loot.items).length ? `<p class="hand blue" style="margin:0">Ödül: ${esc(lootText(r.loot))}</p>` : `<p class="tiny muted" style="margin:0">Ödül beşinci dalgadan sonra başlar.</p>`}
+        ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
         <h3>Nöbette gelişen</h3>${gainList(cfg, r.gains, 6)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }, { label: "Kuleye dön", fn: () => doNobet(id) }]);
     });
   }

@@ -11,18 +11,20 @@ import { applyGain, realUse, type GainReport } from "./progression";
 import { maxHp } from "./combat";
 import { Rng } from "./rng";
 import { ENEMIES } from "../content/world";
+import { addItem } from "./inventory";
 
 export const NFIELD = { w: 100, h: 130 };
 export const TOWER = { x: 50, y: 65, r: 7 };
 
 /* ---------- nöbet yerleri ---------- */
-export interface NobetSite { place: string; name: string; foes: string[]; boss: string; unlock: (s: GameState) => string | null; ground: "cayir" | "kar" | "tas" }
+/** purse: her beş dalgada verilen ödül; yerin parasına göre (köyde köy kadar, şehirde daha çok). */
+export interface NobetSite { place: string; name: string; foes: string[]; boss: string; unlock: (s: GameState) => string | null; ground: "cayir" | "kar" | "tas"; purse: { money: number; items: string[] } }
 const done = (s: GameState, q: string) => (s.quests[q]?.count ?? 0) > 0 || s.quests[q]?.status === "bitti";
 export const NOBET_SITES: NobetSite[] = [
-  { place: "yayla", name: "Yayla gözetleme kulesi", foes: ["kurt"], boss: "akyele", ground: "cayir", unlock: s => done(s, "kurt") ? null : "Önce Hasan'ın kurt derdine yardım et" },
-  { place: "karacam_han", name: "Han kulesi", foes: ["haydut", "kurt"], boss: "muhafiz", ground: "tas", unlock: s => done(s, "kervan") ? null : "Önce Selim'in kervanını koru" },
-  { place: "ayaz_mutfak", name: "Ayazkale suru", foes: ["kar_kurdu", "muhafiz"], boss: "kayhan", ground: "kar", unlock: s => done(s, "mutfak") ? null : "Önce Gülizar'ın mutfağında çalış" },
-  { place: "ardic_kul", name: "Kül mahallesi damı", foes: ["muhafiz", "haydut"], boss: "sungur", ground: "tas", unlock: s => done(s, "kul_ana") ? null : "Önce Kül Ana'yı dinle" },
+  { place: "yayla", name: "Yayla gözetleme kulesi", foes: ["kurt"], boss: "akyele", ground: "cayir", purse: { money: 3, items: ["deri", "peynir", "ekmek", "ok"] }, unlock: s => done(s, "kurt") ? null : "Önce Hasan'ın kurt derdine yardım et" },
+  { place: "karacam_han", name: "Han kulesi", foes: ["haydut", "kurt"], boss: "muhafiz", ground: "tas", purse: { money: 6, items: ["ok", "deri", "ekmek"] }, unlock: s => done(s, "kervan") ? null : "Önce Selim'in kervanını koru" },
+  { place: "ayaz_mutfak", name: "Ayazkale suru", foes: ["kar_kurdu", "muhafiz"], boss: "kayhan", ground: "kar", purse: { money: 8, items: ["ekmek", "deri", "ok"] }, unlock: s => done(s, "mutfak") ? null : "Önce Gülizar'ın mutfağında çalış" },
+  { place: "ardic_kul", name: "Kül mahallesi damı", foes: ["muhafiz", "haydut"], boss: "sungur", ground: "tas", purse: { money: 10, items: ["ok", "peynir", "deri"] }, unlock: s => done(s, "kul_ana") ? null : "Önce Kül Ana'yı dinle" },
 ];
 export const nobetSite = (place: string) => NOBET_SITES.find(x => x.place === place);
 
@@ -75,14 +77,14 @@ export interface NFoe { id: number; def: string; x: number; y: number; hp: numbe
 export interface Shot { x: number; y: number; tx: number; ty: number; target: number; dmg: number; crit: boolean; pierce: number; burn: boolean; hit: number[] }
 export type NFx =
   | { k: "hit"; x: number; y: number; dmg: number; crit: boolean } | { k: "die"; x: number; y: number; coins: number; boss: boolean }
-  | { k: "hurt"; dmg: number } | { k: "zap"; pts: [number, number][] } | { k: "wave"; n: number; boss: boolean } | { k: "card" } | { k: "skill"; x: number; y: number; r: number };
+  | { k: "hurt"; dmg: number } | { k: "zap"; pts: [number, number][] } | { k: "wave"; n: number; boss: boolean } | { k: "card" } | { k: "reward"; wave: number; loot: Loot } | { k: "skill"; x: number; y: number; r: number };
 export interface Nobet {
   site: NobetSite; phase: "play" | "card" | "over"; time: number; wave: number; waveLeft: number; spawnT: number; breakT: number;
   hp: number; maxHp: number; regen: number; dmg: number; rate: number; range: number; crit: number;
   lv: Record<StatId, number>; coins: number; cards: Record<string, number>; offer: string[];
   page: number; pageNeed: number; fireCd: number; shotsFired: number;
   skillCd: number; skillMax: number; pet?: { a: number; cd: number };
-  foes: NFoe[]; shots: Shot[]; fx: NFx[]; nextId: number; seed: number; rng: Rng;
+  loot: Loot; rewarded: number; foes: NFoe[]; shots: Shot[]; fx: NFx[]; nextId: number; seed: number; rng: Rng;
   stats: { kills: number; shots: number; bosses: number; dmgTaken: number; coins: number; cards: number; skills: number };
 }
 
@@ -97,7 +99,7 @@ export function createNobet(cfg: Config, s: GameState, site: NobetSite, seed: nu
     hp, maxHp: hp, regen: 0.3, dmg, rate: (0.9 + lvA(s, "refleks") / 80) * (1 + pm("cabuk") * 0.05), range: 30 + lvA(s, "gorus") / 8, crit: 0.05 + lvA(s, "okculuk") / 400 + pm("keskin") * 0.02,
     lv: { dmg: 0, rate: 0, hp: 0, regen: 0, range: 0 }, coins: 8 + pm("miras") * 6, cards: {}, offer: [],
     page: 0, pageNeed: 6, fireCd: 0, shotsFired: 0, skillCd: 4, skillMax: 18,
-    foes: [], shots: [], fx: [], nextId: 1, seed, rng,
+    loot: { money: 0, items: {} }, rewarded: 0, foes: [], shots: [], fx: [], nextId: 1, seed, rng,
     stats: { kills: 0, shots: 0, bosses: 0, dmgTaken: 0, coins: 0, cards: 0, skills: 0 },
   };
 }
@@ -142,17 +144,30 @@ export function useSkill(n: Nobet): boolean {
 
 /* ---------- dalgalar ---------- */
 export const isBossWave = (w: number) => w % 5 === 0;
+/** Dalga ilerledikçe düşmanlar hızlanır ve sertleşir (1. dalgaya göre çarpan). */
+export function waveScale(w: number): { speed: number; power: number; hp: number } {
+  return { speed: 1 + Math.min(1, (w - 1) * 0.035), power: 1 + (w - 1) * 0.15, hp: Math.pow(1.16, w - 1) };
+}
+/** Beş dalgada bir ödül: yerin kesesinden para ve bir eşya; ileri dalgalarda biraz daha çok. */
+export interface Loot { money: number; items: Record<string, number> }
+export function milestoneReward(site: NobetSite, w: number, rng: Rng): Loot {
+  const tier = Math.floor(w / 5);
+  const items: Record<string, number> = {}; const it = site.purse.items[Math.floor(rng.next() * site.purse.items.length)];
+  items[it] = it === "ok" ? 3 + tier : 1 + Math.floor((tier - 1) / 2);
+  return { money: site.purse.money + Math.floor((tier - 1) * site.purse.money * 0.4), items };
+}
 export function waveSize(w: number) { return isBossWave(w) ? 3 + Math.floor(w / 2) : 4 + Math.floor(w * 1.3); }
 function spawn(n: Nobet) {
   const w = n.wave; const boss = isBossWave(w) && n.waveLeft === waveSize(w);
   const def = boss ? n.site.boss : n.site.foes[Math.floor(n.rng.next() * n.site.foes.length)];
   const d = ENEMIES[def]; const human = d.species === "insan";
   const k = Math.pow(1.16, w - 1);
+  const { speed: spM, power } = waveScale(w);
   const a = n.rng.next() * Math.PI * 2; const R = 78;
   const hp = d.hp * 0.55 * k * (boss ? 4 : 1);
   n.foes.push({ id: n.nextId++, def, x: TOWER.x + Math.cos(a) * R, y: TOWER.y + Math.sin(a) * R, hp, max: hp,
-    speed: (human ? 5 : 7.5) * (d.move / (human ? 3 : 4)) * (boss ? 0.75 : 1) * (1 + Math.min(0.5, w * 0.015)),
-    dmg: ((d.damage[0] + d.damage[1]) / 2) * 0.35 * (1 + (w - 1) * 0.13) * (boss ? 1.8 : 1), cd: 0.5, r: boss ? 4.5 : human ? 3.2 : 3, boss, burn: 0, slow: 0, human,
+    speed: (human ? 5 : 7.5) * (d.move / (human ? 3 : 4)) * (boss ? 0.75 : 1) * spM,
+    dmg: ((d.damage[0] + d.damage[1]) / 2) * 0.35 * power * (boss ? 1.8 : 1), cd: 0.5, r: boss ? 4.5 : human ? 3.2 : 3, boss, burn: 0, slow: 0, human,
     reward: Math.round((1 + w * 0.25) * (boss ? 12 : 1) * (human ? 1.3 : 1)) });
   n.waveLeft--;
 }
@@ -176,6 +191,11 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
   n.skillCd = Math.max(0, n.skillCd - dt);
   // dalga
   if (n.waveLeft <= 0 && !n.foes.length) {
+    if (n.wave > 0 && isBossWave(n.wave) && n.rewarded < n.wave) {
+      const r = milestoneReward(n.site, n.wave, n.rng); n.loot.money += r.money;
+      for (const [k, v] of Object.entries(r.items)) n.loot.items[k] = (n.loot.items[k] ?? 0) + v;
+      n.fx.push({ k: "reward", wave: n.wave, loot: r }); n.rewarded = n.wave;
+    }
     if ((n.breakT -= dt) <= 0) { n.wave++; n.waveLeft = waveSize(n.wave); n.spawnT = 0; n.breakT = 2; n.fx.push({ k: "wave", n: n.wave, boss: isBossWave(n.wave) }); }
   } else if (n.waveLeft > 0 && (n.spawnT -= dt) <= 0) { spawn(n); n.spawnT = Math.max(0.25, 1.3 - n.wave * 0.04) * (0.6 + n.rng.next() * 0.8); }
   // düşmanlar
@@ -237,12 +257,14 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
 }
 
 /** Nöbet bitince: nöbet izi, rekor, gerçek kullanım gelişimi, zaman ve yorgunluk. */
-export interface NobetResult { gains: GainReport; iz: number; wave: number; best: boolean; minutes: number }
+export interface NobetResult { gains: GainReport; iz: number; wave: number; best: boolean; minutes: number; loot: Loot; dropped: Record<string, number> }
 export function finishNobet(cfg: Config, s: GameState, n: Nobet): NobetResult {
   const save = nobetSave(s);
   const wave = Math.max(0, n.wave - (n.waveLeft > 0 || n.foes.length ? 1 : 0)); // tamamlanan dalga
   const iz = Math.round(wave * 2 + n.stats.kills / 6 + n.stats.bosses * 5);
   save.iz += iz; save.runs++;
+  s.money += n.loot.money; const dropped: Record<string, number> = {};
+  for (const [k, v] of Object.entries(n.loot.items)) { const d = addItem(cfg, s, k, v); if (d) dropped[k] = d; }
   const best = wave > (save.best[n.site.place] ?? 0); if (best) save.best[n.site.place] = wave;
   const gains = realUse(cfg, s, "okculuk_idman", Math.min(60, n.stats.shots), 0.05);
   applyGain(cfg, s, "odak", 0.1 + wave * 0.04, gains); applyGain(cfg, s, "taktik", 0.05 + n.stats.cards * 0.05, gains);
@@ -250,7 +272,7 @@ export function finishNobet(cfg: Config, s: GameState, n: Nobet): NobetResult {
   const minutes = 30 + wave * 6;
   s.minute = Math.min(DAY_MINUTES, s.minute + minutes);
   s.energy = Math.max(0, s.energy - 10 - Math.min(20, wave)); s.satiety = Math.max(0, s.satiety - 6);
-  return { gains, iz, wave, best, minutes };
+  return { gains, iz, wave, best, minutes, loot: n.loot, dropped };
 }
 export const NOBET_ENERGY = 20;
 export function canStartNobet(s: GameState, place: string): { ok: boolean; reason?: string } {
