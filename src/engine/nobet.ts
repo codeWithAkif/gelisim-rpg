@@ -13,6 +13,7 @@ import { Rng } from "./rng";
 import { ENEMIES } from "../content/world";
 import { addItem } from "./inventory";
 import { hasRelic } from "./relics";
+import { petMul } from "./pet";
 
 export const NFIELD = { w: 100, h: 130 };
 export const TOWER = { x: 50, y: 65, r: 7 };
@@ -101,7 +102,7 @@ export function createNobet(cfg: Config, s: GameState, site: NobetSite, seed: nu
   const rng = new Rng(seed);
   return {
     site, phase: "play", time: 0, wave: 0, waveLeft: 0, spawnT: 0, breakT: 1.5,
-    hp, maxHp: hp, regen: 0.3, dmg, rate: (0.9 + lvA(s, "refleks") / 80) * (1 + pm("cabuk") * 0.05), range: 30 + lvA(s, "gorus") / 8, crit: 0.05 + lvA(s, "okculuk") / 400 + pm("keskin") * 0.02,
+    hp, maxHp: hp, regen: 0.3, dmg: dmg, rate: (0.9 + lvA(s, "refleks") / 80) * (1 + pm("cabuk") * 0.05), range: (30 + lvA(s, "gorus") / 8) * (s.pet?.id === "sahin" && (s.pet.bond ?? 0) >= 10 ? 1.1 : 1), crit: 0.05 + lvA(s, "okculuk") / 400 + pm("keskin") * 0.02,
     lv: { dmg: 0, rate: 0, hp: 0, regen: 0, range: 0 }, coins: 8 + pm("miras") * 6, cards: {}, offer: [],
     page: 0, pageNeed: 6, fireCd: 0, shotsFired: 0,
     spells: startSpells(s), pet: s.pet ? { x: TOWER.x, y: TOWER.y + 16, hx: TOWER.x, hy: TOWER.y + 16, cd: 0, lv: 1, wx: TOWER.x, wy: TOWER.y + 16, wt: 0 } : undefined,
@@ -280,7 +281,7 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
   }
   // köpek: yerinde bekler; kolladığı alana bir düşman girerse koşup ısırır, sonra yerine döner
   if (n.pet) {
-    const pt = n.pet; pt.cd -= dt; const G = petGuard(n);
+    const pt = n.pet; pt.cd -= dt; const G = petGuard(n); const pm = petMul(s);
     const t = n.foes.filter(f => Math.hypot(f.x - pt.hx, f.y - pt.hy) < G).sort((a, b) => Math.hypot(a.x - pt.x, a.y - pt.y) - Math.hypot(b.x - pt.x, b.y - pt.y))[0];
     // boştayken alanının içinde rastgele gezinir; arada bir durup koklanır
     if (!t && ((pt.wt -= dt) <= 0 || Math.hypot(pt.wx - pt.x, pt.wy - pt.y) < 0.6)) {
@@ -291,7 +292,7 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
     const reach = t ? t.r + 2 : 0.5;
     if (d > reach) { const k = Math.min(d - reach, (t ? 20 : 7) * dt) / d; pt.x += dx * k; pt.y += dy * k; }
     else if (t && pt.cd <= 0) {
-      pt.cd = 1.1 - pt.lv * 0.12; hurt(n, t, n.dmg * (0.45 + pt.lv * 0.3), false); t.slow = Math.max(t.slow, 0.8);
+      pt.cd = 1.1 - pt.lv * 0.12; hurt(n, t, n.dmg * (0.45 + pt.lv * 0.3) * pm, false); t.slow = Math.max(t.slow, 0.8);
       n.fx.push({ k: "bite", x: t.x, y: t.y });
     }
   }

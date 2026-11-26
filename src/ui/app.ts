@@ -8,6 +8,7 @@ import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
 import { QUESTS, CRAFTS, ENEMIES } from "../content/world";
 import { build, upgrade, dismantle, structure } from "../engine/engineering";
+import { feed as petFeed, caress as petCaress, play as petPlay, rename as petRename, release as petRelease, sendHome as petSendHome, swapWithHome as petSwap, adopt as petAdopt, petType } from "../engine/pet";
 import { itemInfo, equip, unequip, drop, buy, bagOf, attachPouch, detachPouch, type InvTab } from "../engine/inventory";
 import type { GearSlot } from "../engine/gear";
 import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
@@ -211,6 +212,26 @@ export function startApp(root: HTMLElement) {
       case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }
       case "unequip": { const r = unequip(cfg, s, id as GearSlot); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "sleep": openSleep(); break;
+      case "pet-feed": {
+        const foods = Object.keys(s.inventory).filter(k => (s.inventory[k] ?? 0) > 0 && itemInfo(cfg, k).kind === "Yiyecek");
+        if (!foods.length) { toast("Çantanda yiyecek yok."); break; }
+        modal(`<p class="hand muted" style="margin:0">${esc(s.pet?.name ?? "")}</p><h2>Ne yedireceksin?</h2><p class="muted tiny" style="margin:0">Sevdiği şeyi yerse daha mutlu olur.</p>`,
+          [...foods.slice(0, 5).map(k => ({ label: `${itemInfo(cfg, k).name} (${s.inventory[k]})`, cls: petType(s.pet!.id).likes.includes(k) ? "primary" : "", fn: () => { const r = petFeed(cfg, s, k); sfx(r.ok ? "good" : "bad"); toast(r.text ?? r.reason ?? ""); persist(); render(); } })), { label: "Vazgeç", fn: () => {} }]);
+        break;
+      }
+      case "pet-caress": { const r = petCaress(s); sfx(r.ok ? "tap" : "bad"); if (r.ok) buzz("light"); toast(r.text ?? r.reason ?? ""); persist(); render(); break; }
+      case "pet-play": { const r = petPlay(s); sfx(r.ok ? "good" : "bad"); if (r.ok) buzz("medium"); toast(r.text ?? r.reason ?? ""); persist(); render(); break; }
+      case "pet-rename": {
+        const bg = document.createElement("div"); bg.className = "modal-bg";
+        bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h2>Yeni adı</h2><input id="petName" class="name-input" maxlength="16" value="${esc(s.pet?.name ?? "")}" aria-label="Evcil hayvanın adı"><div class="row"><button class="btn primary" data-n="ok">Kaydet</button><button class="btn" data-n="x">Vazgeç</button></div></div>`;
+        document.body.appendChild(bg); const inp = bg.querySelector<HTMLInputElement>("#petName")!; inp.focus(); inp.select();
+        bg.addEventListener("click", e2 => { const b2 = (e2.target as HTMLElement).closest<HTMLButtonElement>("[data-n]"); if (!b2) return; if (b2.dataset.n === "ok") { const r = petRename(s, inp.value); toast(r.ok ? "Adı değişti." : r.reason ?? ""); persist(); render(); } bg.remove(); });
+        break;
+      }
+      case "pet-release": modal(`<h2>Salıvermek istiyor musun?</h2><p style="margin:0">${esc(s.pet?.name ?? "")} doğaya döner; geri gelmez.</p>`, [{ label: "Salıver", cls: "red", fn: () => { petRelease(s); persist(); render(); } }, { label: "Vazgeç", fn: () => {} }]); break;
+      case "pet-home": { const r = petSendHome(s); toast(r.ok ? "Evde bıraktın." : r.reason ?? ""); persist(); render(); break; }
+      case "pet-swap": { const r = petSwap(s, +id); toast(r.text ?? r.reason ?? ""); persist(); render(); break; }
+      case "pet-adopt": { const r = petAdopt(s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.text ?? r.reason ?? ""); persist(); render(); break; }
       case "build": { const r = build(cfg, s, id); sfx(r.ok ? "thunk" : "bad"); if (r.ok) buzz("medium"); toast(r.ok ? `${structure(id)!.name} yapıldı.` : r.reason ?? ""); persist(); render(); break; }
       case "upgrade": { const r = upgrade(cfg, s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? `${structure(id)!.name} geliştirildi.` : r.reason ?? ""); persist(); render(); break; }
       case "dismantle": { const r = dismantle(cfg, s, id); sfx(r.ok ? "page" : "bad"); toast(r.ok ? `Söktün: ${Object.entries(r.back ?? {}).map(([k, n]) => `${n} ${itemName(cfg, k)}`).join(", ") || "malzeme kalmadı"}${r.lost ? ` (${r.lost} tanesi sığmadı)` : ""}.` : r.reason ?? ""); persist(); render(); break; }
@@ -286,6 +307,7 @@ export function startApp(root: HTMLElement) {
     persist(); render(false); if (r.event) { sfx("hurt"); buzz("medium"); }
     modal(`<h2>Gün ${s.day - 1} bitti</h2><p class="lede">${esc(r.option.kind === "lodging" ? `Geceyi geçirdin: ${r.option.name}.` : r.option.kind === "tent" ? "Çadırda uyudun." : "Açıkta uyudun.")} ${rep.recovery < 0.75 ? "Tam dinlenemedin." : "Vücut gece çalıştı."}</p>
       ${r.event ? `<p class="story-after" style="border-color:var(--red)">${esc(r.event.text)}</p>` : ""}
+      ${r.pet.length ? `<p class="hand blue" style="margin:0">${r.pet.map(esc).join(" ")}</p>` : ""}
       <h3>Gece işlenen</h3>${gainList(cfg, rep.applied, 8)}
       ${fin.length ? `<h3>Ortaklıklar</h3>${fin.map(l => `<div class="ledger-row"><small>${esc(l.partner)}</small><span>${esc(l.text)}</span><b class="${l.amount >= 0 ? "green" : "red"}">${l.amount ? `${l.amount > 0 ? "+" : ""}${l.amount}` : ""}</b></div>`).join("")}` : ""}`,
       [{ label: "Güne başla", cls: "primary", fn: () => storyTick() }]);

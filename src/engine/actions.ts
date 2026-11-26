@@ -11,9 +11,10 @@ import { MARKETS } from "../content/world";
 import { partnerAt, stake } from "./finance";
 import { lodgingAt } from "./rest";
 import { nobetSite, nobetSave } from "./nobet";
+import { PET_TYPES, canAdopt } from "./pet";
 
 export interface PlaceAction {
-  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place" | "partner" | "sleep" | "nobet";
+  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place" | "partner" | "sleep" | "nobet" | "pet-adopt";
   id: string; label: string; sub?: string; disabled?: string; primary?: boolean;
 }
 /** Bulunduğun yerde yapılabilecekler, önem sırasıyla. */
@@ -30,6 +31,7 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
   if (MARKETS[placeId]) out.push({ act: "market", id: placeId, label: MARKETS[placeId].name, sub: "Al, sat" });
   for (const p of partnerAt(placeId)) { const lock = p.unlock(s); const st = stake(s, p.id);
     if (!lock || st) out.push({ act: "partner", id: p.id, label: `Ortaklık: ${p.name}`, sub: st ? `Payın: ${st} bakır` : `En az ${p.min} bakır` }); }
+  for (const pt of Object.values(PET_TYPES)) if (pt.shop === placeId) { const c = canAdopt(s, pt.id, placeId); out.push({ act: "pet-adopt", id: pt.id, label: `Yavru al: ${pt.species}`, sub: `${pt.price} bakır · ${pt.role}`, disabled: c.ok ? undefined : c.reason }); }
   const ns = nobetSite(placeId);
   if (ns && !ns.unlock(s)) out.push({ act: "nobet", id: placeId, label: `Nöbet tut: ${ns.name}`, sub: `Sonsuz dalga · rekor ${nobetSave(s).best[placeId] ?? 0}. dalga`, disabled: placeId === s.location ? undefined : "Oraya git" });
   if (placeId === s.location) {

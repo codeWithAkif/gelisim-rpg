@@ -35,3 +35,20 @@ export function placePic(id: string, name: string, cls = "art-place"): string {
   const url = ART["yer_" + id];
   return url ? `<div class="${cls}"><img src="${url}" alt="${esc(name)}" loading="lazy"></div>` : "";
 }
+
+/**
+ * Hareketli resim: "anim_<ad>" 2×2 kareli bir sayfadan (4 kare) CSS ile oynatılır; sayfa yoksa durağan resim ya da boş döner.
+ * Kareler soldan sağa, yukarıdan aşağıya: 1-2 / 3-4.
+ */
+export function spriteHtml(key: string, size: number, ms = 640, extra = ""): string | null {
+  const url = ART[key]; if (!url) return null;
+  return `<span class="sprite ${extra}" style="width:${size}px;height:${size}px;background-image:url(${url});animation-duration:${ms}ms" role="img"></span>`;
+}
+/** Evcil hayvanın resmi: önce hareketli sayfa, sonra durağan resim; köpek için kurt resmi renk süzgeciyle. */
+export function petArt(id: string, size: number, state: "yuru" | "dur" = "dur", tint = ""): string {
+  const walk = state === "yuru" ? spriteHtml(`anim_${id}_yuru`, size) : null; if (walk) return walk;
+  const url = ART[`dusman_${id}`] ?? ART[`anim_${id}_dur`] ?? (id === "kopek" || id === "kedi" || id === "sahin" ? ART["dusman_kurt"] : undefined);
+  if (!url) return `<span class="pet-fallback" style="width:${size}px;height:${size}px"></span>`;
+  const own = !!ART[`dusman_${id}`];
+  return `<img class="pet-img" src="${url}" width="${size}" height="${size}" alt="" style="${own ? "" : `filter:${tint}`}">`;
+}

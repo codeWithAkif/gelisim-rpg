@@ -494,3 +494,22 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .seg .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-left: 3px; vertical-align: 2px; }
 .chip.miss { color: var(--red); border-color: var(--red); }
 .struct .btn[disabled] { opacity: .45; }
+/* evcil hayvan */
+.pet-stage { height: 150px; border: 1.5px dashed var(--edge); border-radius: 10px; background: linear-gradient(var(--paper-2), transparent 60%, rgba(120,140,80,.18)); position: relative; overflow: hidden; display: grid; place-items: end center; }
+.pet-walk { animation: petwalk 16s linear infinite; }
+.pet-stage.sleepy .pet-walk, .pet-stage.still .pet-walk { animation: none; }
+.pet-bob { animation: petbob 1.2s ease-in-out infinite; transform-origin: 50% 100%; }
+.pet-stage.sleepy .pet-bob { animation: petbreath 3s ease-in-out infinite; }
+.pet-img { filter-origin: center; display: block; }
+.zz { position: absolute; top: 14px; right: 30%; font-family: var(--f-hand); font-size: 22px; color: var(--blue); animation: petz 2.4s ease-in-out infinite; font-style: normal; }
+@keyframes petwalk { 0% { transform: translateX(-70px) scaleX(1); } 49% { transform: translateX(70px) scaleX(1); } 50% { transform: translateX(70px) scaleX(-1); } 99% { transform: translateX(-70px) scaleX(-1); } 100% { transform: translateX(-70px) scaleX(1); } }
+@keyframes petbob { 0%, 100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-5px) rotate(1.5deg); } }
+@keyframes petbreath { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.04); } }
+@keyframes petz { 0%, 100% { opacity: .2; transform: translateY(6px); } 50% { opacity: 1; transform: translateY(-4px); } }
+.sprite { display: inline-block; background-size: 200% 200%; background-repeat: no-repeat; animation-name: sheet4; animation-timing-function: steps(1); animation-iteration-count: infinite; }
+@keyframes sheet4 { 0% { background-position: 0 0; } 25% { background-position: 100% 0; } 50% { background-position: 0 100%; } 75% { background-position: 100% 100%; } }
+.pet-bar { display: grid; grid-template-columns: 58px 1fr 28px; gap: 8px; align-items: center; font-size: 14px; }
+.pet-bar b { text-align: right; font-family: var(--f-hand); font-size: 17px; }
+.perk { display: grid; grid-template-columns: 56px 1fr; gap: 8px; font-size: 14px; color: var(--pencil); }
+.perk.on { color: var(--ink); } .perk b { font-family: var(--f-hand); font-size: 16px; color: var(--green); }
+.name-input { font: 22px var(--f-hand); padding: 6px 10px; border: 1.5px solid var(--ink); border-radius: 8px; background: var(--paper); color: var(--ink); width: 100%; }

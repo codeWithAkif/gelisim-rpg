@@ -9,6 +9,7 @@ import { Rng } from "./rng";
 import { place } from "./travel";
 import { hasRelic } from "./relics";
 import { stake } from "./finance";
+import { tickPets } from "./pet";
 
 const done = (s: GameState, q: string) => (s.quests[q]?.count ?? 0) > 0 || s.quests[q]?.status === "bitti";
 /** Konaklanabilecek yerler: kim misafir eder, ne ister, ne kadar dinlendirir. */
@@ -55,7 +56,7 @@ export function campRisk(s: GameState): number {
 }
 
 export interface NightEvent { id: "hirsiz" | "kurt" | "soguk" | "yagmur"; text: string }
-export interface SleepResult { report: SleepReport; option: SleepOption; event?: NightEvent; hpBefore: number }
+export interface SleepResult { report: SleepReport; option: SleepOption; event?: NightEvent; hpBefore: number; pet: string[] }
 /** Uyur: yer kalitesi dinlenmeyi, kamp tehlikesi geceyi belirler. */
 export function sleepAt(cfg: Config, s: GameState, kind: SleepKind): SleepResult | { error: string } {
   if (s.journey) return { error: "Yoldayken uyuyamazsın" };
@@ -86,7 +87,8 @@ export function sleepAt(cfg: Config, s: GameState, kind: SleepKind): SleepResult
   // can: iyi uykuda çok, kötüsünde az toparlanır
   const m = maxHp(cfg, s); s.hp = Math.min(m, Math.round((s.hp || m) + m * 0.6 * Math.min(1, quality)));
   if (event) log(s, event.text, "warn");
-  return { report, option: opt, event, hpBefore };
+  const pet = tickPets(s);
+  return { report, option: opt, event, hpBefore, pet };
 }
 
 /* ---------- dinlenmek ---------- */

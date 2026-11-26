@@ -1,5 +1,6 @@
 // Keşif: etrafı aramak, koleksiyon, günlük istekler ve gezdikçe açılan harita (DOM yok).
 import type { Config } from "./config";
+import { petMul } from "./pet";
 import { type GameState, DAY_MINUTES, addRep, log, minutesLeft, hourOf } from "./state";
 import { applyGain, type GainReport } from "./progression";
 import { addItem, removeItem } from "./inventory";
@@ -61,7 +62,7 @@ export function canSearch(s: GameState): { ok: boolean; reason?: string } {
 export function findChance(s: GameState, sense: string): number {
   const lv = (s.attrs[sense]?.level ?? 10) * 0.7 + (s.attrs.analiz?.level ?? 10) * 0.3;
   // köpeğin burnu kokuyla bulunanlarda çok, diğerlerinde biraz yardım eder; bağ büyüdükçe artar
-  const pet = s.pet ? (sense === "koku" ? 12 : 6) + s.pet.bond / 8 : 0;
+  const pet = s.pet ? ((sense === "koku" ? 12 : 6) + s.pet.bond / 8 + (s.pet.id === "kedi" && s.pet.bond >= 10 ? 6 : 0)) * petMul(s) : 0;
   return Math.max(25, Math.min(92, 40 + (lv - 10) * 1.5 + pet));
 }
 /** 20 dakika etrafı arar. Bulunanlar çantaya, ilk kez bulunanlar deftere. */

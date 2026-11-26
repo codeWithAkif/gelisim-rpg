@@ -35,7 +35,8 @@ const lv = (s: GameState, a: string) => s.attrs[a]?.level ?? 10;
 /** Sinsilik: çevre farkındalığı, mekân ve irade. Kuşkunun ne hızla dolduğunu belirler. */
 export function stealthSkill(s: GameState): number {
   const v = (lv(s, "cevresel") + lv(s, "mekansal") + lv(s, "irade") + lv(s, "isitme")) / 4;
-  return Math.max(0.55, Math.min(1.25, 1.3 - v / 45));
+  const cat = s.pet?.id === "kedi" ? (s.pet.bond >= 75 ? 0.75 : 0.88) : 1;
+  return Math.max(0.45, Math.min(1.25, (1.3 - v / 45) * cat));
 }
 
 /* ---------- kurulum: her seferinde başka bir arazi ---------- */

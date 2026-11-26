@@ -10,11 +10,12 @@ import { planSession, SESSION_OPTIONS, wounded, TIME_SCALE, fmtDur } from "../en
 import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount, pouchesOf, pouchSlots, inTab, INV_TABS, MAX_POUCHES, POUCH_SHARE, type InvTab } from "../engine/inventory";
 import { canSell, dayFactor, PARTNERS, stake, ITEM_VALUES } from "../engine/finance";
 import { STRUCTURES, yapiOf, levelOf, canBuild, canUpgrade, upgradeNeed, engLevel, REFUND } from "../engine/engineering";
+import { fill as fillPet, petType, petMul, moodWord, doing, perksOf, homePets, homeSlots, PET_TYPES, type Pet } from "../engine/pet";
 import { gearOf, slotsFor, weaponSet, totalArmor, totalDodge, gearBonus, wornIds, isTwoHanded, WEAR_SLOTS, SLOT_NAMES, type GearSlot } from "../engine/gear";
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, MARKETS, CRAFTS } from "../content/world";
 import { esc, inkBar, wolfSketch, humanSketch, bodySketch, VITAL_ICONS, ICONS, STRUCT_ICONS } from "./sketch";
-import { personPic, itemPic, placePic, motherPic, artUrl } from "./art";
+import { personPic, itemPic, placePic, motherPic, artUrl, petArt } from "./art";
 import { RELICS } from "../content/relics";
 import { REGION_NAMES } from "../content/map";
 import { collected, seenCount, dailyRequests, searchInfo, canSearch } from "../engine/explore";
@@ -103,9 +104,8 @@ export function defterScreen(cfg: Config, s: GameState, page = 0): string {
       <p class="hand blue">${esc(s.name)} · tanınırlık ${rep} · güven ${Math.floor(repOf(s, s.region, "guven"))}</p>
     </section>` },
     { title: "Tanıdıklar", html: `<section class="sec"><h2>Tanıdıklar</h2><div class="people">${people}</div></section>
-      ${s.pet ? `<section class="sec"><h2>Yol arkadaşın</h2><div class="card"><div class="entry-head"><span class="entry-title">${esc(s.pet.name)}</span><span class="entry-meta">bağ ${Math.floor(s.pet.bond)}/100</span></div>
-        <div class="gb"><div class="gf" style="width:${s.pet.bond}%;background:var(--green)"></div></div>
-        <p class="tiny" style="margin:0">Savaşta yanındaki kurda koşar ve ısırır; kurtlar onu da hedef alır. Etrafı ararken burnu, kokuyla bulunan şeylerde çok işe yarar ve günde bir bulgu fazladan getirir. Birlikte savaştıkça ve gezdikçe bağınız güçlenir; güçlendikçe daha isabetli ısırır, daha çok dayanır.</p></div></section>` : ""}` },
+</section>` },
+    ...(s.pet || homePets(s).length ? [{ title: "Evcil", html: petPage(cfg, s) }] : []),
     { title: "Koleksiyon", html: collectionSection(s) },
   ];
   if (s.knownElements.length) pages.push({ title: "Annem", html: `<section class="sec"><h2>Annemin sayfaları</h2>${motherPic()}${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` });
@@ -426,3 +426,33 @@ function craftingSection(cfg: Config, s: GameState, craftsHtml: string): string 
   <section class="sec"><h2>Eşya yapımı</h2><p class="muted tiny" style="margin:0">Malzemen ve becerin yetiyorsa kendin yap.</p>${craftsHtml}</section>`;
 }
 export function diyarScreen(_cfg: Config, _s: GameState, _ui: UiState): string { return `<div class="page"><section class="sec"><h1>Diyar</h1></section></div>`; }
+
+/* ---------------- Evcil hayvan sayfası ---------------- */
+function petPage(_cfg: Config, s: GameState): string {
+  const p = s.pet; const at = s.location === s.estate?.homePlace; const slots = homeSlots(s);
+  const bar = (label: string, v: number, color: string) => `<div class="pet-bar"><span>${label}</span><div class="gb"><div class="gf" style="width:${Math.max(0, Math.min(100, v))}%;background:${color}"></div></div><b>${Math.round(v)}</b></div>`;
+  const stage = (pet: Pet) => {
+    const f = fillPet(pet); const sleepy = 6 + s.minute / 60 >= 21 || f.energy < 20; const hungry = f.satiety < 20;
+    return `<div class="pet-stage ${sleepy ? "sleepy" : hungry ? "still" : ""}"><div class="pet-walk"><div class="pet-bob">${petArt(pet.id, 120, sleepy || hungry ? "dur" : "yuru", ENEMIES[pet.id]?.tint ?? "")}</div></div>${sleepy ? `<i class="zz">z z z</i>` : ""}</div>`;
+  };
+  let main = `<section class="sec"><h2>Evcil hayvan</h2><p class="muted tiny" style="margin:0">Bir seferde tek hayvan yanında gezer${slots ? `; evin ${slots} hayvanlık yer veriyor.` : ". Bir evin olursa diğerleri orada yaşar."}</p></section>`;
+  if (p) {
+    const f = fillPet(p); const t = petType(p.id);
+    main += `<section class="sec">${stage(p)}
+      <div class="entry-head"><span class="entry-title" style="font-size:26px">${esc(p.name)}</span><span class="entry-meta">${esc(t.species)} · ${esc(t.role)} · ${moodWord(p)}</span></div>
+      <p class="hand blue" style="margin:0">${esc(doing(s, p))}</p>
+      ${bar("Tokluk", f.satiety, "var(--green)")}${bar("Keyif", f.mood, "#B07A1E")}${bar("Enerji", f.energy, "var(--blue)")}${bar("Bağ", p.bond, "var(--red)")}
+      <p class="tiny muted" style="margin:0">${esc(t.desc)} Etkisi: ${Math.round(petMul(s) * 100)}% (tok ve keyifliyse tam çalışır).</p>
+      <div class="row"><button class="btn small primary" data-act="pet-feed">Besle</button><button class="btn small" data-act="pet-caress">Sev</button><button class="btn small" data-act="pet-play">Oyna (30 dk)</button><button class="btn small" data-act="pet-rename">Adı değiştir</button></div>
+      <h3>Yetenekler</h3>${perksOf(p).map(x => `<div class="perk ${x.on ? "on" : ""}"><b>${x.on ? "✓" : "bağ " + x.bond}</b><span>${esc(x.text)}</span></div>`).join("")}
+      <div class="row">${slots ? `<button class="btn small" data-act="pet-home" ${at && homePets(s).length < slots ? "" : "disabled"}>Evde bırak</button>` : ""}<button class="btn small red" data-act="pet-release">Salıver</button></div>
+      ${slots && !at ? `<p class="tiny muted" style="margin:0">Değiştirmek için evinde olmalısın.</p>` : ""}</section>`;
+  } else main += `<section class="sec"><p class="hand blue" style="margin:0">Yanında evcil hayvan yok.</p></section>`;
+  const home = homePets(s);
+  if (home.length) main += `<section class="sec"><h2>Evde yaşayanlar</h2>${home.map((h, i) => { const f = fillPet(h); const t = petType(h.id);
+    return `<div class="card"><div class="item-detail">${petArt(h.id, 56, "dur", ENEMIES[h.id]?.tint ?? "")}<div style="flex:1;min-width:0"><div class="entry-head"><span class="entry-title">${esc(h.name)}</span><span class="entry-meta">${esc(t.species)} · ${moodWord(h)}</span></div>
+      <div class="tiny muted">tokluk ${Math.round(f.satiety)} · keyif ${Math.round(f.mood)} · bağ ${Math.floor(h.bond)}</div><div class="row" style="margin-top:6px"><button class="btn small" data-act="pet-swap" data-id="${i}" ${at ? "" : "disabled"}>Yanıma al</button></div></div></div></div>`; }).join("")}</section>`;
+  const shops = Object.values(PET_TYPES).filter(x => x.shop);
+  main += `<section class="sec"><h2>Yavru bulmak</h2><p class="muted tiny" style="margin:0">Yavruları ilgili yerlerde bulursun; bir sorun çıkmaması için önce yer ayırmalısın.</p>${shops.map(x => `<div class="entry"><div class="item-detail">${petArt(x.id, 44, "dur", ENEMIES[x.id]?.tint ?? "")}<div><div class="entry-head"><span class="entry-title">${esc(x.species)}</span><span class="entry-meta">${x.price} bakır</span></div><div class="tiny muted">${esc(x.role)} · ${esc(x.desc)}</div><div class="tiny">Nerede: ${esc(place(x.shop!)?.name ?? x.shop!)}</div></div></div></div>`).join("")}</section>`;
+  return main;
+}

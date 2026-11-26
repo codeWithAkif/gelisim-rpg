@@ -14,6 +14,7 @@ import { ENEMIES, GAME_ITEMS, CONFIG_WEAPON_DAMAGE } from "../content/world";
 import { weaponSet, totalArmor, hasBow } from "./gear";
 import { config } from "./config";
 import { barricadeCount, barricadeMul } from "./engineering";
+import { petMul } from "./pet";
 
 export const ARENA = { w: 100, h: 140 };
 const CX = ARENA.w / 2, CY = ARENA.h / 2;
@@ -236,7 +237,7 @@ export function step(cfg: Config, s: GameState, sg: Siege, dt: number) {
     const pt = sg.pet; pt.cd = Math.max(0, pt.cd - dt);
     const t = sg.foes.filter(f => f.hp > 0 && !f.flee && Math.hypot(f.x - pt.px, f.y - pt.py) < 16).sort((a, b) => Math.hypot(a.x - pt.x, a.y - pt.y) - Math.hypot(b.x - pt.x, b.y - pt.y))[0];
     const gx = t ? t.x : pt.px, gy = t ? t.y : pt.py; const d = Math.hypot(gx - pt.x, gy - pt.y);
-    if (t && d < t.r + 3) { if (pt.cd <= 0) { const bond = s.pet?.bond ?? 0; damage(sg, t, 2 + Math.floor(bond / 25) + rng.int(0, 2), "kopek"); sg.stats.petHits++; t.slowT = Math.max(t.slowT, 0.6); pt.cd = 1; } }
+    if (t && d < t.r + 3) { if (pt.cd <= 0) { const bond = s.pet?.bond ?? 0; damage(sg, t, Math.max(1, Math.round((2 + Math.floor(bond / 25) + rng.int(0, 2)) * petMul(s))), "kopek"); sg.stats.petHits++; t.slowT = Math.max(t.slowT, 0.6); pt.cd = 1; } }
     else if (d > 0.5) { const v = 14 * dt; pt.x += (gx - pt.x) / d * Math.min(v, d); pt.y += (gy - pt.y) / d * Math.min(v, d); }
   }
   // yakın dövüş: yanındakine otomatik vurursun

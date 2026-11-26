@@ -11,6 +11,7 @@ import { applyGain, realUse, summarize, type GainReport } from "./progression";
 import { attackTimingMods, dodgeMod } from "./timing";
 import { weaponSet, totalArmor, totalDodge, wornIds, hasBow } from "./gear";
 import { trapEffect, trapsOwned } from "./engineering";
+import { petMul } from "./pet";
 import { ENEMIES, GAME_ITEMS, MAPS, MAP_CHARS, TERRAIN, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, WOLF_WORDS, type Terrain, type WeakPoint, type FoeWords } from "../content/world";
 
 export type Weather = "acik" | "yagmur" | "sis";
@@ -117,7 +118,7 @@ export function doPrep(cfg: Config, s: GameState, questId: string, what: "scout"
   const today = s.prep[questId]?.day === s.day ? s.prep[questId] : { day: s.day };
   if (today[what]) return;
   today[what] = true; s.prep[questId] = today;
-  if (what === "scout") { s.minute = Math.min(DAY_MINUTES, s.minute + 30); s.energy = Math.max(0, s.energy - 4); applyGain(cfg, s, "analiz", 0.3, {}); applyGain(cfg, s, "mekansal", 0.2, {}); }
+  if (what === "scout") { if (s.pet?.id !== "sahin") { s.minute = Math.min(DAY_MINUTES, s.minute + 30); s.energy = Math.max(0, s.energy - 4); } applyGain(cfg, s, "analiz", 0.3, {}); applyGain(cfg, s, "mekansal", 0.2, {}); }
   else { s.minute = Math.min(DAY_MINUTES, s.minute + 10); applyGain(cfg, s, "koku", 0.2, {}); }
 }
 export function prepDone(s: GameState, questId: string): { scout: boolean; readWind: boolean } {
@@ -661,7 +662,7 @@ function allyTurn(cfg: Config, s: GameState, b: Battle, rng: Rng, out: string[])
     const d = ENEMIES[e.def!];
     const hit = rng.chance(Math.max(15, Math.min(90, 55 + bond / 4 - d.evasion)));
     let dmg = 0;
-    if (hit) { dmg = rng.int(2, 4) + Math.floor(bond / 30); e.hp = Math.max(0, e.hp - dmg); e.alert = true; b.stats.petHits = (b.stats.petHits ?? 0) + 1; out.push(`${a.name} ısırdı: ${e.name}, ${dmg} hasar.` + moraleCheck(b, e)); }
+    if (hit) { dmg = Math.max(1, Math.round((rng.int(2, 4) + Math.floor(bond / 30)) * petMul(s))); e.hp = Math.max(0, e.hp - dmg); e.alert = true; b.stats.petHits = (b.stats.petHits ?? 0) + 1; out.push(`${a.name} ısırdı: ${e.name}, ${dmg} hasar.` + moraleCheck(b, e)); }
     else out.push(`${a.name} havladı, ${e.name} geri sıçradı.`);
     b.events.push({ k: "attack", uid: a.uid, target: e.uid, hit, crit: false, dmg });
   }
