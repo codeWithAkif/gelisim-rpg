@@ -53,6 +53,7 @@ export interface GameState {
   pet?: { id: string; name: string; bond: number }; // evcil hayvan: bağ büyüdükçe işe yarar
   market?: { day: number; sold: Record<string, number> };          // bugün ne sattın (fiyat düşer)
   partners?: Record<string, { amount: number; since: number; earned: number; acc?: number }>; // acc: henüz bütün bakıra varmamış pay // ortaklıklar
+  nobet?: { iz: number; best: Record<string, number>; perm: Record<string, number>; runs: number }; // nöbet: kalıcı iz ve rekorlar
   ledger?: { day: number; text: string; amount: number }[];         // hesap defteri
   log: LogEntry[];
 }

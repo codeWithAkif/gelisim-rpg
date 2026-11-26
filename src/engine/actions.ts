@@ -10,9 +10,10 @@ import { FINDS, SEARCH_MINUTES } from "../content/explore";
 import { MARKETS } from "../content/world";
 import { partnerAt, stake } from "./finance";
 import { lodgingAt } from "./rest";
+import { nobetSite, nobetSave } from "./nobet";
 
 export interface PlaceAction {
-  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place" | "partner" | "sleep";
+  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place" | "partner" | "sleep" | "nobet";
   id: string; label: string; sub?: string; disabled?: string; primary?: boolean;
 }
 /** Bulunduğun yerde yapılabilecekler, önem sırasıyla. */
@@ -29,6 +30,8 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
   if (MARKETS[placeId]) out.push({ act: "market", id: placeId, label: MARKETS[placeId].name, sub: "Al, sat" });
   for (const p of partnerAt(placeId)) { const lock = p.unlock(s); const st = stake(s, p.id);
     if (!lock || st) out.push({ act: "partner", id: p.id, label: `Ortaklık: ${p.name}`, sub: st ? `Payın: ${st} bakır` : `En az ${p.min} bakır` }); }
+  const ns = nobetSite(placeId);
+  if (ns && !ns.unlock(s)) out.push({ act: "nobet", id: placeId, label: `Nöbet tut: ${ns.name}`, sub: `Sonsuz dalga · rekor ${nobetSave(s).best[placeId] ?? 0}. dalga`, disabled: placeId === s.location ? undefined : "Oraya git" });
   if (placeId === s.location) {
     const l = lodgingAt(placeId); const ok = !!l && !l.unlock(s);
     out.push({ act: "sleep", id: "", label: ok ? `Konakla: ${l!.name}` : "Dinlen ya da kamp kur", sub: ok ? "Güvenli uyku, dinlenme" : "Açıkta uyumak tehlikeli" });

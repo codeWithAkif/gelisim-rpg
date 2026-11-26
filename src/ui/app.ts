@@ -21,6 +21,7 @@ import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { openSiege } from "./siege-view";
 import { openStealth } from "./stealth-view";
+import { openNobetHub } from "./nobet-view";
 import { rollFoes, bonusOf, modeOptions, stealthGoal, siegeFromFoes, groundOf, type Mode, type Context } from "../engine/encounter";
 import { addItem } from "../engine/inventory";
 import { isNight } from "../engine/state";
@@ -224,6 +225,7 @@ export function startApp(root: HTMLElement) {
         sfx("coin"); buzz("light"); toast(`${itemInfo(cfg, id).name} sattın: +${r.price} bakır`); persist(); render(); break;
       }
       case "partner": openPartner(id); break;
+      case "nobet": doNobet(id); break;
       case "market": tab = "isler"; render(false); setTimeout(() => main.querySelector(".shop-item")?.closest("section")?.scrollIntoView({ behavior: "smooth" }), 50); break;
       case "toggle-done": ui.showDone = !ui.showDone; render(); break;
       case "deliver": {
@@ -234,6 +236,16 @@ export function startApp(root: HTMLElement) {
     }
   });
 
+  /** Nöbet: önce kalıcı güçlenmeler, sonra sonsuz dalgalar; bitince sonuç. */
+  function doNobet(id: string) {
+    openNobetHub(cfg, s, id, persist, r => {
+      persist(); render();
+      modal(`<p class="hand muted" style="margin:0">Nöbet bitti</p><h2>${r.wave}. dalgaya kadar dayandın${r.best ? " · yeni rekor!" : ""}</h2>
+        <p class="lede">Kule düştü ama her nöbet bir iz bırakır.</p>
+        <div class="odds"><span>Nöbet izi <b>+${r.iz}</b></span><span>Geçen süre <b>${r.minutes} dk</b></span></div>
+        <h3>Nöbette gelişen</h3>${gainList(cfg, r.gains, 6)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }, { label: "Kuleye dön", fn: () => doNobet(id) }]);
+    });
+  }
   /** Uyu ya da dinlen: nerede uyuyacağın dinlenmeyi ve gecenin tehlikesini belirler. */
   function openSleep() {
     if (s.journey) { toast("Yoldayken uyuyamazsın."); return; }
