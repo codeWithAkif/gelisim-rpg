@@ -9,7 +9,7 @@ import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
 import { QUESTS, CRAFTS, ENEMIES } from "../content/world";
 import { build, upgrade, dismantle, structure } from "../engine/engineering";
-import { callable, callMany, heroDef, ROLE_NAMES, afterBattle, hire as hireHero, buyHouse, found as foundVenture, upVenture, setWorker, collect as collectVenture, toggleParty, dismiss, assign as assignJob, recall as recallHero, VENTURES } from "../engine/estate";
+import { callable, callMany, heroDef, ROLE_NAMES, afterBattle, hire as hireHero, buyHouse, found as foundVenture, upVenture, setWorker, collect as collectVenture, toggleParty, dismiss, assign as assignJob, recall as recallHero, VENTURES, diyarOpen } from "../engine/estate";
 import { feed as petFeed, caress as petCaress, play as petPlay, rename as petRename, release as petRelease, sendHome as petSendHome, swapWithHome as petSwap, adopt as petAdopt, petType } from "../engine/pet";
 import { itemInfo, equip, unequip, drop, buy, bagOf, attachPouch, detachPouch, type InvTab } from "../engine/inventory";
 import type { GearSlot } from "../engine/gear";
@@ -27,13 +27,12 @@ import { openPlan } from "./plan-view";
 import { openSiege } from "./siege-view";
 import { openStealth } from "./stealth-view";
 import { diyarScreen } from "./diyar-screen";
-import { openNobetHub, lootText } from "./nobet-view";
 import { openScavHub } from "./scav-view";
 import { rollFoes, bonusOf, modeOptions, stealthGoal, siegeFromFoes, groundOf, type Mode, type Context } from "../engine/encounter";
 import { addItem } from "../engine/inventory";
 import { isNight } from "../engine/state";
 import type { BattleOutcome } from "../engine/combat";
-import { SIEGES } from "../engine/siege";
+import { SIEGES, escalate } from "../engine/siege";
 import { showIntro } from "./intro";
 import { applyDaylight } from "./daylight";
 import { notifyAt, clearNotify } from "../notify";
@@ -43,7 +42,7 @@ import { sfx, buzz, ambience, unlockAudio } from "./feel";
 import { darkness } from "./daylight";
 import { beginSearch, collectFind, deliverRequest } from "../engine/explore";
 import { openSeek } from "./seek-view";
-import { sell, partner, stake, invest, withdraw, nightlyFinance } from "../engine/finance";
+import { sell, partner, partnerLock, stake, invest, withdraw, nightlyFinance } from "../engine/finance";
 import { sleepOptions, sleepAt, rest, type SleepKind } from "../engine/rest";
 import { minutesLeft } from "../engine/state";
 import { itemPic, artUrl } from "./art";
@@ -73,7 +72,15 @@ export function startApp(root: HTMLElement) {
   window.addEventListener("gelisim-ayar", syncAmbience);
   document.addEventListener("visibilitychange", syncAmbience);
   function toast(t: string) { const el = root.querySelector("#toast")!; el.textContent = t; el.classList.add("on"); clearTimeout((toast as any).t); (toast as any).t = setTimeout(() => el.classList.remove("on"), 2400); }
+  /** Diyar sekmesi "Köy dostu" olunca belirir; ilk açıldığında bir kez haber verilir. */
+  function syncTabs() {
+    const open = diyarOpen(s);
+    root.querySelector<HTMLButtonElement>('[data-tab="diyar"]')!.hidden = !open;
+    if (!open && tab === "diyar") tab = "defter";
+    if (open && !s.story.flags.diyarAcik) { s.story.flags.diyarAcik = s.day; persist(); toast("Adın duyuldu: Diyar sayfası açıldı."); }
+  }
   function render(keepScroll = true) {
+    syncTabs();
     const y = main.scrollTop;
     applyDaylight(s.minute); syncAmbience();
     root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
@@ -276,7 +283,6 @@ export function startApp(root: HTMLElement) {
         sfx("coin"); buzz("light"); toast(`${itemInfo(cfg, id).name} sattın: +${r.price} bakır`); persist(); render(); break;
       }
       case "partner": openPartner(id); break;
-      case "nobet": doNobet(id); break;
       case "scav": doScav(id); break;
       case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;
       case "jobtab": ui.jobTab = id as UiState["jobTab"]; sfx("page"); render(false); break;
@@ -288,7 +294,7 @@ export function startApp(root: HTMLElement) {
     }
   });
 
-  /** Nöbet: önce kalıcı güçlenmeler, sonra sonsuz dalgalar; bitince sonuç. */
+  /** Harabe araması; bitince sonuç. */
   function doScav(id: string) {
     openScavHub(cfg, s, id, persist, r => {
       persist(); render();
@@ -301,17 +307,6 @@ export function startApp(root: HTMLElement) {
         ${lost.length ? `<p class="tiny red" style="margin:0">Kaybolan: ${esc(lost.join(", "))}</p>` : ""}
         ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
         <h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
-    });
-  }
-  function doNobet(id: string) {
-    openNobetHub(cfg, s, id, persist, r => {
-      persist(); render();
-      modal(`<p class="hand muted" style="margin:0">Nöbet bitti</p><h2>${r.wave}. dalgaya kadar dayandın${r.best ? " · yeni rekor!" : ""}</h2>
-        <p class="lede">Kule düştü ama her nöbet bir iz bırakır.</p>
-        <div class="odds"><span>Nöbet izi <b>+${r.iz}</b></span><span>Geçen süre <b>${r.minutes} dk</b></span></div>
-        ${r.loot.money || Object.keys(r.loot.items).length ? `<p class="hand blue" style="margin:0">Ödül: ${esc(lootText(r.loot))}</p>` : `<p class="tiny muted" style="margin:0">Ödül beşinci dalgadan sonra başlar.</p>`}
-        ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
-        <h3>Nöbette gelişen</h3>${gainList(cfg, r.gains, 6)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }, { label: "Kuleye dön", fn: () => doNobet(id) }]);
     });
   }
   /** Uyu ya da dinlen: nerede uyuyacağın dinlenmeyi ve gecenin tehlikesini belirler. */
@@ -348,7 +343,7 @@ export function startApp(root: HTMLElement) {
   }
   /** Ortaklık: şartlar, payın, yatır ya da çek. */
   function openPartner(id: string) {
-    const p = partner(id)!; const st = stake(s, id); const lock = p.unlock(s);
+    const p = partner(id)!; const st = stake(s, id); const lock = partnerLock(s, p);
     const steps = [10, 25, 50].map(n => Math.max(n, st ? 0 : p.min)).filter((n, i, a) => a.indexOf(n) === i && st + n <= p.max && n <= s.money);
     const risk = p.risk * (p.safer?.(s) ? 0.5 : 1);
     const btns: { label: string; cls?: string; fn: () => void }[] = steps.map(n => ({ label: `${n} yatır`, cls: "primary", fn: () => { const r = invest(s, id, n); toast(r.ok ? `${p.name}: ${n} bakır yatırdın.` : r.reason ?? ""); if (r.ok) sfx("coin"); persist(); render(); } }));
@@ -435,7 +430,7 @@ export function startApp(root: HTMLElement) {
         };
         if (q.siege) {
           const cl = callable(s, q.at);
-          const go = (called: string[]) => openSiege(cfg, s, SIEGES[q.siege!], (s.seed + s.day * 31) | 0, (won, gains, hs) => siegeEnd(won, gains, undefined, hs), persist, called);
+          const go = (called: string[]) => openSiege(cfg, s, escalate(SIEGES[q.siege!], s.quests[id]?.count ?? 0), (s.seed + s.day * 31) | 0, (won, gains, hs) => siegeEnd(won, gains, undefined, hs), persist, called);
           if (!cl.length) { go([]); return; }
           const pickd = new Set<string>();
           modal(`<p class="hand muted" style="margin:0">Savunma</p><h2>${esc(q.title)}</h2><p style="margin:0">Evdeki adamlara haber salmak ister misin? Yetişmeleri <b>${cl[0].eta} dk</b> sürer.</p><div class="chips">${cl.map(c => `<button class="chip" data-hid="${c.hero.id}" ${c.ok ? "" : "disabled"}>${esc(heroDef(c.hero.id)!.name)} · ${ROLE_NAMES[heroDef(c.hero.id)!.role]}</button>`).join("")}</div>`,

@@ -8,7 +8,6 @@ import { INTRO, CHAPTERS } from "../src/content/story";
 import { HEROES } from "../src/content/estate";
 import { PET_TYPES } from "../src/content/pets";
 import { STRUCTURES } from "../src/content/engineering";
-import { NOBET_SITES } from "../src/engine/nobet";
 
 // Görsel dosya adları ada göre eşleşir; yanlış yazılan ad oyunda sessizce eskize döner.
 const DIR = "src/assets/art";
@@ -20,7 +19,7 @@ test("her görsel bilinen bir kişi, yer ya da eşyaya ait ve küçük boyutlu",
     if (kind === "portre") expect(id === "anne" || NPCS.some(n => n.id === id) || HEROES.some(h => h.id === id), f).toBe(true);
     if (kind === "anim") expect(["kahraman_yuru", "kahraman_yay", "kahraman_ara", "kahraman_tirman", "kahraman_buyu", "kurt_yuru", ...Object.keys(PET_TYPES).map(k => k + "_yuru")], f).toContain(id);
     if (kind === "yapi") expect(STRUCTURES.some(d => d.id === id), f).toBe(true);
-    if (kind === "kule") expect(NOBET_SITES.some(d => d.place === id), f).toBe(true);
+    if (kind === "kule") expect(PLACES.some(p => p.id === id), f).toBe(true);   // eski nöbet kuleleri; kuşatma arka planı için saklı
     if (kind === "harabe") expect(/^(oda_(koru|karacam_sarnic|ardic_kul)|merdiven|kilit_kapi|kapi_acik|cikis|sandik|dolap|fici|cuval|raf|yatak|ocak|kasa|tas_nis|soba|anahtar|silah_(pasli_kilic|eski_mizrak|civili_sopa|kemik_balta|avci_yayi|kisa_yay))$/.test(id), f).toBe(true);
     if (kind === "vucut") expect(id, f).toBe("insan");
     if (kind === "yer") expect(PLACES.some(p => p.id === id), f).toBe(true);

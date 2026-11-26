@@ -8,15 +8,14 @@ import { nextMilestone } from "./story";
 import { NPC_PLACE } from "../content/map";
 import { FINDS, SEARCH_MINUTES } from "../content/explore";
 import { MARKETS } from "../content/world";
-import { partnerAt, stake } from "./finance";
+import { partnerAt, partnerLock, stake } from "./finance";
 import { lodgingAt } from "./rest";
-import { nobetSite, nobetSave } from "./nobet";
 import { scavSite } from "./scavenge";
 import { PET_TYPES, canAdopt } from "./pet";
 import { homeBed, candidatesAt, canHire, canBuyHouse, HOUSES, HOME_PLACES, ROLE_NAMES } from "./estate";
 
 export interface PlaceAction {
-  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place" | "partner" | "sleep" | "nobet" | "scav" | "pet-adopt" | "hire" | "house";
+  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "market" | "show-place" | "partner" | "sleep" | "scav" | "pet-adopt" | "hire" | "house";
   id: string; label: string; sub?: string; disabled?: string; primary?: boolean;
 }
 /** Bulunduğun yerde yapılabilecekler, önem sırasıyla. */
@@ -31,13 +30,11 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
     out.push({ act: "deliver", id: r.def.id, label: `${r.npcName}'in isteği`, sub: r.def.text, disabled: r.have ? undefined : "Çantanda yeterince yok" });
   if (FINDS[placeId]) { const c = placeId === s.location ? canSearch(s) : { ok: true }; out.push({ act: "search", id: "", label: `Etrafı ara (${SEARCH_MINUTES} dk)`, disabled: c.ok ? undefined : c.reason }); }
   if (MARKETS[placeId]) out.push({ act: "market", id: placeId, label: MARKETS[placeId].name, sub: "Al, sat" });
-  for (const p of partnerAt(placeId)) { const lock = p.unlock(s); const st = stake(s, p.id);
+  for (const p of partnerAt(placeId)) { const lock = partnerLock(s, p); const st = stake(s, p.id);
     if (!lock || st) out.push({ act: "partner", id: p.id, label: `Ortaklık: ${p.name}`, sub: st ? `Payın: ${st} bakır` : `En az ${p.min} bakır` }); }
   for (const pt of Object.values(PET_TYPES)) if (pt.shop === placeId) { const c = canAdopt(s, pt.id, placeId); out.push({ act: "pet-adopt", id: pt.id, label: `Yavru al: ${pt.species}`, sub: `${pt.price} bakır · ${pt.role}`, disabled: c.ok ? undefined : c.reason }); }
   for (const h of candidatesAt(s, placeId)) { const c = canHire(s, h.id); out.push({ act: "hire", id: h.id, label: `Adam tut: ${h.name}`, sub: `${ROLE_NAMES[h.role]} · ${h.hire} bakır, günlük ${h.wage} · ${h.bio}`, disabled: c.ok ? undefined : c.reason }); }
   if (HOME_PLACES.includes(placeId) && !(s.estate?.house)) { const c = canBuyHouse(cfg, s, placeId); out.push({ act: "house", id: placeId, label: `Ev kur: ${HOUSES[0].name}`, sub: `${HOUSES[0].cost.money} bakır + ${Object.entries(HOUSES[0].cost.items).map(([k, n]) => `${n} ${k}`).join(", ")} · ${HOUSES[0].desc}`, disabled: placeId === s.location ? (c.ok ? undefined : c.reason) : "Oraya git" }); }
-  const ns = nobetSite(placeId);
-  if (ns && !ns.unlock(s)) out.push({ act: "nobet", id: placeId, label: `Nöbet tut: ${ns.name}`, sub: `Sonsuz dalga · rekor ${nobetSave(s).best[placeId] ?? 0}. dalga`, disabled: placeId === s.location ? undefined : "Oraya git" });
   const sv = scavSite(placeId);
   if (sv && !sv.unlock(s)) out.push({ act: "scav", id: placeId, label: `Harabeyi ara: ${sv.name}`, sub: `${sv.floors} kat · baskınlar gelir · çıkışta kazanç`, disabled: placeId === s.location ? undefined : "Oraya git" });
   if (placeId === s.location) {

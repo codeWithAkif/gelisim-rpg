@@ -72,3 +72,4 @@ npx cap open android      # Android Studio'da açar; oradan telefona Çalıştı
 | `src/ui/` | Defter görünümlü arayüz (DOM + SVG) ve savaş haritası (canvas) |
 | `tools/` | Editör çıktısını oyuna alan dönüştürücü |
 | `tests/` | Vitest testleri, denge koruması dahil |
+| `docs/modlar.md` | Hangi oyun modu neden var; tut / birleştir / ertele kararları |

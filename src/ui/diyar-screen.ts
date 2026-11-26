@@ -3,7 +3,7 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   est, rankOf, RANKS, HOUSES, HOME_PLACES, VENTURES, HEROES, ROLE_NAMES, heroDef, heroStats, heroLimit, houseOf, canBuyHouse, jobsFor, canAssign, successChance,
-  canFound, canUpVenture, ventureUpCost, heroOf, xpFor, PARTY_MAX, togglePartyCheck, jobDef, rankNo,
+  canFound, canUpVenture, ventureUpCost, heroOf, xpFor, PARTY_MAX, togglePartyCheck, jobDef, rankNo, venturesOpen,
 } from "../engine/estate";
 import { homePets } from "../engine/pet";
 import { itemInfo, freeCount } from "../engine/inventory";
@@ -16,8 +16,9 @@ const TABS: [string, string][] = [["genel", "Genel"], ["ev", "Ev"], ["isletme", 
 const STATUS: Record<string, string> = { evde: "evde", yolda: "seninle", gorevde: "görevde", yarali: "yaralı" };
 
 export function diyarScreen(cfg: Config, s: GameState, ui: UiState): string {
-  const tab = ui.diyarTab ?? "genel";
-  const seg = `<div class="seg" role="tablist">${TABS.map(([id, n]) => `<button role="tab" class="${tab === id ? "on" : ""}" data-act="diyartab" data-id="${id}" aria-selected="${tab === id}">${n}</button>`).join("")}</div>`;
+  const open = venturesOpen(s); const tabs = TABS.filter(([id]) => open || (id !== "isletme" && id !== "pano"));
+  const tab = tabs.some(([id]) => id === ui.diyarTab) ? ui.diyarTab! : "genel";
+  const seg = `<div class="seg" role="tablist">${tabs.map(([id, n]) => `<button role="tab" class="${tab === id ? "on" : ""}" data-act="diyartab" data-id="${id}" aria-selected="${tab === id}">${n}</button>`).join("")}</div>`;
   const body = tab === "ev" ? evTab(cfg, s) : tab === "isletme" ? isletmeTab(cfg, s) : tab === "adamlar" ? adamlarTab(cfg, s) : tab === "pano" ? panoTab(cfg, s) : genelTab(cfg, s);
   return `<div class="page">${seg}${body}</div>`;
 }
@@ -36,7 +37,7 @@ function genelTab(_cfg: Config, s: GameState): string {
       <span>Ev <b>${houseOf(s)?.name ?? "yok"}</b></span><span>İşletme <b>${Object.keys(e.ventures!).length}</b></span><span>Adam <b>${e.heroes!.length}/${heroLimit(s)}</b></span><span>Evcil <b>${(s.pet ? 1 : 0) + homePets(s).length}</b></span></div>
       <p class="tiny muted" style="margin:4px 0 0">Günlük gider: maaş ${wages} + bakım ${upkeep} bakır. Her gece uyuyunca ödenir.</p></section>
     ${e.reports!.length ? `<section class="sec"><h2>Dün gece</h2>${e.reports!.map(x => `<div class="note">${esc(x)}</div>`).join("")}</section>` : ""}
-    <section class="sec"><h3>Nereden başlamalı?</h3><p class="tiny muted" style="margin:0">1) Köy meydanında <b>ev kur</b> (rütbe: Köy dostu). 2) Bir <b>adam tut</b>. 3) Rütbe 2'de <b>işletme</b> kur, adama işletmeyi ver. 4) Tekrarlı işleri <b>Görevler</b>'den adamlarına ata.</p></section>`;
+    <section class="sec"><h3>Nereden başlamalı?</h3><p class="tiny muted" style="margin:0">${venturesOpen(s) ? `1) Köy meydanında <b>ev kur</b>. 2) Bir <b>adam tut</b>. 3) Rütbe 2'de <b>işletme</b> kur, adama işletmeyi ver. 4) Tekrarlı işleri <b>Görevler</b>'den adamlarına ata.` : `1) Köy meydanında <b>ev kur</b>: kendi yatağında daha iyi dinlenirsin. 2) Bir <b>adam tut</b>: yanında gezen adam savaşta yardım eder. İşletme ve görev panosu ileride, adın şehre ulaşınca açılır.`}</p></section>`;
 }
 function evTab(cfg: Config, s: GameState): string {
   const e = est(s); const h = houseOf(s); const lv = e.house ?? 0; const next = HOUSES[lv]; const c = canBuyHouse(cfg, s, s.location);

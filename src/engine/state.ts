@@ -62,7 +62,6 @@ export interface GameState {
   market?: { day: number; sold: Record<string, number> };          // bugün ne sattın (fiyat düşer)
   partners?: Record<string, { amount: number; since: number; earned: number; acc?: number }>; // acc: henüz bütün bakıra varmamış pay // ortaklıklar
   yapi?: Record<string, { n: number; lv: number }>; // mühendislik: kalıcı yapılar (engine/engineering.ts)
-  nobet?: { iz: number; best: Record<string, number>; perm: Record<string, number>; runs: number }; // nöbet: kalıcı iz ve rekorlar
   ledger?: { day: number; text: string; amount: number }[];         // hesap defteri
   log: LogEntry[];
 }

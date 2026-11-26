@@ -85,7 +85,7 @@ export function dismantle(cfg: Config, s: GameState, id: string): { ok: boolean;
 /* ---------- savaşta kullanım ---------- */
 /** Barikat dayanıklılık çarpanı (seviyeye göre). */
 export const barricadeMul = (s: GameState) => 1 + 0.3 * (levelOf(s, "kazik_barikat") - 1);
-/** Kuşatma ve nöbette kurulabilecek barikat sayısı: ücretsiz iki geçici kazık + yaptıkların. */
+/** Kuşatmada kurulabilecek barikat sayısı: ücretsiz iki geçici kazık + yaptıkların. */
 export const FREE_STAKES = 2;
 export const barricadeCount = (s: GameState) => FREE_STAKES + owned(s, "kazik_barikat");
 export interface TrapEffect { dmg: number; slow: number; fire: boolean }

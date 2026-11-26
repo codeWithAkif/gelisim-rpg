@@ -24,6 +24,9 @@ test("satış: pazarda, alıştan ucuza; aynı malı çok satınca fiyat düşer
 
 test("ortaklık: kilitli başlar, ortağın yanında yatırılır, geceleri ortalamada kazandırır, bazen kaybettirir", () => {
   const s = newGame(cfg, 9); s.money = 100;
+  s.quests.kurt = { status: "bitti", count: 1 }; s.location = "yayla";
+  expect(invest(s, "suru", 20).reason).toMatch(/Karaçam/);   // ortaklık Bölüm 2'de açılır
+  s.story.reached.push("k_varis"); delete s.quests.kurt;
   expect(invest(s, "suru", 20).ok).toBe(false);              // önce kurt derdi
   s.quests.kurt = { status: "bitti", count: 1 };
   s.location = "koy_meydani"; expect(invest(s, "suru", 20).reason).toMatch(/yanında/);
@@ -41,7 +44,7 @@ test("ortaklık: kilitli başlar, ortağın yanında yatırılır, geceleri orta
 });
 
 test("en küçük payla da sürü zamanla para getirir (kesirler birikir)", () => {
-  const s = newGame(cfg, 9); s.quests.kurt = { status: "bitti", count: 1 }; s.location = "yayla"; s.money = 10;
+  const s = newGame(cfg, 9); s.quests.kurt = { status: "bitti", count: 1 }; s.location = "yayla"; s.money = 10; s.story.reached.push("k_varis");
   expect(invest(s, "suru", 10).ok).toBe(true);
   let gained = 0;
   for (let d = 0; d < 15; d++) { s.day++; for (const l of nightlyFinance(s)) if (l.amount > 0) gained += l.amount; if (!stake(s, "suru")) break; }

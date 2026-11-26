@@ -9,7 +9,7 @@ export const RANKS: RankDef[] = [
   { id: 1, name: "Köy dostu", at: 10, unlocks: "Ev satın alabilirsin; bir adam tutabilirsin." },
   { id: 2, name: "Taşpınar'ın adamı", at: 28, unlocks: "İşletme kurabilirsin; iki adam tutabilirsin." },
   { id: 3, name: "Vadi ağası", at: 55, unlocks: "Evi büyütebilirsin; üç adam; ağır işler." },
-  { id: 4, name: "Bölgenin sözü geçeni", at: 95, unlocks: "Dört adam; büyük işletmeler; kule nöbetini devredebilirsin." },
+  { id: 4, name: "Bölgenin sözü geçeni", at: 95, unlocks: "Dört adam; büyük işletmeler; gece savunmalarını adamlarına devredebilirsin." },
   { id: 5, name: "Diyar efendisi", at: 150, unlocks: "Beş adam. Sözün her yerde geçiyor." },
 ];
 
