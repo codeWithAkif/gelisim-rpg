@@ -18,8 +18,8 @@ const CX = ARENA.w / 2, CY = ARENA.h / 2;
 const imgCache = new Map<string, HTMLImageElement | null>();
 const img = (key: string) => { if (!imgCache.has(key)) { const u = artUrl(key); imgCache.set(key, u ? Object.assign(new Image(), { src: u }) : null); } const i = imgCache.get(key)!; return i && i.complete && i.naturalWidth ? i : null; };
 
-export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number, onEnd: (won: boolean, gains: GainReport) => void, persist: () => void) {
-  const sg: Siege = createSiege(cfg, s, def, seed);
+export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number, onEnd: (won: boolean, gains: GainReport, heroes: string[]) => void, persist: () => void, called: string[] = []) {
+  const sg: Siege = createSiege(cfg, s, def, seed, called);
   const el = document.createElement("div"); el.className = "siege"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Kuşatma");
   el.innerHTML = `<div class="siege-top"><div class="siege-title hand"></div><div class="siege-bars"><div class="gb"><div class="gf" id="sgHp" style="background:var(--red)"></div></div><div class="gb"><div class="gf" id="sgMana" style="background:var(--blue)"></div></div></div></div>
     <div class="siege-stage"><canvas></canvas></div><div class="siege-panel"></div>`;
@@ -139,6 +139,9 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
       const p = sg.pet; if (sg.phase !== "fight") { g.strokeStyle = C("--blue"); g.setLineDash([3, 4]); g.beginPath(); g.arc(X(p.px), Y(p.py), 16 * scale, 0, 7); g.stroke(); g.setLineDash([]); }
       if (!figure("dusman_kurt", p.x, p.y, 8, false, p.down ? "grayscale(1) opacity(.5)" : ENEMIES.kopek.tint ?? "none")) { g.fillStyle = "#6B4A2E"; g.beginPath(); g.ellipse(X(p.x), Y(p.y), scale * 2.5, scale * 1.4, 0, 0, 7); g.fill(); }
     }
+    // adamlar
+    for (const h of sg.helpers) { const tint = ENEMIES["h_" + h.role]?.tint ?? "none"; figure("poz_kahraman_durus", h.x, h.y, 13, h.x < CX, tint);
+      g.fillStyle = C("--ink"); g.font = "700 13px Caveat, cursive"; g.textAlign = "center"; g.fillText(h.name.split(" ")[0], X(h.x), Y(h.y) + 10); }
     // düşmanlar
     for (const f of sg.foes) {
       const d = ENEMIES[f.def]; const right = CX > f.x; const h = f.human ? 15 * (d.scale ?? 1) : 9.5 * (d.scale ?? 1);
@@ -200,7 +203,7 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
     cancelAnimationFrame(raf); ro.disconnect();
     const r = finishSiege(cfg, s, sg); persist(); el.remove();
     sfx(r.won ? "win" : "lose"); if (!r.won) buzz("long");
-    onEnd(r.won, r.gains);
+    onEnd(r.won, r.gains, sg.helpers.map(h => h.id));
   }
   const ro = new ResizeObserver(layout); ro.observe(stage);
   layout(); renderPanel(); raf = requestAnimationFrame(loop);

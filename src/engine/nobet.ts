@@ -14,6 +14,7 @@ import { ENEMIES } from "../content/world";
 import { addItem } from "./inventory";
 import { hasRelic } from "./relics";
 import { petMul } from "./pet";
+import { partyHeroes, heroDef, heroStats } from "./estate";
 
 export const NFIELD = { w: 100, h: 130 };
 export const TOWER = { x: 50, y: 65, r: 7 };
@@ -89,6 +90,7 @@ export interface Nobet {
   lv: Record<StatId, number>; coins: number; cards: Record<string, number>; offer: string[];
   page: number; pageNeed: number; fireCd: number; shotsFired: number;
   spells: Partial<Record<SpellId, { cd: number; max: number }>>;
+  helpers: { id: string; name: string; role: string; cd: number; dmg: number; a: number }[];
   pet?: { x: number; y: number; hx: number; hy: number; cd: number; lv: number; wx: number; wy: number; wt: number }; // wx/wy: boşta gezindiği nokta
   loot: Loot; rewarded: number; foes: NFoe[]; shots: Shot[]; fx: NFx[]; nextId: number; seed: number; rng: Rng;
   stats: { kills: number; shots: number; bosses: number; dmgTaken: number; coins: number; cards: number; skills: number };
@@ -105,7 +107,7 @@ export function createNobet(cfg: Config, s: GameState, site: NobetSite, seed: nu
     hp, maxHp: hp, regen: 0.3, dmg: dmg, rate: (0.9 + lvA(s, "refleks") / 80) * (1 + pm("cabuk") * 0.05), range: (30 + lvA(s, "gorus") / 8) * (s.pet?.id === "sahin" && (s.pet.bond ?? 0) >= 10 ? 1.1 : 1), crit: 0.05 + lvA(s, "okculuk") / 400 + pm("keskin") * 0.02,
     lv: { dmg: 0, rate: 0, hp: 0, regen: 0, range: 0 }, coins: 8 + pm("miras") * 6, cards: {}, offer: [],
     page: 0, pageNeed: 6, fireCd: 0, shotsFired: 0,
-    spells: startSpells(s), pet: s.pet ? { x: TOWER.x, y: TOWER.y + 16, hx: TOWER.x, hy: TOWER.y + 16, cd: 0, lv: 1, wx: TOWER.x, wy: TOWER.y + 16, wt: 0 } : undefined,
+    spells: startSpells(s), helpers: partyHeroes(s).map((h, i) => ({ id: h.id, name: heroDef(h.id)!.name, role: heroDef(h.id)!.role, cd: 0.6 + i * 0.4, dmg: (heroStats(h).dmg[0] + heroStats(h).dmg[1]) / 2, a: Math.PI * (0.62 + i * 0.28) })), pet: s.pet ? { x: TOWER.x, y: TOWER.y + 16, hx: TOWER.x, hy: TOWER.y + 16, cd: 0, lv: 1, wx: TOWER.x, wy: TOWER.y + 16, wt: 0 } : undefined,
     loot: { money: 0, items: {} }, rewarded: 0, foes: [], shots: [], fx: [], nextId: 1, seed, rng,
     stats: { kills: 0, shots: 0, bosses: 0, dmgTaken: 0, coins: 0, cards: 0, skills: 0 },
   };
@@ -295,6 +297,14 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
       pt.cd = 1.1 - pt.lv * 0.12; hurt(n, t, n.dmg * (0.45 + pt.lv * 0.3) * pm, false); t.slow = Math.max(t.slow, 0.8);
       n.fx.push({ k: "bite", x: t.x, y: t.y });
     }
+  }
+  // adamlar kuleden destek verir: atıcılar vurur, şifacı kuleyi onarır
+  for (const h of n.helpers) {
+    h.cd -= dt; if (h.cd > 0) continue;
+    if (h.role === "sifaci" || h.role === "usta") { n.hp = Math.min(n.maxHp, n.hp + (h.role === "sifaci" ? 2.5 : 1.5)); h.cd = 2; continue; }
+    const t = n.foes.filter(f => Math.hypot(f.x - TOWER.x, f.y - TOWER.y) <= n.range * (h.role === "okcu" || h.role === "izci" ? 1 : 0.55)).sort((a, b) => Math.hypot(a.x - TOWER.x, a.y - TOWER.y) - Math.hypot(b.x - TOWER.x, b.y - TOWER.y))[0];
+    if (!t) { h.cd = 0.3; continue; }
+    hurt(n, t, h.dmg * 0.9, false); h.cd = h.role === "okcu" ? 1.15 : 1.0;
   }
   // atış
   n.fireCd -= dt;

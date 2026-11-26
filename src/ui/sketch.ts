@@ -243,6 +243,8 @@ export const ACT_ICONS: Record<string, string> = {
   sleep: ai('<path d="M15 3a8 8 0 1 0 6 12A7 7 0 0 1 15 3z" fill="rgba(46,76,122,.1)"/><path d="M6 5v2M5 6h2"/>'),
   // gözetleme kulesi
   "pet-adopt": ai('<path d="M12 20c-5-3-8-6-8-10a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 4-3 7-8 10z" fill="rgba(158,52,35,.18)"/>', "var(--red)"),
+  hire: ai('<circle cx="12" cy="7" r="3.2" fill="rgba(46,76,122,.15)"/><path d="M5 20c0-4 3-7 7-7s7 3 7 7"/><path d="M17 5l2 2 3-3"/>', "var(--blue)"),
+  house: ai('<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10" fill="rgba(139,106,69,.2)"/><path d="M10 20v-5.5h4V20"/>'),
   nobet: ai('<path d="M6 21l2-11h8l2 11"/><path d="M5 10h14l-1-4H6z" fill="rgba(42,39,34,.1)"/><path d="M9 6V3M15 6V3M12 6V2M7 21l9-7M17 21l-9-7"/>'),
   // açık kitap
   "session-pick": ai('<path d="M12 6c-2-1.5-5-2-8-1.5V19c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V4.5c-3-.5-6 0-8 1.5z"/><path d="M12 6v14.5"/>'),

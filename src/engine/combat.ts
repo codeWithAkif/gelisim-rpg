@@ -12,6 +12,8 @@ import { attackTimingMods, dodgeMod } from "./timing";
 import { weaponSet, totalArmor, totalDodge, wornIds, hasBow } from "./gear";
 import { trapEffect, trapsOwned } from "./engineering";
 import { petMul } from "./pet";
+import { partyHeroes, heroOf, heroDef, heroStats } from "./estate";
+import "../content/estate";
 import { ENEMIES, GAME_ITEMS, MAPS, MAP_CHARS, TERRAIN, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, WOLF_WORDS, type Terrain, type WeakPoint, type FoeWords } from "../content/world";
 
 export type Weather = "acik" | "yagmur" | "sis";
@@ -84,7 +86,7 @@ function windVec(dir: number) { const a = dir * Math.PI / 3; return { x: Math.co
 
 /* ---------- senaryo & hazırlık ---------- */
 export interface Scenario { mapId: string; enemies: string[]; weatherNow: Weather; weatherEvening: Weather; wind: { dir: number; strength: number }; seed: number }
-export interface Plan { timing: "simdi" | "aksam"; start: number; scout: boolean; readWind: boolean; traps: XY[]; trapTypes?: string[]; torch: boolean; paid?: ("scout" | "readWind")[]; ambushed?: boolean; surprise?: boolean }
+export interface Plan { timing: "simdi" | "aksam"; start: number; scout: boolean; readWind: boolean; traps: XY[]; trapTypes?: string[]; helpers?: string[]; torch: boolean; paid?: ("scout" | "readWind")[]; ambushed?: boolean; surprise?: boolean }
 export const DEFAULT_PLAN: Plan = { timing: "simdi", start: 0, scout: false, readWind: false, traps: [], torch: false };
 
 /** Savaş metinlerinde düşman nasıl anılır (kurtlar, haydutlar, muhafızlar…). */
@@ -230,6 +232,14 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
     const d = ENEMIES[s.pet.id]; const free = [[st.at[0] - 1, st.at[1]], [st.at[0] + 1, st.at[1]], [st.at[0], st.at[1] - 1], [st.at[0], st.at[1] + 1]]
       .find(([x, y]) => inside({ w: m.rows[0].length, h: m.rows.length }, x, y) && m.rows[y][x] !== "=" && !units.some(u => u.x === x && u.y === y));
     if (d && free) { const hp = petHp(s); units.push({ uid: "pet", side: "ally", def: s.pet.id, name: s.pet.name, x: free[0], y: free[1], hp, maxHp: hp, moveLeft: 0, acted: false, slowed: 0 }); }
+  }
+  // adamlar: yanında gezenler ve çağrılanlar
+  const hids = [...new Set([...partyHeroes(s).map(h => h.id), ...(plan.helpers ?? [])])].slice(0, 4);
+  for (const hid of hids) {
+    const h = heroOf(s, hid), hd = heroDef(hid); if (!h || !hd) continue;
+    const spot = [...neighbors({ w: m.rows[0].length, h: m.rows.length }, st.at[0], st.at[1]), ...[[st.at[0] - 2, st.at[1]], [st.at[0] + 2, st.at[1]]] as XY[]]
+      .find(([x, y]) => inside({ w: m.rows[0].length, h: m.rows.length }, x, y) && !TERRAIN[MAP_CHARS[m.rows[y][x]] ?? "cayir"].blocks && !units.some(u => u.x === x && u.y === y));
+    if (spot) { const hp = Math.min(heroStats(h).maxHp, Math.max(8, h.hp)); units.push({ uid: "h:" + hid, side: "ally", def: "h_" + hd.role, name: hd.name, x: spot[0], y: spot[1], hp, maxHp: heroStats(h).maxHp, moveLeft: 0, acted: false, slowed: 0 }); }
   }
   const traps: Record<string, number> = {}; const trapInfo: NonNullable<Battle["trapInfo"]> = {};
   plan.traps.forEach(([x, y], i) => { traps[key(x, y)] = 1; trapInfo[key(x, y)] = trapEffect(s, plan.trapTypes?.[i] ?? "ilmik_tuzagi"); });
@@ -646,24 +656,28 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
 
 /* ---------- evcil hayvan ---------- */
 export function petHp(s: GameState) { return 14 + Math.floor((s.pet?.bond ?? 0) / 5); }
-/** Köpek kendi turunda en yakın kurda koşar, yanındaysa ısırır. Bağ büyüdükçe isabet ve hasar artar. */
+/** Müttefikler: köpek koşup ısırır; adamlar rollerine göre vurur (okçu uzaktan), şifacı seni iyileştirir. */
 function allyTurn(cfg: Config, s: GameState, b: Battle, rng: Rng, out: string[]) {
   const bond = s.pet?.bond ?? 0;
   for (const a of allies(b)) {
+    const hero = a.uid.startsWith("h:") ? heroOf(s, a.uid.slice(2)) : undefined; const hs = hero ? heroStats(hero) : null; const role = hero ? heroDef(hero.id)!.role : null;
+    if (role === "sifaci") { const p = player(b); if (p.hp < p.maxHp * 0.8) { const heal = 3 + hero!.lv; p.hp = Math.min(p.maxHp, p.hp + heal); out.push(`${a.name} yaranı sardı (+${heal} can).`); continue; } }
     const foes = enemies(b); if (!foes.length) return;
+    const reach = hs?.range ?? 1;
     let e = foes.sort((x, y) => dist(a.x, a.y, x.x, x.y) - dist(a.x, a.y, y.x, y.y))[0];
-    if (dist(a.x, a.y, e.x, e.y) > 1) {
+    if (dist(a.x, a.y, e.x, e.y) > reach) {
       const r = reachable(b, a, 4); let best: XY | null = null, bd = dist(a.x, a.y, e.x, e.y);
       for (const k of r.keys()) { const [x, y] = k.split(",").map(Number); const d = dist(x, y, e.x, e.y); if (d < bd) { bd = d; best = [x, y]; } }
       if (best) { const path = pathTo(b, a, 4, best[0], best[1]); b.events.push({ k: "move", uid: a.uid, path: [[a.x, a.y], ...path] }); a.x = best[0]; a.y = best[1]; }
     }
     e = enemies(b).sort((x, y) => dist(a.x, a.y, x.x, x.y) - dist(a.x, a.y, y.x, y.y))[0];
-    if (!e || dist(a.x, a.y, e.x, e.y) !== 1) continue;
+    if (!e || dist(a.x, a.y, e.x, e.y) > reach) continue;
     const d = ENEMIES[e.def!];
-    const hit = rng.chance(Math.max(15, Math.min(90, 55 + bond / 4 - d.evasion)));
+    const hit = rng.chance(Math.max(15, Math.min(90, hs ? hs.accuracy - d.evasion : 55 + bond / 4 - d.evasion)));
     let dmg = 0;
-    if (hit) { dmg = Math.max(1, Math.round((rng.int(2, 4) + Math.floor(bond / 30)) * petMul(s))); e.hp = Math.max(0, e.hp - dmg); e.alert = true; b.stats.petHits = (b.stats.petHits ?? 0) + 1; out.push(`${a.name} ısırdı: ${e.name}, ${dmg} hasar.` + moraleCheck(b, e)); }
-    else out.push(`${a.name} havladı, ${e.name} geri sıçradı.`);
+    if (hit && hs) { dmg = Math.max(1, rng.int(hs.dmg[0], hs.dmg[1]) - d.armor); e.hp = Math.max(0, e.hp - dmg); e.alert = true; out.push(`${a.name} vurdu: ${e.name}, ${dmg} hasar.` + moraleCheck(b, e)); }
+    else if (hit) { dmg = Math.max(1, Math.round((rng.int(2, 4) + Math.floor(bond / 30)) * petMul(s))); e.hp = Math.max(0, e.hp - dmg); e.alert = true; b.stats.petHits = (b.stats.petHits ?? 0) + 1; out.push(`${a.name} ısırdı: ${e.name}, ${dmg} hasar.` + moraleCheck(b, e)); }
+    else out.push(hs ? `${a.name} ıskaladı.` : `${a.name} havladı, ${e.name} geri sıçradı.`);
     b.events.push({ k: "attack", uid: a.uid, target: e.uid, hit, crit: false, dmg });
   }
 }

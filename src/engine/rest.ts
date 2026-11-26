@@ -10,6 +10,7 @@ import { place } from "./travel";
 import { hasRelic } from "./relics";
 import { stake } from "./finance";
 import { tickPets } from "./pet";
+import { homeBed, nightly as estateNightly } from "./estate";
 
 const done = (s: GameState, q: string) => (s.quests[q]?.count ?? 0) > 0 || s.quests[q]?.status === "bitti";
 /** Konaklanabilecek yerler: kim misafir eder, ne ister, ne kadar dinlendirir. */
@@ -35,8 +36,9 @@ export type SleepKind = "lodging" | "tent" | "open";
 export interface SleepOption { kind: SleepKind; name: string; quality: number; cost: number; risk: number; ok: boolean; reason?: string; note: string }
 export function sleepOptions(s: GameState): SleepOption[] {
   const out: SleepOption[] = [];
-  const l = lodgingAt(s.location);
-  if (l) {
+  const home = homeBed(s); const l = lodgingAt(s.location);
+  if (home) out.push({ kind: "lodging", name: home.name, quality: home.quality, cost: 0, risk: 0, ok: true, note: "Kendi evin: güvenli, parasız, iyi dinlenirsin." });
+  else if (l) {
     const lock = l.unlock(s); const cost = l.free?.(s) ? 0 : l.cost;
     out.push({ kind: "lodging", name: l.name, quality: l.quality, cost, risk: 0, ok: !lock && s.money >= cost, reason: lock ?? (s.money < cost ? `${cost} bakır gerekir` : undefined),
       note: `${l.host} seni misafir eder. Güvenli${cost ? `, ${cost} bakır` : ", parasız"}.` });
@@ -56,7 +58,7 @@ export function campRisk(s: GameState): number {
 }
 
 export interface NightEvent { id: "hirsiz" | "kurt" | "soguk" | "yagmur"; text: string }
-export interface SleepResult { report: SleepReport; option: SleepOption; event?: NightEvent; hpBefore: number; pet: string[] }
+export interface SleepResult { report: SleepReport; option: SleepOption; event?: NightEvent; hpBefore: number; pet: string[]; estate: string[] }
 /** Uyur: yer kalitesi dinlenmeyi, kamp tehlikesi geceyi belirler. */
 export function sleepAt(cfg: Config, s: GameState, kind: SleepKind): SleepResult | { error: string } {
   if (s.journey) return { error: "Yoldayken uyuyamazsın" };
@@ -87,8 +89,8 @@ export function sleepAt(cfg: Config, s: GameState, kind: SleepKind): SleepResult
   // can: iyi uykuda çok, kötüsünde az toparlanır
   const m = maxHp(cfg, s); s.hp = Math.min(m, Math.round((s.hp || m) + m * 0.6 * Math.min(1, quality)));
   if (event) log(s, event.text, "warn");
-  const pet = tickPets(s);
-  return { report, option: opt, event, hpBefore, pet };
+  const pet = tickPets(s); const estate = estateNightly(cfg, s);
+  return { report, option: opt, event, hpBefore, pet, estate };
 }
 
 /* ---------- dinlenmek ---------- */
@@ -98,7 +100,7 @@ export function rest(cfg: Config, s: GameState, minutes: number): RestResult | {
   if (s.journey) return { error: "Yoldayken dinlenemezsin" };
   if (s.session) return { error: "Çalışırken olmaz" };
   const m = Math.min(minutes, minutesLeft(s)); if (m < 10) return { error: "Gecenin sonu; artık uyuman lazım" };
-  const h = m / 60; const l = lodgingAt(s.location); const good = !!l && !l.unlock(s);
+  const h = m / 60; const l = lodgingAt(s.location); const good = !!homeBed(s) || (!!l && !l.unlock(s));
   const e0 = s.energy, f0 = s.satiety, mana0 = s.mana;
   s.energy = Math.min(100, s.energy + h * (good ? 14 : 10) * (s.satiety < 15 ? 0.5 : 1));
   s.satiety = Math.max(0, s.satiety - h * 6);

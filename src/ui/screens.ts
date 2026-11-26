@@ -425,7 +425,6 @@ function craftingSection(cfg: Config, s: GameState, craftsHtml: string): string 
     Gelecekte kuşatma silahları da burada yapılacak.</p><p class="hand blue" style="margin:0">Mühendislik düzeyi: <b>${eng.toFixed(1)}</b> <span class="muted tiny">(el becerisi, taktik, gözlem, güç)</span></p>${structs}</section>
   <section class="sec"><h2>Eşya yapımı</h2><p class="muted tiny" style="margin:0">Malzemen ve becerin yetiyorsa kendin yap.</p>${craftsHtml}</section>`;
 }
-export function diyarScreen(_cfg: Config, _s: GameState, _ui: UiState): string { return `<div class="page"><section class="sec"><h1>Diyar</h1></section></div>`; }
 
 /* ---------------- Evcil hayvan sayfası ---------------- */
 function petPage(_cfg: Config, s: GameState): string {

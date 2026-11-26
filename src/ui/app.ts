@@ -8,6 +8,7 @@ import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
 import { QUESTS, CRAFTS, ENEMIES } from "../content/world";
 import { build, upgrade, dismantle, structure } from "../engine/engineering";
+import { callable, callMany, heroDef, ROLE_NAMES, afterBattle, hire as hireHero, buyHouse, found as foundVenture, upVenture, setWorker, collect as collectVenture, toggleParty, dismiss, assign as assignJob, recall as recallHero, VENTURES } from "../engine/estate";
 import { feed as petFeed, caress as petCaress, play as petPlay, rename as petRename, release as petRelease, sendHome as petSendHome, swapWithHome as petSwap, adopt as petAdopt, petType } from "../engine/pet";
 import { itemInfo, equip, unequip, drop, buy, bagOf, attachPouch, detachPouch, type InvTab } from "../engine/inventory";
 import type { GearSlot } from "../engine/gear";
@@ -19,11 +20,12 @@ import { startJourney, dueEvent, pauseJourney, resumeJourney, resolveEvent, fini
 import { makeScenario, DEFAULT_PLAN, foeWords, cap } from "../engine/combat";
 import { AMBUSH_MAP } from "../content/world";
 import { esc, ICONS } from "./sketch";
-import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, diyarScreen, gainList, alerts, type UiState } from "./screens";
+import { statusBar, defterScreen, vucutScreen, calisScreen, islerScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
 import { openPlan } from "./plan-view";
 import { openSiege } from "./siege-view";
 import { openStealth } from "./stealth-view";
+import { diyarScreen } from "./diyar-screen";
 import { openNobetHub, lootText } from "./nobet-view";
 import { rollFoes, bonusOf, modeOptions, stealthGoal, siegeFromFoes, groundOf, type Mode, type Context } from "../engine/encounter";
 import { addItem } from "../engine/inventory";
@@ -231,6 +233,18 @@ export function startApp(root: HTMLElement) {
       case "pet-release": modal(`<h2>Salıvermek istiyor musun?</h2><p style="margin:0">${esc(s.pet?.name ?? "")} doğaya döner; geri gelmez.</p>`, [{ label: "Salıver", cls: "red", fn: () => { petRelease(s); persist(); render(); } }, { label: "Vazgeç", fn: () => {} }]); break;
       case "pet-home": { const r = petSendHome(s); toast(r.ok ? "Evde bıraktın." : r.reason ?? ""); persist(); render(); break; }
       case "pet-swap": { const r = petSwap(s, +id); toast(r.text ?? r.reason ?? ""); persist(); render(); break; }
+      case "hire": { const r = hireHero(s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? `${heroDef(id)!.name} artık sana bağlı.` : r.reason ?? ""); persist(); render(); break; }
+      case "house": { const r = buyHouse(cfg, s); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? "Ev kurdun." : r.reason ?? ""); persist(); render(); break; }
+      case "diyartab": ui.diyarTab = id; sfx("page"); render(false); break;
+      case "house-up": { const r = buyHouse(cfg, s); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? "Evin hazır." : r.reason ?? ""); persist(); render(); break; }
+      case "venture-found": { const r = foundVenture(cfg, s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? "İşletme kuruldu." : r.reason ?? ""); persist(); render(); break; }
+      case "venture-up": { const r = upVenture(cfg, s, id); sfx(r.ok ? "good" : "bad"); toast(r.ok ? "Geliştirildi." : r.reason ?? ""); persist(); render(); break; }
+      case "venture-worker": { const [v, h] = id.split("|"); const r = setWorker(s, v, h || undefined); toast(r.ok ? "Tamam." : r.reason ?? ""); persist(); render(); break; }
+      case "venture-collect": { const r = collectVenture(cfg, s, id); sfx(r.ok ? "coin" : "bad"); toast(r.ok ? `${r.got} ${itemName(cfg, VENTURES.find(v => v.id === id)!.makes)} aldın${r.lost ? ` (${r.lost} tanesi sığmadı)` : ""}.` : "Ambar boş."); persist(); render(); break; }
+      case "hero-party": { const r = toggleParty(s, id); toast(r.ok ? "Tamam." : r.reason ?? ""); sfx(r.ok ? "tap" : "bad"); persist(); render(); break; }
+      case "hero-dismiss": modal(`<h2>${esc(heroDef(id)?.name ?? "")} terhis edilsin mi?</h2><p style="margin:0">Maaşı kesilir; geri gelmek için yeniden tutman gerekir.</p>`, [{ label: "Terhis et", cls: "red", fn: () => { dismiss(s, id); persist(); render(); } }, { label: "Vazgeç", fn: () => {} }]); break;
+      case "job-assign": { const [j, h] = id.split("|"); const r = assignJob(s, j, h); sfx(r.ok ? "good" : "bad"); toast(r.ok ? "Yola çıktı; sonucu yarın sabah görürsün." : r.reason ?? ""); persist(); render(); break; }
+      case "job-recall": recallHero(s, id); toast("Geri çağırdın."); persist(); render(); break;
       case "pet-adopt": { const r = petAdopt(s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.text ?? r.reason ?? ""); persist(); render(); break; }
       case "build": { const r = build(cfg, s, id); sfx(r.ok ? "thunk" : "bad"); if (r.ok) buzz("medium"); toast(r.ok ? `${structure(id)!.name} yapıldı.` : r.reason ?? ""); persist(); render(); break; }
       case "upgrade": { const r = upgrade(cfg, s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? `${structure(id)!.name} geliştirildi.` : r.reason ?? ""); persist(); render(); break; }
@@ -307,6 +321,7 @@ export function startApp(root: HTMLElement) {
     persist(); render(false); if (r.event) { sfx("hurt"); buzz("medium"); }
     modal(`<h2>Gün ${s.day - 1} bitti</h2><p class="lede">${esc(r.option.kind === "lodging" ? `Geceyi geçirdin: ${r.option.name}.` : r.option.kind === "tent" ? "Çadırda uyudun." : "Açıkta uyudun.")} ${rep.recovery < 0.75 ? "Tam dinlenemedin." : "Vücut gece çalıştı."}</p>
       ${r.event ? `<p class="story-after" style="border-color:var(--red)">${esc(r.event.text)}</p>` : ""}
+      ${r.estate.length ? `<h3>Diyar</h3>${r.estate.map(x => `<div class="note">${esc(x)}</div>`).join("")}` : ""}
       ${r.pet.length ? `<p class="hand blue" style="margin:0">${r.pet.map(esc).join(" ")}</p>` : ""}
       <h3>Gece işlenen</h3>${gainList(cfg, rep.applied, 8)}
       ${fin.length ? `<h3>Ortaklıklar</h3>${fin.map(l => `<div class="ledger-row"><small>${esc(l.partner)}</small><span>${esc(l.text)}</span><b class="${l.amount >= 0 ? "green" : "red"}">${l.amount ? `${l.amount > 0 ? "+" : ""}${l.amount}` : ""}</b></div>`).join("")}` : ""}`,
@@ -363,37 +378,54 @@ export function startApp(root: HTMLElement) {
         return;
         }
   /** Nasıl savaşacaksın: göğüs göğüse, barikat, gizlenme. Her karşılaşmada sorulur. */
-  function chooseMode(title: string, foes: string[], ctx: Context, pick: (m: Mode) => void, cancel?: () => void) {
+  const heroLinesHtml = (l: string[]) => l.length ? `<p class="hand blue" style="margin:0">${l.map(esc).join(" ")}</p>` : "";
+  function chooseMode(title: string, foes: string[], ctx: Context, pick: (m: Mode, called: string[]) => void, cancel?: () => void, place?: string) {
     const counts: Record<string, number> = {}; for (const f of foes) counts[f] = (counts[f] ?? 0) + 1;
     const who = Object.entries(counts).map(([k, n]) => `${n > 1 ? n + " " : ""}${ENEMIES[k]?.name ?? k}`).join(", ");
     const opts = modeOptions(s, foes, ctx);
+    const cl = place && ctx === "gorev" ? callable(s, place) : []; const sel = new Set<string>();
+    const callHtml = cl.length ? `<div class="callbox"><h3 style="margin:2px 0">Haber salla</h3><p class="tiny muted" style="margin:0">Evdeki adamlar yardıma gelebilir; yetişmeleri <b>${cl[0].eta} dk</b> sürer. Yanında olmayanı beklemezsen tek girersin.</p>
+      <div class="chips">${cl.map(c => `<button class="chip" data-call="${c.hero.id}" ${c.ok ? "" : "disabled"}>${esc(heroDef(c.hero.id)!.name)} · ${ROLE_NAMES[heroDef(c.hero.id)!.role]} sv.${c.hero.lv}</button>`).join("")}</div></div>` : "";
     const bg = document.createElement("div"); bg.className = "modal-bg";
     bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">${ctx === "yol" ? "Yolda" : "Karşılaşma"}${isNight(s) ? " · gece" : ""}</p><h2>${esc(title)}</h2>
       <p style="margin:0">Karşında: <b>${esc(who)}</b>.${isNight(s) ? ` <span class="red">Gece: daha kalabalık, daha tehlikeli; ödülü de fazla.</span>` : ""}</p>
+      ${callHtml}
       <h3 style="margin:4px 0 0">Nasıl karşılayacaksın?</h3>
       <div class="choices modes">${opts.map(o => `<button class="choice" data-m="${o.id}" ${o.ok ? "" : "disabled"}><b>${esc(o.name)}</b><span>${esc(o.desc)}</span><span class="muted tiny">${esc(o.reason ?? o.outcome)}</span></button>`).join("")}</div>
       ${cancel ? `<div class="row"><button class="btn" data-m="x">Vazgeç</button></div>` : ""}</div>`;
     document.body.appendChild(bg); sfx("page");
     bg.addEventListener("click", e => {
+      const cb = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-call]");
+      if (cb && !cb.disabled) { const id = cb.dataset.call!; if (sel.has(id)) sel.delete(id); else sel.add(id); cb.classList.toggle("on", sel.has(id)); sfx("tap"); return; }
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-m]"); if (!b || b.disabled) return;
-      bg.remove(); if (b.dataset.m === "x") { cancel?.(); return; } pick(b.dataset.m as Mode);
+      if (b.dataset.m !== "x" && sel.size && place) { const r = callMany(s, [...sel], place); if (!r.ok) { toast(r.reason ?? ""); return; } toast(`Haber gitti; adamlar ${r.minutes} dk sonra yetişti.`); persist(); render(); }
+      bg.remove(); if (b.dataset.m === "x") { cancel?.(); return; } pick(b.dataset.m as Mode, [...sel]);
     });
   }
   function doFight(id: string) {
         const q = QUESTS.find(x => x.id === id)!;
         if (s.energy < 15) { toast("Bu yorgunlukla savaşa giremezsin; dinlen."); return; }
-        const siegeEnd = (won: boolean, gains: Record<string, number>, foes?: string[]) => {
-          let extra = "";
+        const siegeEnd = (won: boolean, gains: Record<string, number>, foes?: string[], hs: string[] = []) => {
+          let extra = heroLinesHtml(afterBattle(s, hs, won ? "won" : "lost"));
           if (won) { const r = completeQuest(cfg, s, id, foes ? bonusOf(s, q.battle!.enemies, foes) : bonusOf(s, [], [])); extra = `<h3>Ödül</h3>${rewardHtml(r)}`; }
           persist(); render();
           modal(`<h2>${won ? "Savunma tuttu" : "Savunma düştü"}</h2><p class="lede">${won ? "Son dalga da çekildi." : "Geri çekilmek zorunda kaldın. Dinlen, kazıkları daha iyi yerleştir, yeniden dene."}</p>
             <h3>Savaşta gelişen</h3>${gainList(cfg, gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
         };
-        if (q.siege) { openSiege(cfg, s, SIEGES[q.siege], (s.seed + s.day * 31) | 0, (won, gains) => siegeEnd(won, gains), persist); return; }
+        if (q.siege) {
+          const cl = callable(s, q.at);
+          const go = (called: string[]) => openSiege(cfg, s, SIEGES[q.siege!], (s.seed + s.day * 31) | 0, (won, gains, hs) => siegeEnd(won, gains, undefined, hs), persist, called);
+          if (!cl.length) { go([]); return; }
+          const pickd = new Set<string>();
+          modal(`<p class="hand muted" style="margin:0">Savunma</p><h2>${esc(q.title)}</h2><p style="margin:0">Evdeki adamlara haber salmak ister misin? Yetişmeleri <b>${cl[0].eta} dk</b> sürer.</p><div class="chips">${cl.map(c => `<button class="chip" data-hid="${c.hero.id}" ${c.ok ? "" : "disabled"}>${esc(heroDef(c.hero.id)!.name)} · ${ROLE_NAMES[heroDef(c.hero.id)!.role]}</button>`).join("")}</div>`,
+            [{ label: "Haber salla ve başla", cls: "primary", fn: () => { const r = callMany(s, [...pickd], q.at); if (!r.ok) { toast(r.reason ?? ""); return; } if (r.minutes) { toast(`Adamlar ${r.minutes} dk sonra yetişti.`); persist(); render(); } go([...pickd]); } }, { label: "Tek gireyim", fn: () => go([]) }, { label: "Vazgeç", fn: () => {} }]);
+          document.querySelectorAll<HTMLButtonElement>("[data-hid]").forEach(b => b.addEventListener("click", () => { const i = b.dataset.hid!; if (pickd.has(i)) pickd.delete(i); else pickd.add(i); b.classList.toggle("on", pickd.has(i)); }));
+          return;
+        }
         const base = q.battle!.enemies; const foes = rollFoes(s, base, id);
         const W = foeWords(foes); const big = foes.find(e => (ENEMIES[e]?.scale ?? 1) > 1);
-        const battleEnd = (o: BattleOutcome) => {
-          let extra = "";
+        const battleEnd = (o: BattleOutcome, bt?: { units: { uid: string }[] }) => {
+          let extra = heroLinesHtml(afterBattle(s, (bt?.units ?? []).filter(u => u.uid.startsWith("h:")).map(u => u.uid.slice(2)), o.result === "won" ? "won" : o.result === "fled" ? "fled" : "lost"));
           if (o.result === "won") {
             const r = completeQuest(cfg, s, id, bonusOf(s, base, foes));
             if (Object.keys(r.dropped).length) toast("Çantan doluydu; bazı ödülleri taşıyamadın.");
@@ -405,9 +437,9 @@ export function startApp(root: HTMLElement) {
             <p class="lede">${o.result === "lost" ? (boss ? "Sürü seni inden kovaladı; köylüler seni yarı baygın buldu. Hazırlanmadan dönme." : home ? "Hasan seni yaralı hâlde bulup köye taşıdı. Dinlenmeden tekrar deneme." : "Yaralı hâlde sürünerek kurtuldun. Dinlenmeden, hazırlanmadan tekrar deneme.") : o.result === "fled" ? (big ? `Sağ çıktın. ${esc(ENEMIES[big].name)} seni artık tanıyor.` : `${esc(cap(W.pl))} hâlâ orada. Hazırlanıp tekrar dene.`) : boss ? "Kalan kurtlar uluyarak kuzeye kaçtı." : home ? "Hasan uzaktan izliyordu; koşarak geldi." : "Nefesin yerine geldi; geride sessizlik kaldı."}</p>
             <h3>Savaşta gelişen</h3>${gainList(cfg, o.gains, 6)}${extra}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
         };
-        chooseMode(q.title, foes, "gorev", mode => {
-          if (mode === "yakin") { openPlan(cfg, s, id, q.title, q.battle!.map, foes, (sc, plan) => openBattle(cfg, s, sc, plan, id, battleEnd, persist), () => { persist(); render(); }); return; }
-          if (mode === "barikat") { openSiege(cfg, s, siegeFromFoes(q.title, foes, groundOf(s.region, foes)), (s.seed + s.day * 31 + s.minute) | 0, (won, gains) => siegeEnd(won, gains, foes), persist); return; }
+        chooseMode(q.title, foes, "gorev", (mode, called) => {
+          if (mode === "yakin") { openPlan(cfg, s, id, q.title, q.battle!.map, foes, (sc, plan) => openBattle(cfg, s, sc, { ...plan, helpers: called }, id, battleEnd, persist), () => { persist(); render(); }); return; }
+          if (mode === "barikat") { openSiege(cfg, s, siegeFromFoes(q.title, foes, groundOf(s.region, foes)), (s.seed + s.day * 31 + s.minute) | 0, (won, gains, hs) => siegeEnd(won, gains, foes, hs), persist, called); return; }
           const goal = stealthGoal(foes, "gorev"); const night = isNight(s);
           openStealth(cfg, s, q.title, foes, goal, (s.seed * 7 + s.day * 131 + s.minute) | 0, night, (won, gains) => {
             persist(); render();
@@ -422,7 +454,7 @@ export function startApp(root: HTMLElement) {
               : `<h2>Görüldün!</h2><p class="lede">Bir dal çatırdadı; bakışlar sana döndü. Kaçacak yer yok.</p>${gainList(cfg, gains, 4)}`,
               [{ label: "Savaş", cls: "primary", fn: () => openBattle(cfg, s, sc, { ...DEFAULT_PLAN, surprise: won, ambushed: !won }, id, battleEnd, persist) }]);
           }, persist);
-        }, () => {});
+        }, () => {}, q.at);
   }
   /* ---------- yolculuk: her saniye ilerleme, sürpriz ve varış ---------- */
   let eventOpen = false;
@@ -449,14 +481,15 @@ export function startApp(root: HTMLElement) {
           const endModal = (head: string, text: string, gains: Record<string, number>) => { persist(); render(); modal(`<h2>${esc(head)}</h2><p class="lede">${esc(text)}</p>${gainList(cfg, gains, 5)}`, [{ label: "Yola devam", cls: "primary", fn: cont }]); };
           const melee = (plan = { ...DEFAULT_PLAN, ambushed: true }) => {
             const sc = makeScenario(s, AMBUSH_MAP, foes, "pusu" + s.day + s.minute);
-            openBattle(cfg, s, sc, plan, undefined, o => endModal(o.result === "won" ? (foes.length > 1 ? "Sürü dağıldı" : "Kurt kaçtı") : o.result === "fled" ? "Sıyrıldın" : "Yaralandın",
-              (o.result === "lost" ? "Kanayan kolunla yoluna devam ettin." : "Soluklanıp yoluna devam ettin.") + spoils(o.result === "won"), o.gains), persist);
+            openBattle(cfg, s, sc, plan, undefined, (o, bt) => { const hl = afterBattle(s, bt.units.filter(u => u.uid.startsWith("h:")).map(u => u.uid.slice(2)), o.result === "won" ? "won" : o.result === "fled" ? "fled" : "lost");
+              endModal(o.result === "won" ? (foes.length > 1 ? "Sürü dağıldı" : "Kurt kaçtı") : o.result === "fled" ? "Sıyrıldın" : "Yaralandın",
+              (o.result === "lost" ? "Kanayan kolunla yoluna devam ettin." : "Soluklanıp yoluna devam ettin.") + spoils(o.result === "won") + (hl.length ? " " + hl.join(" ") : ""), o.gains); }, persist);
           };
           chooseMode(due.def.title, foes, "yol", mode => {
             if (mode === "yakin") { melee(); return; }
             if (mode === "barikat") {
               openSiege(cfg, s, siegeFromFoes(due.def.title, foes, groundOf(s.region, foes)), (s.seed + s.day * 17 + s.minute) | 0,
-                (won, gains) => endModal(won ? "Atlattın" : "Yaralandın", (won ? "Kazıkların arkasında sabaha kadar dayandın; sonunda çekildiler." : "Kazıklar dağıldı; zar zor sıyrıldın.") + spoils(won), gains), persist);
+                (won, gains, hs) => { const hl = afterBattle(s, hs, won ? "won" : "lost"); endModal(won ? "Atlattın" : "Yaralandın", (won ? "Kazıkların arkasında sabaha kadar dayandın; sonunda çekildiler." : "Kazıklar dağıldı; zar zor sıyrıldın.") + spoils(won) + (hl.length ? " " + hl.join(" ") : ""), gains); }, persist);
               return;
             }
             openStealth(cfg, s, due.def.title, foes, "kacis", (s.seed * 3 + s.day * 53 + s.minute) | 0, night, (won, gains) => {

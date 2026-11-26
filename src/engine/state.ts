@@ -4,6 +4,7 @@ import type { Session } from "./session";
 import type { Journey } from "./journey";
 import { normalizeGear } from "./gear";
 import type { Pet } from "./pet";
+import type { Estate } from "./estate";
 
 export const SAVE_VERSION = 1;
 export const DAY_START_HOUR = 6;     // uyanış
@@ -57,7 +58,7 @@ export interface GameState {
   requests?: { day: number; ids: string[]; done: string[] };
   relics?: string[];                           // kadim eşyalar
   pet?: Pet; homePets?: Pet[];                   // evcil hayvan (yanında) ve evde yaşayanlar (engine/pet.ts)
-  estate?: { house?: number; homePlace?: string; [k: string]: unknown }; // Diyar: ev, işletme, adamlar (engine/estate.ts)
+  estate?: Estate;                               // Diyar: ev, işletme, adamlar (engine/estate.ts)
   market?: { day: number; sold: Record<string, number> };          // bugün ne sattın (fiyat düşer)
   partners?: Record<string, { amount: number; since: number; earned: number; acc?: number }>; // acc: henüz bütün bakıra varmamış pay // ortaklıklar
   yapi?: Record<string, { n: number; lv: number }>; // mühendislik: kalıcı yapılar (engine/engineering.ts)

@@ -15,6 +15,7 @@ import { weaponSet, totalArmor, hasBow } from "./gear";
 import { config } from "./config";
 import { barricadeCount, barricadeMul } from "./engineering";
 import { petMul } from "./pet";
+import { partyHeroes, heroOf, heroDef, heroStats } from "./estate";
 
 export const ARENA = { w: 100, h: 140 };
 const CX = ARENA.w / 2, CY = ARENA.h / 2;
@@ -37,6 +38,7 @@ export interface Siege {
   hp: number; maxHp: number; mana: number; maxMana: number; meleeCd: number; bowCd: number;
   budget: number; barricades: Barricade[]; foes: Foe[]; zones: Zone[]; arrows: Arrow[];
   pet?: { x: number; y: number; px: number; py: number; hp: number; max: number; cd: number; down?: boolean };
+  helpers: { id: string; name: string; role: string; x: number; y: number; cd: number; dmg: [number, number]; range: number }[];
   queue: { def: string; at: number; side: number }[];
   spellCd: Record<string, number>; seed: number; nextId: number; fx: SiegeFx[]; waveKills: number;
   stats: { kills: number; shots: number; arrowHits: number; melee: number; casts: number; castMastery: Record<string, number>; built: number; dmgTaken: number; petHits: number };
@@ -47,15 +49,18 @@ export interface Siege {
 export function weaponPower(s: GameState): number { return weaponSet(config, s).dmg; }
 /** Kaç barikat kurabilirsin: iki geçici kazık + atölyede yaptıkların (engine/engineering.ts). */
 export function barricadeBudget(s: GameState): number { return barricadeCount(s); }
-export function createSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number): Siege {
+export function createSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number, called: string[] = []): Siege {
   const mh = maxHp(cfg, s);
   if (s.mana < 0) s.mana = maxMana(cfg, s);
   const sg: Siege = {
     def, phase: "build", time: 0, wave: 0, hp: Math.max(1, Math.min(mh, s.hp || mh)), maxHp: mh, mana: s.mana, maxMana: maxMana(cfg, s),
-    meleeCd: 0, bowCd: 0, budget: barricadeBudget(s), barricades: [], foes: [], zones: [], arrows: [], queue: [],
+    meleeCd: 0, bowCd: 0, helpers: [], budget: barricadeBudget(s), barricades: [], foes: [], zones: [], arrows: [], queue: [],
     spellCd: {}, seed, nextId: 1, fx: [], waveKills: 0,
     stats: { kills: 0, shots: 0, arrowHits: 0, melee: 0, casts: 0, castMastery: {}, built: 0, dmgTaken: 0, petHits: 0 },
   };
+  const hids = [...new Set([...partyHeroes(s).map(h => h.id), ...called])].slice(0, 4);
+  hids.forEach((hid, i) => { const h = heroOf(s, hid), hd = heroDef(hid); if (!h || !hd) return; const st = heroStats(h); const a = Math.PI * (0.55 + i * 0.3);
+    sg.helpers.push({ id: hid, name: hd.name, role: hd.role, x: CX + Math.cos(a) * 12, y: CY + Math.sin(a) * 12, cd: 0.5 + i * 0.3, dmg: st.dmg, range: hd.role === "okcu" ? 46 : hd.role === "izci" ? 36 : 13 }); });
   if (s.pet) { const max = 14 + Math.floor(s.pet.bond / 5); sg.pet = { x: CX + 8, y: CY + 4, px: CX + 8, py: CY + 4, hp: max, max, cd: 0 }; }
   return sg;
 }
@@ -233,6 +238,15 @@ export function step(cfg: Config, s: GameState, sg: Siege, dt: number) {
   }
   sg.barricades = sg.barricades.filter(b => b.hp > 0);
   // köpek: noktasında bekler, yaklaşanı ısırır
+  // adamlar: rollerine göre vurur, iyileştirir ya da barikatı onarır
+  for (const h of sg.helpers) {
+    h.cd -= dt; if (h.cd > 0) continue;
+    if (h.role === "sifaci") { if (sg.hp < sg.maxHp) { sg.hp = Math.min(sg.maxHp, sg.hp + 2.5); h.cd = 2.2; sg.fx.push({ k: "hit", x: CX, y: CY - 6, dmg: -2, by: "kopek" } as SiegeFx); } else h.cd = 0.6; continue; }
+    if (h.role === "usta") { const b = sg.barricades.filter(q => q.hp < q.max).sort((x, y) => x.hp / x.max - y.hp / y.max)[0]; if (b) b.hp = Math.min(b.max, b.hp + 5); h.cd = 1.0; continue; }
+    const t = sg.foes.filter(f => Math.hypot(f.x - h.x, f.y - h.y) <= h.range + f.r).sort((x, y) => Math.hypot(x.x - h.x, x.y - h.y) - Math.hypot(y.x - h.x, y.y - h.y))[0];
+    if (!t) { h.cd = 0.25; continue; }
+    damage(sg, t, rng.int(h.dmg[0], h.dmg[1]), h.role === "okcu" || h.role === "izci" ? "ok" : "kilic"); h.cd = h.role === "okcu" ? 1.25 : 1.0;
+  }
   if (sg.pet && !sg.pet.down) {
     const pt = sg.pet; pt.cd = Math.max(0, pt.cd - dt);
     const t = sg.foes.filter(f => f.hp > 0 && !f.flee && Math.hypot(f.x - pt.px, f.y - pt.py) < 16).sort((a, b) => Math.hypot(a.x - pt.x, a.y - pt.y) - Math.hypot(b.x - pt.x, b.y - pt.y))[0];

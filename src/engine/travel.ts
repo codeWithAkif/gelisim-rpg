@@ -10,7 +10,7 @@ export const place = (id: string) => PLACES.find(p => p.id === id);
 export const here = (s: GameState): Place => place(s.location) ?? PLACES[0];
 const len = (pts: [number, number][]) => pts.slice(1).reduce((a, p, i) => a + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
 /** Harita birimi → dakika (yayladan meydana yaklaşık bir saat). */
-const MIN_PER_UNIT = 0.36;
+export const MIN_PER_UNIT = 0.36;
 
 /** Yer açık mı: bölüm kilidi olan yerler hikâyede o sayfaya ulaşınca açılır. */
 export function isOpen(p: Place, s?: GameState) { return !p.unlock || !!s?.story.reached.includes(p.unlock); }

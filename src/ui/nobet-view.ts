@@ -202,6 +202,8 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       else { const R = armed === "simsek" ? 14 : armed === "sarmasik" ? 18 : 26; g.beginPath(); g.arc(X(aim.x), Y(aim.y), R * scale, 0, 7); g.stroke(); g.fillStyle = "rgba(158,52,35,.08)"; g.fill(); }
       g.setLineDash([]);
     }
+    // adamlar kulenin çevresinde
+    for (const h of n.helpers) { const hx = TOWER.x + Math.cos(h.a) * 11, hy = TOWER.y + Math.sin(h.a) * 8 + 4; figure("poz_kahraman_durus", hx, hy, 9, Math.cos(h.a) < 0, ENEMIES["h_" + h.role]?.tint ?? "none"); }
     // kule ve sen
     tower();
     if (!figure(n.fireCd > 1 / n.rate - 0.12 ? "poz_kahraman_vurus" : "poz_kahraman_durus", TOWER.x, TOWER.y - 1.5, 13, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(TOWER.x), Y(TOWER.y - 4), 2.5 * scale, 0, 7); g.fill(); }
