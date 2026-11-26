@@ -71,6 +71,21 @@ kalan süre görünür. Bu arada Defter, Vücut, Çanta ve Harita'ya bakılabili
 savaşmak, uyumak, yemek) çalışmanın bitmesini bekler. Uygulama kapalıyken de süre işler, bitince bildirim gelir.
 Odak turları isteğe bağlı bir ikramdır: en çok ×1,5.
 
+## Ölçer işi (prototip)
+
+Annenin büyüsü "dua değil hesap": `src/engine/olcer.ts`. Küçük bir ısı ağında her hamle bir birim ısıyı
+yolla bağlı komşuya taşır; **toplam ısı hiç değişmez**. Bazı yerlerin ısısı ölçülmeden görünmez; ölçmeden
+boş bir yerden taşımaya kalkan hamlesini boşa harcar. "Soğuk çeken taş" her iki hamlede bir en sıcak
+komşusundan ısı alır: ısı kaybolmaz, bir yere toplanır (Soğuk Ocak'ın küçük bir habercisi).
+
+- Yer: köy meydanı, annenin defterinden ilk sayfa öğrenilince ("Annemin işi" tanıtımı).
+- Üç iş: Donmuş pınar (5 hamle), Ağılın gecesi (6), Soğuk çeken taş (9). Her biri temel karakterle tam
+  bütçede çözülür, bir eksikle çözülmez (testte çözücüyle kanıtlı).
+- Karakter: odak her 20 puanda +1 hamle, analiz her 15 puanda +1 ölçüm.
+- Kazanç: analiz, odak, mana, ateş; ilk çözümde Taşpınar'da güven +1.
+
+Sonraki adım (karar bekliyor): bu kural savaşa ve Soğuk Ocak bölümüne taşınacak mı, mevcut büyü kartlarının yerine mi geçecek?
+
 ## Dondurma kuralı
 
 Bu kararlar yürürlükteyken yeni mod, yeni kart sistemi ya da kalıcı güçlenme eklenmez. Yapılan işler:
