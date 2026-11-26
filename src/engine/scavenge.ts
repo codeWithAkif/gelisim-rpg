@@ -11,14 +11,18 @@ import { maxHp } from "./combat";
 import { Rng } from "./rng";
 import { ENEMIES } from "../content/world";
 import { addItem, removeItem } from "./inventory";
-import { weaponSet, hasBow, totalArmor } from "./gear";
+import { weaponSet, hasBow, totalArmor, slotsFor } from "./gear";
+import { spellOptions } from "./magic";
+import { SPELL_KIND, type SpellKind } from "./nobet";
+import { trapsOwned, trapEffect } from "./engineering";
+import { petMul } from "./pet";
 
 export const SW = 300;                 // yapının genişliği (birim)
 export const EXIT_X = 8;               // çıkış, zemin katın solunda
 export const LADDER_XS = [250, 50];    // 0→1 ve 1→2 merdivenlerinin yeri
 export const ladderX = (gap: number) => LADDER_XS[gap % 2];
 
-interface LootEntry { item?: string; money?: [number, number]; w: number; n?: [number, number] }
+interface LootEntry { item?: string; money?: [number, number]; weapon?: boolean; w: number; n?: [number, number] }
 export interface ScavSite {
   place: string; name: string; desc: string; floors: number; foes: string[]; spotsPerFloor: number;
   names: string[]; loot: LootEntry[]; unlock: (s: GameState) => string | null;
@@ -27,15 +31,15 @@ const done = (s: GameState, q: string) => (s.quests[q]?.count ?? 0) > 0 || s.que
 export const SCAV_SITES: ScavSite[] = [
   { place: "koru", name: "Yıkık avcı kulübesi", desc: "Korunun derinliğinde, çökmüş bir kulübe. İçinde eski avcıların bıraktıkları olabilir.", floors: 2, foes: ["kurt"], spotsPerFloor: 3,
     names: ["Sandık", "Yatak altı", "Raf", "Çuval", "Ocak yanı"],
-    loot: [{ item: "deri", w: 4 }, { item: "ok", w: 4, n: [2, 4] }, { item: "ip", w: 3 }, { item: "kekik", w: 2, n: [1, 2] }, { item: "ekmek", w: 2 }, { money: [1, 3], w: 3 }, { item: "eski_sikke", w: 1 }],
+    loot: [{ item: "deri", w: 4 }, { item: "ok", w: 4, n: [2, 4] }, { item: "ip", w: 3 }, { item: "kekik", w: 2, n: [1, 2] }, { item: "ekmek", w: 2 }, { money: [1, 3], w: 3 }, { item: "eski_sikke", w: 1 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "kurt") ? null : "Önce Hasan'ın kurt derdine yardım et" },
   { place: "karacam_sarnic", name: "Sarnıç mahzeni", desc: "Nemli taş katlar, aşağıya inen merdivenler. Eski depolar boş değil.", floors: 3, foes: ["haydut", "kurt"], spotsPerFloor: 3,
     names: ["Fıçı", "Dolap", "Sandık", "Kasa", "Taş niş"],
-    loot: [{ item: "demir_parca", w: 4, n: [1, 2] }, { item: "ok", w: 3, n: [2, 5] }, { item: "ip", w: 3 }, { item: "peynir", w: 2 }, { item: "deri", w: 2 }, { money: [2, 6], w: 4 }, { item: "eski_sikke", w: 2 }],
+    loot: [{ item: "demir_parca", w: 4, n: [1, 2] }, { item: "ok", w: 3, n: [2, 5] }, { item: "ip", w: 3 }, { item: "peynir", w: 2 }, { item: "deri", w: 2 }, { money: [2, 6], w: 4 }, { item: "eski_sikke", w: 2 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "sarnic") ? null : "Önce Selim'in sarnıç işini bitir" },
   { place: "ardic_kul", name: "Yanık evler", desc: "Kül Yangını'ndan kalan üç katlı yıkık bir ev. Isı hâlâ burada gibi.", floors: 3, foes: ["muhafiz", "haydut"], spotsPerFloor: 3,
     names: ["Kömürleşmiş sandık", "Dolap", "Yatak", "Kasa", "Soba dibi"],
-    loot: [{ item: "demir_parca", w: 3, n: [1, 3] }, { item: "ok", w: 3, n: [3, 6] }, { item: "peynir", w: 2 }, { item: "ekmek", w: 2 }, { item: "deri", w: 2 }, { money: [4, 10], w: 5 }, { item: "eski_sikke", w: 2 }, { item: "kartal_tuyu", w: 1 }],
+    loot: [{ item: "demir_parca", w: 3, n: [1, 3] }, { item: "ok", w: 3, n: [3, 6] }, { item: "peynir", w: 2 }, { item: "ekmek", w: 2 }, { item: "deri", w: 2 }, { money: [4, 10], w: 5 }, { item: "eski_sikke", w: 2 }, { item: "kartal_tuyu", w: 1 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "kul_ana") ? null : "Önce Kül Ana'yı dinle" },
 ];
 export const scavSite = (place: string) => SCAV_SITES.find(x => x.place === place);
@@ -62,52 +66,133 @@ export const SCARDS: SCard[] = [
   { id: "sessiz", name: "Sessiz ayak", desc: "Sıradaki baskın 10 sn gecikir (her seçişte).", max: 3 },
 ];
 
+/* ---------- bulunan silahlar ---------- */
+export interface FoundWeapon { id: string; name: string; kind: "melee" | "bow"; dmg: number; parts: string[] }
+export const FOUND_WEAPONS: FoundWeapon[] = [
+  { id: "pasli_kilic", name: "Paslı kılıç", kind: "melee", dmg: 9, parts: ["demir_parca"] },
+  { id: "eski_mizrak", name: "Eski mızrak", kind: "melee", dmg: 8, parts: ["odun", "demir_parca"] },
+  { id: "civili_sopa", name: "Çivili sopa", kind: "melee", dmg: 7, parts: ["odun", "demir_parca"] },
+  { id: "kemik_balta", name: "Kemik saplı balta", kind: "melee", dmg: 11, parts: ["demir_parca", "odun"] },
+  { id: "avci_yayi", name: "Eski avcı yayı", kind: "bow", dmg: 9, parts: ["odun", "ip"] },
+  { id: "kisa_yay", name: "Kısa kompozit yay", kind: "bow", dmg: 12, parts: ["odun", "ip", "deri"] },
+];
+
+/* ---------- başlangıç seçimi: yalnız TEK şey götürürsün ---------- */
+export type LoadKind = "yumruk" | "melee" | "bow" | "dog" | "trap" | "spell";
+export interface Loadout { kind: LoadKind; id?: string }
+export interface LoadOption { kind: LoadKind; id?: string; label: string; note: string }
+export const hasBowItem = (s: GameState) => !!s.equipped.bow || Object.keys(s.inventory).some(id => (s.inventory[id] ?? 0) > 0 && slotsFor(id).includes("bow"));
+export function loadoutOptions(cfg: Config, s: GameState): LoadOption[] {
+  const out: LoadOption[] = [];
+  const ids = new Set<string>(); if (s.equipped.weapon) ids.add(s.equipped.weapon);
+  for (const id of Object.keys(s.inventory)) if ((s.inventory[id] ?? 0) > 0 && slotsFor(id).includes("weapon")) ids.add(id);
+  for (const id of ids) { const d = weaponSet(cfg, { ...s, equipped: { weapon: id } } as GameState); out.push({ kind: "melee", id, label: d.name, note: `yakın dövüş · vuruş ${+d.dmg.toFixed(1)}${s.equipped.weapon === id ? " · elinde" : ""}` }); }
+  if (hasBowItem(s)) { const ok = Math.min(12, s.inventory.ok ?? 0); out.push({ kind: "bow", label: "Yay", note: ok ? `uzaktan · ${ok} ok` : "okun yok; kutulardan ok bulursan atarsın" }); }
+  if (s.pet) out.push({ kind: "dog", label: s.pet.name, note: "arada koşup düşmanla dövüşür" });
+  for (const tp of trapsOwned(s)) out.push({ kind: "trap", id: tp.id, label: `Tuzak: ${tp.id.replace(/_/g, " ")}`, note: `${Math.min(3, tp.n)} tane taşırsın; tetiklenince dolana kadar bekler` });
+  for (const o of spellOptions(cfg, { ...s, mana: 999 } as GameState)) if (o.ok && SPELL_KIND[o.spell.id]) out.push({ kind: "spell", id: o.spell.id, label: o.spell.name, note: "büyü; her kullanımdan sonra dolması gerekir" });
+  return out;
+}
+export function defaultLoadout(cfg: Config, s: GameState): Loadout {
+  const o = loadoutOptions(cfg, s); const eq = o.find(x => x.kind === "melee" && x.id === s.equipped.weapon) ?? o.find(x => x.kind === "bow") ?? o[0];
+  return eq ? { kind: eq.kind, id: eq.id } : { kind: "yumruk" };
+}
+
 /* ---------- durum ---------- */
-export interface Spot { id: number; x: number; floor: number; name: string; done: boolean; prog: number }
-export interface SFoe { id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number }
+export interface Stage { kind: "empty" | "item" | "money" | "weapon"; item?: string; n?: number; money?: number; weapon?: string; time: number }
+export interface Spot { id: number; x: number; floor: number; name: string; stages: Stage[]; stage: number; prog: number; done: boolean }
+export interface SFoe { id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
 export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
-  | { k: "hurt"; dmg: number } | { k: "raid"; n: number } | { k: "card" } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number } | { k: "spot"; x: number; floor: number };
-export interface Target { x: number; floor: number; spot?: number; exit?: boolean }
+  | { k: "hurt"; dmg: number } | { k: "raid"; n: number } | { k: "card" } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
+  | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
+export interface TrapSlot { id: string; state: "hand" | "placed" | "cool"; x: number; floor: number; t: number }
+export interface Dog { x: number; floor: number; state: "yanda" | "av" | "don"; t: number; cd: number; moving: boolean; face: 1 | -1; lag: number }
 export interface Scav {
-  site: ScavSite; seed: number; rng: Rng; time: number; phase: "play" | "card" | "over"; result?: "exit" | "dead";
-  px: number; floor: number; face: 1 | -1; hp: number; maxHp: number; target: Target | null; climb: { t: number; to: number } | null;
-  spots: Spot[]; foes: SFoe[]; nextId: number; wave: number; raidT: number;
-  bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoMax: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number;
-  armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[]; searchT: number;
+  site: ScavSite; seed: number; rng: Rng; time: number; phase: "play" | "card" | "over"; result?: "exit" | "dead"; load: Loadout;
+  px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
+  spots: Spot[]; searchId: number; foes: SFoe[]; nextId: number; wave: number; raidT: number;
+  bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
+  foundWeapons: string[]; armor: number; cards: Record<string, number>; offer: string[]; rerolls: number; searched: number; nextCard: number; shots: number; kills: number; found: number; fx: SFx[];
+  traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number };
 }
 const bagCount = (n: Scav) => Object.values(n.bag).reduce((a, b) => a + b, 0);
 export const bagUsed = bagCount;
 export const speedOf = (n: Scav) => 22 * (1 + (n.cards.hafif_adim ?? 0) * 0.12);
-export const searchTime = (n: Scav) => 2.6 * Math.pow(0.75, n.cards.cevik_el ?? 0);
+export const CLIMB_SPEED = 0.5;      // kat/sn
+export const SPOT_STAGES = 3;
+/** Çıkacak şey basitse hızlı, değerliyse yavaş aranır. */
+function stageTime(e: LootEntry | null, money?: number): number {
+  if (!e) return 0.9; if (e.weapon) return 4.6; if (e.money) return (money ?? 0) <= 3 ? 1.2 : 2.2;
+  return e.w >= 4 ? 1.3 : e.w >= 3 ? 1.9 : e.w >= 2 ? 2.7 : 4.0;
+}
+function rollStage(site: ScavSite, rng: Rng): Stage {
+  if (rng.chance(12)) return { kind: "empty", time: stageTime(null) };
+  const total = site.loot.reduce((a, e) => a + e.w, 0); let q = rng.next() * total; let pick = site.loot[0];
+  for (const e of site.loot) { q -= e.w; if (q <= 0) { pick = e; break; } }
+  if (pick.weapon) return { kind: "weapon", weapon: FOUND_WEAPONS[rng.int(0, FOUND_WEAPONS.length - 1)].id, time: stageTime(pick) };
+  if (pick.money) { const m = rng.int(pick.money[0], pick.money[1]); return { kind: "money", money: m, time: stageTime(pick, m) }; }
+  return { kind: "item", item: pick.item, n: pick.n ? rng.int(pick.n[0], pick.n[1]) : 1, time: stageTime(pick) };
+}
+export const searchMul = (n: Scav) => Math.pow(0.75, n.cards.cevik_el ?? 0);
+export const stageSeconds = (n: Scav, sp: Spot) => sp.stages[sp.stage] ? sp.stages[sp.stage].time * searchMul(n) : 0;
 
-export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: number): Scav {
+export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: number, load: Loadout = defaultLoadout(cfg, s)): Scav {
   const rng = new Rng(seed); const spots: Spot[] = []; let id = 1;
   for (let f = 0; f < site.floors; f++) {
     const xs: number[] = [];
     for (let k = 0; k < site.spotsPerFloor; k++) {
       let x = 0; for (let t = 0; t < 30; t++) { x = 30 + rng.next() * 240; if (xs.every(q => Math.abs(q - x) > 36) && LADDER_XS.every(l => Math.abs(l - x) > 22)) break; }
-      xs.push(x); spots.push({ id: id++, x, floor: f, name: site.names[rng.int(0, site.names.length - 1)], done: false, prog: 0 });
+      xs.push(x); spots.push({ id: id++, x, floor: f, name: site.names[rng.int(0, site.names.length - 1)], stages: Array.from({ length: SPOT_STAGES }, () => rollStage(site, rng)), stage: 0, prog: 0, done: false });
     }
   }
-  const mh = maxHp(cfg, s); const ws = weaponSet(cfg, s); const lv = (a: string) => s.attrs[a]?.level ?? 0; const bow = hasBow(s);
-  const arrows = Math.min(12, s.inventory.ok ?? 0);
+  const mh = maxHp(cfg, s); const lv = (a: string) => s.attrs[a]?.level ?? 0; const fist = 2 + lv("ust_govde") / 10;
+  let melee = fist, weaponName = "Yumruk", bow = false, ammo = 0; const traps: TrapSlot[] = []; let dog: Dog | undefined; let spell: Scav["spell"];
+  if (load.kind === "melee" && load.id) { const d = weaponSet(cfg, { ...s, equipped: { weapon: load.id } } as GameState); melee = d.dmg + lv("ust_govde") / 10; weaponName = d.name; }
+  if (load.kind === "bow") { bow = true; ammo = Math.min(12, s.inventory.ok ?? 0); weaponName = "Yay"; }
+  if (load.kind === "dog" && s.pet) dog = { x: EXIT_X + 10, floor: 0, state: "yanda", t: 12, cd: 0, moving: false, face: 1, lag: 0 };
+  if (load.kind === "trap" && load.id) { const own = trapsOwned(s).find(x => x.id === load.id); for (let i = 0; i < Math.min(3, own?.n ?? 0); i++) traps.push({ id: load.id, state: "hand", x: 0, floor: 0, t: 0 }); }
+  if (load.kind === "spell" && load.id) { const o = spellOptions(cfg, { ...s, mana: 999 } as GameState).find(x => x.spell.id === load.id && x.ok); const info = SPELL_KIND[load.id];
+    if (o && info) { const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0; spell = { id: load.id, kind: info.kind, name: o.spell.name, cd: 4, max: info.cd * Math.max(0.6, 1 - m / 120), mul: info.mul * (1 + m / 100), r: info.r }; } }
   return {
-    site, seed, rng, time: 0, phase: "play", px: EXIT_X + 6, floor: 0, face: 1, hp: Math.max(1, s.hp || mh), maxHp: mh, target: null, climb: null, spots, foes: [], nextId: 1, wave: 0, raidT: 55,
-    bag: {}, bagCap: 8, money: 0, ammo: bow ? arrows : 0, ammoMax: arrows, bow: bow && arrows > 0, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee: ws.dmg + lv("ust_govde") / 10, rate: 0.9 + lv("refleks") / 80,
-    atkCd: 0, atkFx: 0, armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [], searchT: 0,
+    site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, s.hp || mh), maxHp: mh,
+    spots, searchId: 0, foes: [], nextId: 1, wave: 0, raidT: 45, bag: {}, bagCap: 8, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
+    atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], armor: totalArmor(s), cards: {}, offer: [], rerolls: 2, searched: 0, nextCard: 2, shots: 0, kills: 0, found: 0, fx: [],
+    traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
 }
 
 /* ---------- komutlar ---------- */
-/** Bir yere yürü (kat farklıysa önce merdivene). */
-export function goTo(n: Scav, x: number, floor: number) { if (n.phase !== "play") return; n.target = { x: Math.max(0, Math.min(SW, x)), floor: Math.max(0, Math.min(n.site.floors - 1, floor)) }; }
-export function goToSpot(n: Scav, id: number) { const sp = n.spots.find(q => q.id === id); if (!sp || sp.done || n.phase !== "play") return; n.target = { x: sp.x, floor: sp.floor, spot: id }; }
-export function goToExit(n: Scav) { if (n.phase !== "play") return; n.target = { x: EXIT_X, floor: 0, exit: true }; }
-export const atExit = (n: Scav) => n.floor === 0 && n.px <= EXIT_X + 3;
-
-/** Çıkışta çıkarsın: bulduklarını götürürsün. */
+export function setInput(n: Scav, dx: number, dy: number) { n.input = { dx: Math.max(-1, Math.min(1, dx)), dy: Math.max(-1, Math.min(1, dy)) }; }
+export const atExit = (n: Scav) => !n.climbing && n.floor === 0 && n.px <= EXIT_X + 3;
 export function leave(n: Scav): boolean { if (!atExit(n) || n.phase === "over") return false; n.phase = "over"; n.result = "exit"; return true; }
+/** Yakındaki (±8 birim) bitmemiş arama noktası. */
+export function nearSpot(n: Scav): Spot | undefined {
+  if (n.climbing) return undefined;
+  return n.spots.filter(q => !q.done && q.floor === n.floor && Math.abs(q.x - n.px) <= 8).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
+}
+export function beginSearch(n: Scav): boolean { const sp = nearSpot(n); if (!sp || n.phase !== "play") return false; n.searchId = sp.id; n.px = sp.x; return true; }
+export function placeTrap(n: Scav): boolean {
+  const tr = n.traps.find(q => q.state === "hand"); if (!tr || n.phase !== "play" || n.climbing) return false;
+  tr.state = "placed"; tr.x = n.px; tr.floor = n.floor; return true;
+}
+export const trapsInHand = (n: Scav) => n.traps.filter(q => q.state === "hand").length;
+export const TRAP_RECHARGE = 25;
+export function castSpell(n: Scav): boolean {
+  const sp = n.spell; if (!sp || sp.cd > 0 || n.phase !== "play") return false;
+  const R = sp.r * 2.4; const hits = n.foes.filter(f => f.floor === n.floor && f.climbT <= 0 && Math.abs(f.x - n.px) <= R);
+  if (!hits.length && sp.kind !== "kilic") return false;
+  sp.cd = sp.max; const base = n.dmg * sp.mul;
+  for (const f of hits) {
+    if (sp.kind === "ates") f.burn = Math.max(f.burn, 4);
+    if (sp.kind === "buz" || sp.kind === "sarmasik") f.root = Math.max(f.root, 3.5);
+    if (sp.kind === "camur") f.slow = Math.max(f.slow, 5);
+    if (sp.kind === "karga") f.root = Math.max(f.root, 2.5);
+    if (sp.kind === "kilic") f.root = Math.max(f.root, 2);
+    hurtFoe(n, f, base, false);
+  }
+  n.fx.push({ k: "spell", kind: sp.kind, x: n.px, floor: n.floor, r: R }); return true;
+}
 
 export function rerollScav(n: Scav): boolean {
   if (n.phase !== "card" || n.rerolls <= 0) return false;
@@ -121,29 +206,29 @@ export function pickScavCard(n: Scav, id: string): boolean {
   if (n.phase !== "card" || !n.offer.includes(id)) return false;
   n.cards[id] = (n.cards[id] ?? 0) + 1; n.offer = []; n.phase = "play";
   if (id === "genis_cep") n.bagCap += 3;
-  if (id === "dolu_sadak") { n.ammoMax += 6; n.ammo += 6; }
+  if (id === "dolu_sadak") { n.ammo += 6; }
   if (id === "keskin_el") { n.dmg *= 1.15; n.melee *= 1.15; }
   if (id === "demir_ten") { const add = Math.round(n.maxHp * 0.15); n.maxHp += add; n.hp = Math.min(n.maxHp, n.hp + add + 4); }
   if (id === "sessiz") n.raidT += 10;
   return true;
 }
 
-/* ---------- arama ve baskın ---------- */
-function rollLoot(n: Scav, sp: Spot) {
-  const rolls = 1 + (n.rng.chance(Math.min(80, (n.cards.sans_eli ?? 0) * 20)) ? 1 : 0);
-  let any = false;
-  for (let r = 0; r < rolls; r++) {
-    if (r === 0 && n.rng.chance(12)) continue;                                  // bazı yerler boş çıkar
-    const total = n.site.loot.reduce((a, e) => a + e.w, 0); let q = n.rng.next() * total; let pick = n.site.loot[0];
-    for (const e of n.site.loot) { q -= e.w; if (q <= 0) { pick = e; break; } }
-    if (pick.money) { const m = n.rng.int(pick.money[0], pick.money[1]); n.money += m; n.fx.push({ k: "loot", text: `+${m} bakır`, x: sp.x, floor: sp.floor }); any = true; }
-    else if (pick.item) {
-      const c = pick.n ? n.rng.int(pick.n[0], pick.n[1]) : 1; let got = 0;
-      for (let i = 0; i < c; i++) { if (bagCount(n) >= n.bagCap) { n.fx.push({ k: "full", x: sp.x, floor: sp.floor }); break; } n.bag[pick.item] = (n.bag[pick.item] ?? 0) + 1; got++; }
-      if (got) { n.fx.push({ k: "loot", text: `+${got} ${pick.item}`, x: sp.x, floor: sp.floor }); any = true; n.found += got; }
-    }
+/* ---------- arama, silah, baskın ---------- */
+function applyStage(n: Scav, sp: Spot, st: Stage) {
+  const at = { x: sp.x, floor: sp.floor };
+  if (st.kind === "empty") { n.fx.push({ k: "loot", text: "boş", ...at }); return; }
+  if (st.kind === "money") { n.money += st.money ?? 0; n.fx.push({ k: "loot", text: `+${st.money} bakır`, ...at }); return; }
+  if (st.kind === "weapon") {
+    const w = FOUND_WEAPONS.find(x => x.id === st.weapon)!;
+    if (w.kind === "melee") { if (w.dmg > n.melee) { n.melee = w.dmg * (1 + (n.cards.keskin_el ?? 0) * 0.15); n.weaponName = w.name; } }
+    else if (!n.bow) { n.bow = true; n.dmg = Math.max(n.dmg, w.dmg); n.ammo += 6; n.weaponName = w.name; }
+    else n.dmg = Math.max(n.dmg, w.dmg);
+    n.foundWeapons.push(w.id); n.fx.push({ k: "weapon", name: w.name, ...at }); return;
   }
-  if (!any) n.fx.push({ k: "loot", text: "boş", x: sp.x, floor: sp.floor });
+  const c = st.n ?? 1; const id = st.item!;
+  if (id === "ok" && n.bow) { n.ammo += c; n.fx.push({ k: "loot", text: `+${c} ok`, ...at }); n.found += c; return; }
+  let got = 0; for (let i = 0; i < c; i++) { if (bagCount(n) >= n.bagCap) { n.fx.push({ k: "full", ...at }); break; } n.bag[id] = (n.bag[id] ?? 0) + 1; got++; }
+  if (got) { n.found += got; n.fx.push({ k: "loot", text: `+${got} ${id}`, ...at }); }
 }
 export const danger = (n: Scav) => 5 + n.wave * 2;
 function spawnRaid(n: Scav) {
@@ -151,59 +236,103 @@ function spawnRaid(n: Scav) {
   for (let i = 0; i < count; i++) {
     const def = n.site.foes[n.rng.int(0, n.site.foes.length - 1)]; const d = ENEMIES[def];
     const floor = n.rng.chance(60) ? n.floor : n.rng.int(0, n.site.floors - 1); const x = n.rng.chance(50) ? SW - 4 - n.rng.next() * 10 : 12 + n.rng.next() * 30;
-    n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale, max: d.hp * scale, speed: 8 + (d.move ?? 4) * 1.6 + n.rng.next() * 3, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 0.8, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0 });
+    n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale, max: d.hp * scale, speed: 8 + (d.move ?? 4) * 1.6 + n.rng.next() * 3, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 0.8, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
-  n.raidT = Math.max(28, 52 - n.wave * 3); n.fx.push({ k: "raid", n: count });
+  n.raidT = Math.max(25, 48 - n.wave * 3); n.fx.push({ k: "raid", n: count });
 }
-function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean) {
-  f.hp -= dmg; f.hitT = 0.2; n.fx.push({ k: "hit", x: f.x, floor: f.floor, dmg: Math.round(dmg), crit });
-  if (f.hp <= 0) { n.foes = n.foes.filter(q => q !== f); n.kills++; n.fx.push({ k: "die", x: f.x, floor: f.floor }); }
+function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean, quiet = false) {
+  f.hp -= dmg; f.hitT = 0.2; if (!quiet) n.fx.push({ k: "hit", x: f.x, floor: f.floor, dmg: Math.round(dmg), crit });
+  if (f.hp <= 0 && n.foes.includes(f)) { n.foes = n.foes.filter(q => q !== f); n.kills++; n.fx.push({ k: "die", x: f.x, floor: f.floor }); }
 }
 
 /** Zamanı ilerlet. */
 export function stepScav(n: Scav, dt: number) {
   if (n.phase !== "play") return; dt = Math.min(dt, 0.05); n.time += dt; n.atkFx = Math.max(0, n.atkFx - dt);
-  // baskın sayacı
   n.raidT -= dt; if (n.raidT <= 0) spawnRaid(n);
-  // oyuncu hareketi
-  if (n.climb) { n.climb.t -= dt; if (n.climb.t <= 0) { n.floor = n.climb.to; n.climb = null; } }
-  else if (n.target) {
-    const t = n.target;
-    if (t.floor !== n.floor) {
-      const gap = t.floor > n.floor ? n.floor : n.floor - 1; const lx = ladderX(gap); const d = lx - n.px;
-      if (Math.abs(d) > 1) { const st = Math.min(Math.abs(d), speedOf(n) * dt); n.px += Math.sign(d) * st; n.face = d > 0 ? 1 : -1; }
-      else { n.px = lx; n.climb = { t: 1.1 / (1 + (n.cards.hafif_adim ?? 0) * 0.12), to: t.floor > n.floor ? n.floor + 1 : n.floor - 1 }; }
+  if (n.spell) n.spell.cd = Math.max(0, n.spell.cd - dt);
+  // yönlendirme
+  const { dx, dy } = n.input; const moveIn = Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2; n.moving = false;
+  if (moveIn && n.searchId) n.searchId = 0;
+  const onLadder = Math.abs(n.py - Math.round(n.py)) > 0.02;
+  if (!n.searchId) {
+    if (onLadder) {
+      const gap = Math.floor(n.py); n.px = ladderX(gap);
+      if (Math.abs(dy) > 0.25) n.py = Math.max(gap, Math.min(gap + 1, n.py - Math.sign(dy) * CLIMB_SPEED * dt * (1 + (n.cards.hafif_adim ?? 0) * 0.12)));
+      if (Math.abs(n.py - Math.round(n.py)) <= 0.02) n.py = Math.round(n.py);
     } else {
-      const d = t.x - n.px;
-      if (Math.abs(d) > 1) { const st = Math.min(Math.abs(d), speedOf(n) * dt); n.px += Math.sign(d) * st; n.face = d > 0 ? 1 : -1; }
-      else if (!t.spot && !t.exit) n.target = null;
+      if (Math.abs(dx) > 0.2) { n.px = Math.max(0, Math.min(SW, n.px + dx * speedOf(n) * dt)); n.face = dx > 0 ? 1 : -1; n.moving = true; }
+      if (Math.abs(dy) > 0.25) {
+        const up = dy < 0; const gap = up ? n.floor : n.floor - 1;
+        if (gap >= 0 && gap < n.site.floors - 1 && Math.abs(n.px - ladderX(gap)) <= 6) { n.px = ladderX(gap); n.py = n.floor + (up ? 0.04 : -0.04); }
+      }
     }
   }
+  n.climbing = Math.abs(n.py - Math.round(n.py)) > 0.02; n.floor = Math.round(n.py); if (n.climbing) n.moving = false;
   // arama
-  const tsp = n.target?.spot ? n.spots.find(q => q.id === n.target!.spot) : undefined;
-  if (tsp && !tsp.done && !n.climb && tsp.floor === n.floor && Math.abs(tsp.x - n.px) <= 2) {
-    n.searchT = tsp.id; tsp.prog += dt / searchTime(n);
-    if (tsp.prog >= 1) { tsp.done = true; tsp.prog = 1; n.searched++; n.target = null; n.searchT = 0; n.fx.push({ k: "spot", x: tsp.x, floor: tsp.floor }); rollLoot(n, tsp); if (n.searched >= n.nextCard) { n.nextCard += 3; offerCards(n); } }
-  } else n.searchT = 0;
+  if (n.searchId) {
+    const sp = n.spots.find(q => q.id === n.searchId);
+    if (!sp || sp.done || n.climbing) n.searchId = 0;
+    else {
+      sp.prog += dt / Math.max(0.3, stageSeconds(n, sp));
+      if (sp.prog >= 1) {
+        const st = sp.stages[sp.stage]; sp.stage++; sp.prog = 0; applyStage(n, sp, st); n.fx.push({ k: "spot", x: sp.x, floor: sp.floor });
+        if (sp.stage >= SPOT_STAGES) { sp.done = true; n.searchId = 0; n.searched++; if (n.searched >= n.nextCard) { n.nextCard += 3; offerCards(n); } }
+      }
+    }
+  }
+  // tuzaklar
+  for (const tr of n.traps) {
+    if (tr.state === "cool") { tr.t -= dt; if (tr.t <= 0) tr.state = "hand"; }
+    else if (tr.state === "placed") {
+      const hit = n.foes.find(f => f.floor === tr.floor && f.climbT <= 0 && Math.abs(f.x - tr.x) <= 7);
+      if (hit) {
+        const eff = n.trapFx[tr.id] ?? { dmg: 6, slow: 2, fire: false };
+        for (const f of n.foes.filter(q => q.floor === tr.floor && Math.abs(q.x - tr.x) <= 12)) { hurtFoe(n, f, eff.dmg * (1 + n.wave * 0.1) * 1.6, false); f.root = Math.max(f.root, eff.slow); if (eff.fire) f.burn = Math.max(f.burn, 4); }
+        n.fx.push({ k: "trap", x: tr.x, floor: tr.floor }); tr.state = "cool"; tr.t = TRAP_RECHARGE;
+      }
+    }
+  }
   // düşmanlar
+  const pf = n.floor; const exposed = !n.climbing || Math.abs(n.py - pf) < 0.3;
   for (const f of [...n.foes]) {
-    f.hitT = Math.max(0, f.hitT - dt); f.cd -= dt;
+    f.hitT = Math.max(0, f.hitT - dt); f.cd -= dt; f.root = Math.max(0, f.root - dt); f.slow = Math.max(0, f.slow - dt);
+    if (f.burn > 0) { f.burn -= dt; hurtFoe(n, f, n.dmg * 0.25 * dt, false, true); if (!n.foes.includes(f)) continue; }
     if (f.climbT > 0) { f.climbT -= dt; if (f.climbT <= 0) f.floor = f.toFloor; continue; }
-    const pf = n.climb ? n.climb.to : n.floor;
+    if (f.root > 0) continue;
+    const sp = f.speed * (f.slow > 0 ? 0.45 : 1);
     if (f.floor !== pf) {
       const gap = pf > f.floor ? f.floor : f.floor - 1; const lx = ladderX(gap); const d = lx - f.x;
-      if (Math.abs(d) > 1) f.x += Math.sign(d) * Math.min(Math.abs(d), f.speed * dt);
-      else { f.x = lx; f.toFloor = pf > f.floor ? f.floor + 1 : f.floor - 1; f.climbT = 1.4; }
+      if (Math.abs(d) > 1) f.x += Math.sign(d) * Math.min(Math.abs(d), sp * dt);
+      else { f.x = lx; f.toFloor = pf > f.floor ? f.floor + 1 : f.floor - 1; f.climbT = 1.6; }
       continue;
     }
     const d = n.px - f.x;
-    if (Math.abs(d) > 5.5) f.x += Math.sign(d) * Math.min(Math.abs(d) - 5, f.speed * dt);
-    else if (f.cd <= 0 && !n.climb) { f.cd = 1.3; const dm = f.dmg * Math.max(0.35, 1 - n.armor / 40); n.hp -= dm; n.fx.push({ k: "hurt", dmg: Math.round(dm) }); }
+    if (Math.abs(d) > 5.5) f.x += Math.sign(d) * Math.min(Math.abs(d) - 5, sp * dt);
+    else if (f.cd <= 0 && exposed) { f.cd = 1.3; const dm = f.dmg * Math.max(0.35, 1 - n.armor / 40); n.hp -= dm; n.fx.push({ k: "hurt", dmg: Math.round(dm) }); }
   }
   if (n.hp <= 0) { n.hp = 0; n.phase = "over"; n.result = "dead"; return; }
+  // köpek: yanında durur, arada çıkıp düşmanla dövüşür
+  const dg = n.dog;
+  if (dg) {
+    dg.moving = false; dg.cd -= dt; dg.t -= dt;
+    if (dg.state === "yanda") {
+      if (dg.floor !== n.floor && !n.climbing) { dg.lag += dt; if (dg.lag > 1.5) { dg.floor = n.floor; dg.x = n.px; dg.lag = 0; } } else dg.lag = 0;
+      const want = n.px - n.face * 7; const d = want - dg.x; if (Math.abs(d) > 1.5 && dg.floor === n.floor) { dg.x += Math.sign(d) * Math.min(Math.abs(d), 26 * dt); dg.face = d > 0 ? 1 : -1; dg.moving = true; }
+      if (dg.t <= 0) { const tgt = n.foes.find(f => f.floor === dg.floor); if (tgt) { dg.state = "av"; dg.t = 9; } else dg.t = 3; }
+    } else if (dg.state === "av") {
+      const tgt = n.foes.filter(f => f.floor === dg.floor && f.climbT <= 0).sort((a, b) => Math.abs(a.x - dg.x) - Math.abs(b.x - dg.x))[0];
+      if (!tgt || dg.t <= 0) { dg.state = "don"; dg.t = 6; }
+      else { const d = tgt.x - dg.x; dg.face = d > 0 ? 1 : -1;
+        if (Math.abs(d) > 4) { dg.x += Math.sign(d) * Math.min(Math.abs(d) - 3, 30 * dt); dg.moving = true; }
+        else if (dg.cd <= 0) { dg.cd = 0.9; hurtFoe(n, tgt, (3 + n.dogBond / 20) * n.dogMul * (1 + n.wave * 0.05), false); tgt.slow = Math.max(tgt.slow, 0.8); n.fx.push({ k: "bite", x: tgt.x, floor: tgt.floor }); } }
+    } else {
+      const d = n.px - dg.x; if (Math.abs(d) > 3 && dg.floor === n.floor) { dg.x += Math.sign(d) * Math.min(Math.abs(d), 28 * dt); dg.face = d > 0 ? 1 : -1; dg.moving = true; } else { dg.state = "yanda"; dg.t = 14; }
+      if (dg.t <= 0) { dg.state = "yanda"; dg.t = 14; dg.floor = n.floor; dg.x = n.px; }
+    }
+  }
   // oyuncu saldırısı
   n.atkCd -= dt;
-  if (n.atkCd <= 0 && !n.climb) {
+  if (n.atkCd <= 0 && !n.climbing && !n.searchId) {
     const same = n.foes.filter(f => f.floor === n.floor && f.climbT <= 0).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px));
     const t = same[0];
     if (t) {
@@ -215,16 +344,21 @@ export function stepScav(n: Scav, dt: number) {
 }
 
 /* ---------- bitiş ---------- */
-export interface ScavResult { result: "exit" | "dead"; items: Record<string, number>; lostItems: Record<string, number>; money: number; dropped: Record<string, number>; minutes: number; gains: GainReport; kills: number; waves: number; searched: number }
+export interface ScavResult { result: "exit" | "dead"; items: Record<string, number>; lostItems: Record<string, number>; money: number; dropped: Record<string, number>; minutes: number; gains: GainReport; kills: number; waves: number; searched: number; weaponParts: string[] }
 export function finishScav(cfg: Config, s: GameState, n: Scav): ScavResult {
   const dead = n.result === "dead"; const gains: GainReport = {};
   const items = dead ? {} : { ...n.bag }; const lostItems = dead ? { ...n.bag } : {}; const money = dead ? Math.floor(n.money / 2) : n.money;
   s.money += money; const dropped: Record<string, number> = {};
   for (const [k, v] of Object.entries(items)) { const d = addItem(cfg, s, k, v); if (d) dropped[k] = d; }
-  if (n.shots) { removeItem(s, "ok", Math.min(n.shots, s.inventory.ok ?? 0)); Object.assign(gains, realUse(cfg, s, "okculuk_idman", Math.min(40, n.shots), 0.05)); }
+  // oklar: taşıdıkların harcanır, kalan (bulunanlar dahil) çıkışta cebine döner
+  if (n.bow || n.ammoStart) { const ok0 = s.inventory.ok ?? 0; const left = dead ? 0 : n.ammo; const nv = Math.max(0, ok0 - n.ammoStart + left); if (nv > 0) s.inventory.ok = nv; else delete s.inventory.ok; }
+  if (n.shots) Object.assign(gains, realUse(cfg, s, "okculuk_idman", Math.min(40, n.shots), 0.05));
+  // bulunan silahlar kalmaz; yalnız onu oluşturan parçalardan biri cebe girer
+  const weaponParts: string[] = [];
+  if (!dead) for (const id of n.foundWeapons) { const w = FOUND_WEAPONS.find(x => x.id === id)!; const part = w.parts[Math.floor(Math.abs(Math.sin(n.seed + id.length)) * w.parts.length) % w.parts.length]; if (!addItem(cfg, s, part, 1)) weaponParts.push(part); }
   applyGain(cfg, s, "analiz", 0.05 + n.searched * 0.03, gains); applyGain(cfg, s, "gorus", 0.03 + n.searched * 0.02, gains); applyGain(cfg, s, "stres", 0.1 + n.wave * 0.04, gains);
   s.hp = dead ? Math.max(1, Math.round(n.maxHp * 0.2)) : Math.max(1, Math.round(n.hp));
   const minutes = Math.min(120, 20 + Math.round(n.time / 3)); s.minute = Math.min(DAY_MINUTES, s.minute + minutes);
   s.energy = Math.max(0, s.energy - SCAV_ENERGY - Math.min(12, n.wave * 2)); s.satiety = Math.max(0, s.satiety - 5);
-  return { result: n.result ?? "exit", items, lostItems, money, dropped, minutes, gains, kills: n.kills, waves: n.wave, searched: n.searched };
+  return { result: n.result ?? "exit", items, lostItems, money, dropped, minutes, gains, kills: n.kills, waves: n.wave, searched: n.searched, weaponParts };
 }
