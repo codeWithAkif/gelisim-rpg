@@ -142,14 +142,14 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       if (tr.state === "cool") { g.fillStyle = "#F2E7C9"; g.font = "700 14px Caveat, cursive"; g.textAlign = "center"; g.fillText(`${Math.ceil(tr.t)}`, x, y - 12); } g.globalAlpha = 1; }
     // düşmanlar
     for (const f of n.foes) {
-      const d = ENEMIES[f.def]; const wolf = f.def === "kurt" || f.def === "kar_kurdu"; const h = (wolf ? 13 : 21) * (d?.scale ?? 1); const right = n.px > f.x; const climbing = f.climbT > 0; const moving = f.root <= 0 && !climbing;
+      const d = ENEMIES[f.def]; const wolf = f.def === "kurt" || f.def === "kar_kurdu"; const h = (wolf ? 9 : 20) * (d?.scale ?? 1); const right = n.px > f.x; const climbing = f.climbT > 0; const moving = f.root <= 0 && !climbing;
       const key = artUrl("dusman_" + f.def) ? "dusman_" + f.def : "dusman_kurt";
       const tint = f.burn > 0 ? "sepia(1) saturate(4) hue-rotate(-20deg)" : f.root > 0 ? "hue-rotate(160deg) saturate(2)" : "none";
       if (!drawFoeOrDog(key, wolf ? "anim_kurt_yuru" : null, moving, f.x, f.floor + (climbing ? ((1.6 - f.climbT) / 1.6) * (f.toFloor - f.floor) : 0), h, key === "dusman_kurt" ? right : !right, now, climbing ? 0.7 : 1, tint)) { g.fillStyle = "#B03A2A"; g.beginPath(); g.arc(X(f.x), gy(f.floor) - 12, 7, 0, 7); g.fill(); }
       if (f.hp < f.max) { const w = 26, yy = gy(f.floor) - h * sc() - 6; g.fillStyle = "rgba(20,16,10,.8)"; g.fillRect(X(f.x) - w / 2, yy, w, 4); g.fillStyle = "#D9503A"; g.fillRect(X(f.x) - w / 2, yy, w * Math.max(0, f.hp / f.max), 4); }
     }
     // köpek
-    if (n.dog) { const dg = n.dog; const petId = s.pet?.id ?? "kopek"; drawFoeOrDog(artUrl("dusman_" + petId) ? "dusman_" + petId : "dusman_kurt", `anim_${petId}_yuru`, dg.moving, dg.x, dg.floor, 10, dg.face === 1, now, 1, artUrl("dusman_" + petId) ? "none" : ENEMIES[petId]?.tint ?? "none"); }
+    if (n.dog) { const dg = n.dog; const petId = s.pet?.id ?? "kopek"; drawFoeOrDog(artUrl("dusman_" + petId) ? "dusman_" + petId : "dusman_kurt", `anim_${petId}_yuru`, dg.moving, dg.x, dg.floor, 8, dg.face === 1, now, 1, artUrl("dusman_" + petId) ? "none" : ENEMIES[petId]?.tint ?? "none"); }
     // sen: merdivende yavaş yavaş çıkar
     { const x = n.px; const fl = n.py; const climbing = n.climbing; const key = n.atkFx > 0 ? "poz_kahraman_vurus" : "poz_kahraman_durus";
       const walkQ = n.moving ? quad("anim_kahraman_yuru", walkFrame(now, 0, 9)) : null; const bowQ = n.bow && n.atkFx > 0 ? quad("anim_kahraman_yay", 3) : null;
