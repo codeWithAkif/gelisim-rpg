@@ -582,3 +582,5 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .load-opt b { font-family: var(--f-hand); font-size: 20px; font-weight: 700; }
 .load-opt span { font-size: 14px; color: var(--ink-soft); }
 .load-opt.on { border-color: var(--green); box-shadow: inset 0 0 0 2px var(--green); }
+.bagrow { display: flex; align-items: center; gap: 10px; }
+.bagrow b { flex: 1; font-family: var(--f-hand); font-size: 20px; }

@@ -118,6 +118,8 @@ export interface Scav {
 }
 const bagCount = (n: Scav) => Object.values(n.bag).reduce((a, b) => a + b, 0);
 export const bagUsed = bagCount;
+/** Çantadan bir tane at (yer aç). */
+export function dropBag(n: Scav, id: string): boolean { if (!n.bag[id]) return false; n.bag[id]--; if (n.bag[id] <= 0) delete n.bag[id]; return true; }
 export const speedOf = (n: Scav) => 22 * (1 + (n.cards.hafif_adim ?? 0) * 0.12);
 export const CLIMB_SPEED = 0.5;      // kat/sn
 export const SPOT_STAGES = 3;

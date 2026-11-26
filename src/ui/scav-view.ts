@@ -3,7 +3,7 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Scav, type Spot, type Loadout, SW, EXIT_X, LADDER_XS, SPOT_STAGES, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, leave, rerollScav, pickScavCard, finishScav, scavSite, canStartScav,
-  SCARDS, bagUsed, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
+  SCARDS, bagUsed, dropBag, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
 import { ENEMIES } from "../content/world";
@@ -49,7 +49,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       <div class="sc-stick" id="scStick"><i id="scKnob"></i></div>
       <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
     <div class="nb-hp"><div class="gb"><div class="gf" id="scHp" style="background:var(--red)"></div></div><span id="scHpT"></span></div>
-    <div class="sc-bar"><span id="scAmmo"></span><span id="scBag"></span></div>
+    <div class="sc-bar"><span id="scAmmo"></span><button class="btn small" id="scBag" data-c="bag"></button></div>
     <div class="nb-card" id="scCard" hidden></div><div class="nb-card" id="scPause" hidden></div>`;
   document.body.appendChild(el);
   const cv = el.querySelector("canvas")!; const stage = el.querySelector<HTMLElement>(".siege-stage")!; const g = cv.getContext("2d")!;
@@ -150,9 +150,9 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       else if (walkQ) drawQuad(g, walkQ, X(x), gy(fl), 20 * sc(), n.face === 1);
       else { const im = img(key); if (im) { const hh = 20 * sc(), w = hh * im.naturalWidth / im.naturalHeight; const bob = climbing ? Math.sin(fl * 16) * 3 : 0; g.save(); g.globalAlpha = climbing ? 0.85 : 1; g.translate(X(x), gy(fl) + bob); if (n.face === 1) g.scale(-1, 1); g.drawImage(im, -w / 2, -hh, w, hh); g.restore(); } }
       if (n.searchId) { g.fillStyle = "#F1C14A"; g.font = `700 ${Math.max(14, sc() * 2)}px Caveat, cursive`; g.textAlign = "center"; g.fillText("aranıyor…", X(x), gy(fl) - 20 * sc() - 6); } }
-    for (const sh of [...shots]) { const a = (now - sh.t) / 160; if (a > 1) { shots.splice(shots.indexOf(sh), 1); continue; } g.strokeStyle = `rgba(255,245,210,${1 - a})`; g.lineWidth = 2; g.beginPath(); g.moveTo(X(sh.a), gy(sh.floor) - 12 * sc()); g.lineTo(X(sh.b), gy(sh.floor) - 8 * sc()); g.stroke(); }
-    for (const r of [...rings]) { const a = (now - r.t) / 500; if (a > 1) { rings.splice(rings.indexOf(r), 1); continue; } g.strokeStyle = `${r.color}${(1 - a).toFixed(2)})`; g.lineWidth = 4; g.beginPath(); g.ellipse(X(r.x), gy(r.floor) - 8 * sc(), r.r * sc() * a, r.r * sc() * 0.5 * a, 0, 0, 7); g.stroke(); }
-    for (const p of [...pops]) { const a = (now - p.t) / 1100; if (a > 1) { pops.splice(pops.indexOf(p), 1); continue; } g.globalAlpha = 1 - a; g.fillStyle = p.color; g.strokeStyle = "rgba(0,0,0,.7)"; g.lineWidth = 3; g.font = `700 ${Math.max(16, sc() * 2.3)}px Caveat, cursive`; g.textAlign = "center";
+    for (const sh of [...shots]) { const a = Math.max(0, (now - sh.t) / 160); if (a > 1) { shots.splice(shots.indexOf(sh), 1); continue; } g.strokeStyle = `rgba(255,245,210,${1 - a})`; g.lineWidth = 2; g.beginPath(); g.moveTo(X(sh.a), gy(sh.floor) - 12 * sc()); g.lineTo(X(sh.b), gy(sh.floor) - 8 * sc()); g.stroke(); }
+    for (const r of [...rings]) { const a = Math.max(0, (now - r.t) / 500); if (a > 1) { rings.splice(rings.indexOf(r), 1); continue; } g.strokeStyle = `${r.color}${(1 - a).toFixed(2)})`; g.lineWidth = 4; g.beginPath(); g.ellipse(X(r.x), gy(r.floor) - 8 * sc(), Math.max(0.1, r.r * sc() * a), Math.max(0.1, r.r * sc() * 0.5 * a), 0, 0, 7); g.stroke(); }
+    for (const p of [...pops]) { const a = Math.max(0, (now - p.t) / 1100); if (a > 1) { pops.splice(pops.indexOf(p), 1); continue; } g.globalAlpha = 1 - a; g.fillStyle = p.color; g.strokeStyle = "rgba(0,0,0,.7)"; g.lineWidth = 3; g.font = `700 ${Math.max(16, sc() * 2.3)}px Caveat, cursive`; g.textAlign = "center";
       const px = X(p.x), py = gy(p.floor) - 24 * sc() / 2.4 - a * 26; g.strokeText(p.text, px, py); g.fillText(p.text, px, py); g.globalAlpha = 1; }
     g.restore();
   }
@@ -221,6 +221,15 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     if (b.dataset.a === "trap") { if (placeTrap(n)) sfx("thunk"); else sfx("bad"); }
     if (b.dataset.a === "spell") { if (!castSpell(n)) { sfx("bad"); tip.hidden = false; tip.textContent = "Yakında düşman yok"; setTimeout(() => { tip.hidden = true; }, 1200); } }
   });
+  const bagEl = el.querySelector<HTMLElement>("#scPause")!;
+  function showBag() {
+    paused = true; bagEl.hidden = false; stickReset(); sfx("page");
+    const ids = Object.keys(n.bag).filter(k => n.bag[k] > 0);
+    bagEl.innerHTML = `<p class="hand" style="margin:0;font-size:26px">Çantan ${bagUsed(n)}/${n.bagCap}</p><p class="tiny muted" style="margin:0">Yer açmak için istemediğini at; silah ve ok çantayı doldurmaz.</p>
+      ${ids.map(id => `<div class="choice bagrow">${itemPic(id, 34)}<b>${esc(itemInfo(cfg, id).name)} ×${n.bag[id]}</b><button class="btn small red" data-drop="${id}">At</button></div>`).join("") || `<p class="muted" style="margin:0">Çantan boş.</p>`}
+      <button class="choice" data-p="resume"><b>Kapat</b></button>`;
+  }
+  el.querySelector(".sc-bar")!.addEventListener("click", e => { if ((e.target as HTMLElement).closest("[data-c=bag]") && n.phase === "play" && !paused) showBag(); });
   el.querySelector(".nb-top")!.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-c]"); if (!b || b.dataset.c !== "pause") return;
     paused = true; pauseEl.hidden = false; sfx("page"); stickReset();
@@ -228,6 +237,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       <button class="choice" data-p="resume"><b>Devam</b></button><button class="choice" data-p="quit"><b>Pes et</b><span>Çanta gider, kaçarsın.</span></button>`;
   });
   pauseEl.addEventListener("click", e => {
+    const dr = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-drop]"); if (dr) { dropBag(n, dr.dataset.drop!); sfx("tap"); showBag(); return; }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-p]"); if (!b) return;
     if (b.dataset.p === "resume") { paused = false; pauseEl.hidden = true; last = performance.now(); } else { paused = false; pauseEl.hidden = true; n.phase = "over"; n.result = "dead"; }
   });
