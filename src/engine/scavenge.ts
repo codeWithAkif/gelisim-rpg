@@ -30,15 +30,15 @@ export interface ScavSite {
 }
 const done = (s: GameState, q: string) => (s.quests[q]?.count ?? 0) > 0 || s.quests[q]?.status === "bitti";
 export const SCAV_SITES: ScavSite[] = [
-  { place: "koru", name: "Yıkık avcı kulübesi", desc: "Korunun derinliğinde, çökmüş bir kulübe. İçinde eski avcıların bıraktıkları olabilir.", floors: 2, foes: ["kurt"], spotsPerFloor: 3,
+  { place: "koru", name: "Yıkık avcı kulübesi", desc: "Korunun derinliğinde, çökmüş bir kulübe. İçinde eski avcıların bıraktıkları olabilir.", floors: 3, foes: ["kurt"], spotsPerFloor: 3,
     names: ["Sandık", "Yatak altı", "Raf", "Çuval", "Ocak yanı"],
     loot: [{ item: "deri", w: 4 }, { item: "ok", w: 4, n: [2, 4] }, { item: "ip", w: 3 }, { item: "kekik", w: 2, n: [1, 2] }, { item: "ekmek", w: 2 }, { money: [1, 3], w: 3 }, { item: "eski_sikke", w: 1 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "kurt") ? null : "Önce Hasan'ın kurt derdine yardım et" },
-  { place: "karacam_sarnic", name: "Sarnıç mahzeni", desc: "Nemli taş katlar, aşağıya inen merdivenler. Eski depolar boş değil.", floors: 3, foes: ["haydut", "kurt"], spotsPerFloor: 3,
+  { place: "karacam_sarnic", name: "Sarnıç mahzeni", desc: "Nemli taş katlar, aşağıya inen merdivenler. Eski depolar boş değil.", floors: 4, foes: ["haydut", "kurt"], spotsPerFloor: 3,
     names: ["Fıçı", "Dolap", "Sandık", "Kasa", "Taş niş"],
     loot: [{ item: "demir_parca", w: 4, n: [1, 2] }, { item: "ok", w: 3, n: [2, 5] }, { item: "ip", w: 3 }, { item: "peynir", w: 2 }, { item: "deri", w: 2 }, { money: [2, 6], w: 4 }, { item: "eski_sikke", w: 2 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "sarnic") ? null : "Önce Selim'in sarnıç işini bitir" },
-  { place: "ardic_kul", name: "Yanık evler", desc: "Kül Yangını'ndan kalan üç katlı yıkık bir ev. Isı hâlâ burada gibi.", floors: 3, foes: ["muhafiz", "haydut"], spotsPerFloor: 3,
+  { place: "ardic_kul", name: "Yanık evler", desc: "Kül Yangını'ndan kalan beş katlı yıkık bir yapı. Isı hâlâ burada gibi.", floors: 5, foes: ["muhafiz", "haydut"], spotsPerFloor: 3,
     names: ["Kömürleşmiş sandık", "Dolap", "Yatak", "Kasa", "Soba dibi"],
     loot: [{ item: "demir_parca", w: 3, n: [1, 3] }, { item: "ok", w: 3, n: [3, 6] }, { item: "peynir", w: 2 }, { item: "ekmek", w: 2 }, { item: "deri", w: 2 }, { money: [4, 10], w: 5 }, { item: "eski_sikke", w: 2 }, { item: "kartal_tuyu", w: 1 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "kul_ana") ? null : "Önce Kül Ana'yı dinle" },
@@ -137,7 +137,7 @@ export function pickGround(n: Scav, gid?: number): "ok" | "full" | "none" {
   const g = gid ? groundNear(n).find(q => q.id === gid) : nearGround(n); if (!g) return "none"; if (bagCount(n) >= n.bagCap) return "full";
   n.ground = n.ground.filter(q => q !== g); n.bag[g.item] = (n.bag[g.item] ?? 0) + 1; return "ok";
 }
-export const speedOf = (n: Scav) => 22 * (1 + (n.cards.hafif_adim ?? 0) * 0.12);
+export const speedOf = (n: Scav) => 32 * (1 + (n.cards.hafif_adim ?? 0) * 0.12);
 export const CLIMB_SPEED = 0.5;      // kat/sn
 export const SPOT_STAGES = 3;
 /** Çıkacak şey basitse hızlı, değerliyse yavaş aranır. */
@@ -293,7 +293,7 @@ function spawnRaid(n: Scav) {
   for (let i = 0; i < count; i++) {
     const def = n.site.foes[n.rng.int(0, n.site.foes.length - 1)]; const d = ENEMIES[def];
     const floor = n.rng.chance(60) ? n.floor : n.rng.int(0, n.site.floors - 1); const [lo, hi] = freeRange(n, floor); const x = n.rng.chance(50) ? hi - 6 - n.rng.next() * 30 : lo + 10 + n.rng.next() * 30;
-    n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale * 1.35, max: d.hp * scale * 1.35, speed: 12 + (d.move ?? 4) * 2.2 + n.rng.next() * 3, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 1.05, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0, root: 0, slow: 0, burn: 0 });
+    n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale * 1.35, max: d.hp * scale * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + n.rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 1.05, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
   n.raidT = Math.max(10, 15 - n.wave); n.fx.push({ k: "raid", n: count });
 }
