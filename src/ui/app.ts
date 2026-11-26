@@ -13,7 +13,7 @@ import { callable, callMany, heroDef, ROLE_NAMES, afterBattle, hire as hireHero,
 import { feed as petFeed, caress as petCaress, play as petPlay, rename as petRename, release as petRelease, sendHome as petSendHome, swapWithHome as petSwap, adopt as petAdopt, petType } from "../engine/pet";
 import { itemInfo, equip, unequip, drop, buy, bagOf, attachPouch, detachPouch, type InvTab } from "../engine/inventory";
 import type { GearSlot } from "../engine/gear";
-import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
+import { startSession, startCraft, finishSession, fmtDur, sessionProgress, type SessionResult } from "../engine/session";
 import { openSessionSheet, openSessionRun } from "./session-view";
 import { mountMap } from "./map-view";
 import { place, here } from "../engine/travel";
@@ -49,6 +49,7 @@ import { itemPic, artUrl } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 import { newUnlocks } from "../engine/unlocks";
+import { crossedThresholds } from "../engine/thresholds";
 
 // "calis" alt çubukta yok: Harita'daki yer kartından açılır, geri düğmesiyle haritaya döner.
 type Tab = "defter" | "vucut" | "canta" | "harita" | "calis" | "diyar";
@@ -93,6 +94,7 @@ export function startApp(root: HTMLElement) {
       main.innerHTML = `<div class="map-host"></div>`;
       mapApi = mountMap(main.querySelector<HTMLElement>(".map-host")!, cfg, s, {
         onTravel: to => {
+          if (busy()) return;
           const r = startJourney(cfg, s, to, Date.now());
           if (!r.ok) { toast(r.reason ?? "Yola çıkamadın"); return; }
           persist(); mapState = { view: mapApi!.state().view, sel: to }; mapApi = undefined; render(); journeyTick();
@@ -155,16 +157,36 @@ export function startApp(root: HTMLElement) {
       ${r.wounded ? `<p class="red" style="margin:0">Yaralıydın; bedensel kazanç düştü.</p>` : ""}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
     sfx(r.early ? "page" : "win"); buzz("medium");
   }
+  /* çalışma arka plandayken: üst şeritte sayaç, bitince sonuç; çakışan eylemler beklenir */
+  let sessWatch = 0;
+  function watchSession() {
+    clearInterval(sessWatch);
+    sessWatch = window.setInterval(() => {
+      if (!s.session || document.querySelector(".session-screen")) { clearInterval(sessWatch); return; }
+      if (sessionProgress(s, Date.now()) >= 1) { clearInterval(sessWatch); const r = finishSession(cfg, s, Date.now()); if (r) sessionDone(r); return; }
+      const t = root.querySelector<HTMLElement>("#sessLeft"); if (t) t.textContent = fmtDur(s.session.durMs - (Date.now() - s.session.startMs));
+    }, 1000);
+  }
+  function showSession() { openSessionRun(cfg, s, sessionDone, persist, scheduleNotify, () => { render(); watchSession(); toast("Çalışman sürüyor; bitince haber veririm."); }); }
   function resumeSession() {
     if (!s.session) return false;
     const r = finishSession(cfg, s, Date.now());
     if (r) { sessionDone(r); return true; }
-    openSessionRun(cfg, s, sessionDone, persist, scheduleNotify);
+    showSession();
     return true;
+  }
+  /** Çalışırken yalnız bakmak serbest; bir şey yapmak (yola çıkmak, savaşmak, uyumak...) bitmesini bekler. */
+  const VIEW_ONLY = new Set(["pick", "bagpage", "bodytab", "invtab", "diyartab", "jobtab", "show-place", "back-map", "study", "menu", "market"]);
+  function busy(): boolean {
+    if (!s.session) return false;
+    toast("Çalışıyorsun. Bitmesini bekle ya da çalışmayı açıp yarıda bırak."); sfx("bad"); return true;
   }
   /** Yeni kilometre taşlarını ve ilk kez açılan sistemleri sırayla "Yeni sayfa" olarak gösterir. */
   function storyTick(after?: () => void) {
     const fresh: { id: string; title: string; text: string }[] = [...advanceStory(s), ...newUnlocks(s)];
+    // aşılan eşikler tek sayfada: "Artık …"
+    const th = crossedThresholds(cfg, s);
+    if (th.length) fresh.push({ id: "esik", title: "Artık yapabildiğin", text: th.map(t => "Artık " + t.text + ".").join(" ") });
     if (!fresh.length) { after?.(); return; }
     persist(); render();
     // birden fazla sayfa birden açıldıysa (eski kayıt, art arda olaylar) tek özet pencere
@@ -199,25 +221,27 @@ export function startApp(root: HTMLElement) {
 
   // üst şeritteki konum düğmesi haritayı açar
   root.querySelector("#statusSlot")!.addEventListener("click", e => {
-    if ((e.target as HTMLElement).closest("[data-act=sleep]")) { openSleep(); return; }
+    if ((e.target as HTMLElement).closest("[data-act=session-open]")) { if (s.session) showSession(); return; }
+    if ((e.target as HTMLElement).closest("[data-act=sleep]")) { if (busy()) return; openSleep(); return; }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-act=show-place]"); if (!b) return;
     tab = "harita"; mapState = { view: { cx: place(s.location)!.x, cy: place(s.location)!.y + 55, w: 230 }, sel: s.location }; render(false);
   });
   main.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-act]"); if (!b || b.disabled) return;
     const id = b.dataset.id ?? "";
+    if (!VIEW_ONLY.has(b.dataset.act ?? "") && busy()) return;
     switch (b.dataset.act) {
       case "session-pick":
         openSessionSheet(cfg, s, id, ms => {
           const p = startSession(cfg, s, id, ms, Date.now());
           if (!p.ok) { toast(p.reason ?? "Başlayamadın"); return; }
-          persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist, scheduleNotify);
+          persist(); render(); scheduleNotify(); showSession();
         });
         break;
       case "craft": {
         const r = startCraft(cfg, s, id, Date.now());
         if (!r.ok) { toast(r.reason ?? "Başlayamadın"); break; }
-        persist(); render(); scheduleNotify(); openSessionRun(cfg, s, sessionDone, persist, scheduleNotify); break;
+        persist(); render(); scheduleNotify(); showSession(); break;
       }
       case "pick": ui.sel = ui.sel === id ? undefined : id; render(); break;
       case "heal": { const r = useHeal(cfg, s, id); if (!r.ok) { toast(r.reason ?? ""); break; } sfx("good"); toast(`${itemInfo(cfg, id).name}: +${r.healed} can${r.gains && r.gains.ilk_yardim ? " · ilk yardım gelişti" : ""}`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); break; }

@@ -26,7 +26,7 @@ Her mod için üç soru:
 | Nöbet | Kuşatmaya katıldı | Kaldırıldı. Sonsuz dalga, "nöbet izi" ve kalıcı güçlenmeler yok. |
 | Harabe | Dönüştürüldü | Arama içi kartlar kaldırıldı; her etki bir özellikten gelir (aşağıda). |
 | Savaş içi jestler | Tut | Değişmedi. |
-| Odak mini oyunları | Tut, isteğe bağlı | Değişmedi. Bekleme ritmi kararı ayrıca verilecek. |
+| Odak mini oyunları | Tut, isteğe bağlı | En iyi oyunla verim ×1,5 (önceden ×2); oynamamak cezalandırılmaz. |
 | Etrafa bak | Tut | Değişmedi. |
 | Diyar | Küçültüldü | Sekme "Köy dostu" rütbesinde açılır. İşletme ve görev panosu Bölüm 2'de (Karaçam'a varış) gelir. |
 | Finans (ortaklık) | Ertelendi | Ortaklıklar Karaçam'a varınca açılır. Pazarda satış her zaman açık. |
@@ -63,6 +63,13 @@ Eski nöbet kulesi görselleri (`kule_*.webp`) ileride kuşatma arka planı olar
 | Üst üste büyü | Odak | 1,5 basamakta 2, 2,5 basamakta 3 |
 
 Harabe giriş ekranındaki "Vücudun burada ne yapar?" bölümü bu tabloyu oyuncuya gösterir.
+
+## Bekleme ritmi
+
+Karar: **başlat, bırak, bildirimle dön.** Çalışma başlayınca ekran "Arka plana al" ile kapanır; üst şeritte
+kalan süre görünür. Bu arada Defter, Vücut, Çanta ve Harita'ya bakılabilir; bir şey yapmak (yola çıkmak,
+savaşmak, uyumak, yemek) çalışmanın bitmesini bekler. Uygulama kapalıyken de süre işler, bitince bildirim gelir.
+Odak turları isteğe bağlı bir ikramdır: en çok ×1,5.
 
 ## Dondurma kuralı
 

@@ -51,6 +51,7 @@ export interface GameState {
   session?: Session;
   journey?: Journey;                           // süren yolculuk                           // süren gerçek zamanlı çalışma
   alerts?: Record<string, boolean>;            // gösterilmiş uyarılar (tekrar etmesin)
+  nightGains?: { day: number; gains: Record<string, number> }; // son uykuda işlenen gelişme (sabah Vücut'ta parlar)
   prep?: Record<string, { day: number; scout?: boolean; readWind?: boolean }>; // savaş öncesi yapılmış keşifler
   seen?: string[];                             // haritada açılmış yerler (yoksa hepsi açık: eski kayıt)
   collection?: Record<string, number>;         // defterdeki koleksiyon: bulunan → ilk bulunduğu gün

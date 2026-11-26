@@ -101,7 +101,8 @@ export function humanSketch(opts: { marks: { name: string; at: [number, number] 
 }
 
 /** Vücut çizimi: kas grupları seviyesine göre koyulaşır, uykuda işlenecek kazanç kesikli yeşil çizilir. */
-export function bodySketch(lv: (id: string) => number, pend: (id: string) => number, names: (id: string) => string, imageUrl?: string | null): string {
+/** grew: bu gece işlenen gelişme; olan kaslar sabah bir süre parlar. */
+export function bodySketch(lv: (id: string) => number, pend: (id: string) => number, names: (id: string) => string, imageUrl?: string | null, grew: (id: string) => number = () => 0): string {
   const s = 3;
   const fig = [
     roughEllipse(100, 40, 20, 25, 1.4, s),
@@ -130,7 +131,7 @@ export function bodySketch(lv: (id: string) => number, pend: (id: string) => num
     m.shapes.forEach(([cx, cy, rx, ry], i) => {
       const grow = 1 + v / 250;
       const d = roughEllipse(cx, cy, rx * grow, ry * grow, 0.8, 50 + mi * 10 + i, 10);
-      parts += `<path d="${d}" fill="rgba(158,52,35,${op.toFixed(2)})" stroke="var(--red)" stroke-width="${sw.toFixed(2)}"/>`;
+      parts += `<path class="${grew(m.id) > 0.01 ? "grew" : ""}" d="${d}" fill="rgba(158,52,35,${op.toFixed(2)})" stroke="var(--red)" stroke-width="${sw.toFixed(2)}"/>`;
       if (p > 0.01) parts += `<path d="${roughEllipse(cx, cy, rx * grow + 3, ry * grow + 3, 0.6, 90 + mi * 10 + i, 10)}" fill="none" stroke="var(--green)" stroke-width="1.4" stroke-dasharray="3 2"/>`;
     });
     const [lx, ly, side] = m.label;

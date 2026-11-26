@@ -108,9 +108,18 @@ export function sleep(cfg: Config, s: GameState, quality = 1): SleepReport {
   s.mana = maxMana(cfg, s);
   s.satiety = Math.max(0, s.satiety - 30);
   s.day += 1; s.minute = 0;
+  s.nightGains = { day: s.day, gains: applied };
   const parts = summarize(cfg, applied);
   log(s, recovery < 0.75 && quality >= 1 ? `Aç uyudun; kasların yarım dinlendi. ${parts}` : `İyi uyudun. Gece işlenen: ${parts}`, recovery < 1 ? "warn" : "gain");
   return { applied, decayed, recovery, energy };
+}
+
+/** Bu sabah görünen geceki gelişme (bugün uyanıldıysa). */
+export function lastNight(s: GameState): Record<string, number> { return s.nightGains && s.nightGains.day === s.day ? s.nightGains.gains : {}; }
+/** Oyunun başından bu yana gelişme: seviye − başlangıç değeri; en çok gelişenler önce. */
+export function sinceStart(cfg: Config, s: GameState, limit = 3): { id: string; name: string; gain: number }[] {
+  return cfg.data.attributes.map(a => ({ id: a.id, name: a.name, gain: (s.attrs[a.id]?.level ?? 0) - (a.base ?? 0) }))
+    .filter(x => x.gain >= 0.05).sort((a, b) => b.gain - a.gain).slice(0, limit);
 }
 
 export function eat(s: GameState, itemId: string, satiety: number) {

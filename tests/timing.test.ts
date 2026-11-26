@@ -32,14 +32,14 @@ test("ritim puanı: isabetli dokunuş yüksek, boş dokunuş cezalı", () => {
 
 test("oturum verimi: oynamak ×2'ye kadar artırır, kötü oynamak cezalandırmaz", () => {
   expect(sessionBoost(undefined, 3_600_000)).toBe(1);
-  expect(sessionBoost([1], 3_600_000)).toBe(2);
+  expect(sessionBoost([1], 3_600_000)).toBe(1.5);
   expect(sessionBoost([0], 3_600_000)).toBe(1);
   expect(sessionRounds(5 * 3_600_000)).toBe(5);
-  expect(sessionBoost([1], 5 * 3_600_000)).toBeCloseTo(1.2, 5);   // uzun oturumda tur başına pay
-  expect(sessionBoost([1, 1, 1, 1, 1, 0.2], 5 * 3_600_000)).toBe(2); // en iyi turlar sayılır
+  expect(sessionBoost([1], 5 * 3_600_000)).toBeCloseTo(1.1, 5);   // uzun oturumda tur başına pay
+  expect(sessionBoost([1, 1, 1, 1, 1, 0.2], 5 * 3_600_000)).toBe(1.5); // en iyi turlar sayılır
 });
 
-test("mini oyunla çalışmak bekleyerek çalışmaktan çok kazandırır", () => {
+test("mini oyunla çalışmak daha çok kazandırır ama en çok ×1,5 (oynamamak cezasız)", () => {
   const run = (score?: number) => {
     const s = newGame(cfg, 3); s.location = "koy_meydani";
     expect(startSession(cfg, s, "meditasyon", 3_600_000, 0).ok).toBe(true);
@@ -48,7 +48,7 @@ test("mini oyunla çalışmak bekleyerek çalışmaktan çok kazandırır", () =
     return Object.values(r.gains).reduce((a, g) => a + g, 0);
   };
   const idle = run(), good = run(0.9);
-  expect(good).toBeGreaterThan(idle * 1.6);
+  expect(good).toBeGreaterThan(idle * 1.35); expect(good).toBeLessThanOrEqual(idle * 1.5 + 1e-9);
   expect(miniFor("meditasyon")).toBe("mum"); expect(miniFor("kilic_idman")).toBe("kesme"); expect(miniFor("botanik")).toBe("ayikla"); expect(miniFor("resim")).toBe("cizgi"); expect(miniFor("odun")).toBe("odun"); expect(miniFor("calisma_ates")).toBe("isaret");
 });
 

@@ -67,6 +67,8 @@ export function canStartScav(s: GameState, place: string): { ok: boolean; reason
 // Harabede ayrı kart ya da güçlenme yok: hız, arama, dayanma, büyü hepsi karakterin özelliklerinden gelir.
 // Gelişim harabede kazanılmaz, harabede sınanır. 10 başlangıç seviyesidir; her 30 puan bir basamak (en çok 3).
 export const step = (lv: number) => Math.max(0, Math.min(3, (lv - 10) / 30));
+/** Odak bu seviyelere gelince harabede büyü üst üste 2, sonra 3 kez salınır. */
+export const SCAV_SHOTS_AT = [55, 85];
 export interface ScavTraits {
   walk: number; climb: number; search: number; melee: number; hp: number; bagCap: number; ammoCap: number;
   firstRaid: number; spellCd: number; spellPow: number; spellShots: number;
@@ -76,7 +78,7 @@ const avgLv = (s: GameState, ids: string[]) => ids.reduce((a, id) => a + (s.attr
 /** Karakterin özelliklerinden harabe çarpanları (saf). */
 export function scavTraits(cfg: Config, s: GameState): ScavTraits {
   const t = (...ids: string[]) => step(avgLv(s, ids));
-  const sh = t("odak");
+  const od = s.attrs.odak?.level ?? 0;
   return {
     walk: 1 + t("bacak", "esneklik") * 0.12,
     climb: 1 + t("kavrama", "esneklik") * 0.12,
@@ -88,7 +90,7 @@ export function scavTraits(cfg: Config, s: GameState): ScavTraits {
     firstRaid: 40 + Math.round(t("isitme", "cevresel") * 10),
     spellCd: Math.pow(0.8, t("nefes")),
     spellPow: 1 + t("mana") * 0.3,
-    spellShots: sh >= 2.5 ? 3 : sh >= 1.5 ? 2 : 1,
+    spellShots: 1 + SCAV_SHOTS_AT.filter(v => od >= v).length,
   };
 }
 /** Başlamadan önce gösterilen özet: hangi özellik neyi değiştiriyor. */

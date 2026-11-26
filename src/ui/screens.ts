@@ -2,13 +2,14 @@
 // Her ekran HTML üretir; tıklamalar app.ts'deki data-act işleyicilerine gider.
 import type { Config } from "../engine/config";
 import { type GameState, clock, minutesLeft, minutesToDark, repOf, isNight } from "../engine/state";
-import { DEFERRED_CATEGORIES, type GainReport } from "../engine/progression";
+import { DEFERRED_CATEGORIES, lastNight, sinceStart, type GainReport } from "../engine/progression";
 import { questList, npc } from "../engine/quests";
 import { maxHp } from "../engine/combat";
 import { maxMana } from "../engine/derived";
 import { healPower } from "../engine/healing";
 import { isUnlocked } from "../engine/unlocks";
 import { nextStep } from "../engine/actions";
+import { nextThreshold, attrShown } from "../engine/thresholds";
 import { planSession, SESSION_OPTIONS, wounded, TIME_SCALE, fmtDur } from "../engine/session";
 import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount, pouchesOf, pouchSlots, inTab, INV_TABS, MAX_POUCHES, POUCH_SHARE, type InvTab } from "../engine/inventory";
 import { canSell, dayFactor, PARTNERS, stake, ITEM_VALUES } from "../engine/finance";
@@ -96,6 +97,7 @@ export function statusBar(cfg: Config, s: GameState): string {
       <div class="money"><span class="coin">${VITAL_ICONS.coin}</span>${s.money}<span class="sr"> bakır</span><button class="sleepbtn ${isNight(s) || s.energy < 25 ? "hot" : ""}" data-act="sleep" aria-label="Uyu ya da dinlen" title="Uyu ya da dinlen">${ICONS.uyku}</button></div>
     </div>
     ${tn ? `<div class="tnote ${tn.level}">${tn.text}</div>` : ""}
+    ${s.session ? `<button class="sess-pill" data-act="session-open">${s.session.kind === "craft" ? "El işin sürüyor" : "Çalışıyorsun"} · <b id="sessLeft">${fmtDur(Math.max(0, s.session.durMs - (Date.now() - s.session.startMs)))}</b> <span class="muted">· aç</span></button>` : ""}
     <div class="vitals">${g}</div>
     ${al.length ? `<div class="alert-strip ${al[0].level}" role="status"><b>!</b><span>${esc(al[0].text)}${al.length > 1 ? ` <i>(+${al.length - 1})</i>` : ""}</span></div>` : ""}
   </header>`;
@@ -209,21 +211,31 @@ export function vucutScreen(cfg: Config, s: GameState, ui: UiState = {}): string
   const lv = (id: string) => s.attrs[id]?.level ?? 0;
   const pd = (id: string) => s.attrs[id]?.pending ?? 0;
   const nm = (id: string) => cfg.attr.get(id)?.name ?? id;
-  const cats = cfg.data.attributeCategories.filter(c => cfg.data.attributes.some(a => a.cat === c.id));
+  // yalnız görünür özelliği olan kategoriler; görünmeyenler kategorinin sonunda katlanır
+  const cats = cfg.data.attributeCategories.filter(c => cfg.data.attributes.some(a => a.cat === c.id && attrShown(cfg, s, a.id)));
   const cur = cats.find(c => c.id === ui.bodyTab) ?? cats[0];
   const pend = (c: { id: string }) => cfg.data.attributes.filter(a => a.cat === c.id).reduce((n, a) => n + (s.attrs[a.id]?.pending ?? 0), 0);
   const tabs = `<div class="seg" role="tablist">${cats.map(c => `<button role="tab" class="${c.id === cur.id ? "on" : ""}" data-act="bodytab" data-id="${c.id}" aria-selected="${c.id === cur.id}">${esc(c.name)}${pend(c) > 0.01 ? ` <i class="dot"></i>` : ""}</button>`).join("")}</div>`;
-  const attrs = cfg.data.attributes.filter(a => a.cat === cur.id);
-  const list = `<section class="sec"><h3 style="color:${esc(cur.color)}">${esc(cur.name)}</h3><div class="attr-group">${attrs.map((a, i) => {
+  const night = lastNight(s); const nightTop = Object.entries(night).filter(([, v]) => v > 0.01).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const inCat = cfg.data.attributes.filter(a => a.cat === cur.id);
+  const attrs = inCat.filter(a => attrShown(cfg, s, a.id)); const folded = inCat.filter(a => !attrShown(cfg, s, a.id));
+  const row = (a: (typeof inCat)[number], i: number) => {
     const st = s.attrs[a.id]; const max = a.max ?? 100;
-    return `<div class="attr"><span class="nm" title="${esc(a.desc ?? "")}">${esc(a.name)}</span><div class="bar">${inkBar(st.level / max, st.pending / max, i + 3)}</div>
-      <span class="v">${st.level.toFixed(1)}${st.pending > 0.01 ? `<br><span class="pend">+${st.pending.toFixed(1)}</span>` : ""}</span></div>`;
-  }).join("")}</div></section>`;
-  const body = cur.id === "fiziksel" ? `<div class="body-wrap">${bodySketch(lv, pd, nm, artUrl("vucut_insan"))}</div>` : "";
+    return `<div class="attr${(night[a.id] ?? 0) > 0.01 ? " grew" : ""}"><span class="nm" title="${esc(a.desc ?? "")}">${esc(a.name)}</span><div class="bar">${inkBar(st.level / max, st.pending / max, i + 3)}</div>
+      <span class="v">${st.level.toFixed(1)}${st.pending > 0.01 ? `<br><span class="pend">+${st.pending.toFixed(1)}</span>` : ""}</span>${(() => {
+        const nx = nextThreshold(cfg, s, a.id); return nx ? `<span class="next-th">${nx.at}'de: ${esc(nx.t.text)}</span>` : ""; })()}</div>`;
+  };
+  const list = `<section class="sec"><h3 style="color:${esc(cur.color)}">${esc(cur.name)}</h3><div class="attr-group">${attrs.map(row).join("")}</div>
+    ${folded.length ? `<details class="more-attrs"><summary class="muted">Diğer ${folded.length} özellik</summary><div class="attr-group">${folded.map((a, i) => row(a, i + attrs.length)).join("")}</div></details>` : ""}</section>`;
+  const since = sinceStart(cfg, s);
+  const body = cur.id === "fiziksel" ? `<div class="body-wrap">${bodySketch(lv, pd, nm, artUrl("vucut_insan"), id => night[id] ?? 0)}</div>` : "";
+  const growth = nightTop.length || since.length ? `<div class="card growth">
+      ${nightTop.length ? `<p style="margin:0"><b class="hand green">Bu gece işlenen</b> ${nightTop.map(([id, v]) => `${esc(nm(id))} <b class="green">+${v.toFixed(1)}</b>`).join(" · ")}</p>` : ""}
+      ${since.length ? `<p class="tiny muted" style="margin:0">Gün 1'den bu yana en çok: ${since.map(x => `${esc(x.name)} +${x.gain.toFixed(1)}`).join(" · ")}</p>` : ""}</div>` : "";
   return `<div class="page">${tabs}
     <section class="sec"><h1>Vücut</h1><p class="lede">Kesikli yeşil çizgi: bu gece uykuda işlenecek gelişme.</p>
     ${wounded(cfg, s) ? `<p class="red" style="margin:0">Yaralısın: can ${s.hp}/${maxHp(cfg, s)}. Uyku yaraların çoğunu kapatır.</p>` : ""}</section>
-    ${body}${list}
+    ${growth}${body}${list}
   </div>`;
 }
 
