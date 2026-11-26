@@ -42,12 +42,14 @@ export function gearBonus(s: GameState, attr: string): number {
 const dmgOf = (cfg: Config, id: string) => GAME_ITEMS[id]?.damage ?? CONFIG_WEAPON_DAMAGE[id] ?? 5;
 export interface WeaponSet { dmg: number; crit: number; name: string; dual: boolean; twoHanded: boolean; acc: number; shield: boolean }
 /** Elindekiler: tek silah, iki silah (sol el yarım vurur, isabet biraz düşer), iki elli ya da kalkanlı. */
+/** Demircilik bilen silahının ağzını bakımlı tutar: yakın dövüş silahı vuruşu seviye 100'de +%25. */
+export const honeMul = (s: GameState) => 1 + (s.attrs.demircilik?.level ?? 0) / 400;
 export function weaponSet(cfg: Config, s: GameState): WeaponSet {
   const w = s.equipped.weapon, o = s.equipped.offhand;
   const nm = (id: string) => GAME_ITEMS[id]?.name ?? cfg.item.get(id)?.name ?? id;
   const shield = !!o && !!gearOf(o).shield;
   if (!w) return { dmg: 2, crit: 0, name: "Yumruk", dual: false, twoHanded: false, acc: 0, shield };
-  const base = { dmg: dmgOf(cfg, w), crit: GAME_ITEMS[w]?.critBonus ?? 0, name: nm(w), dual: false, twoHanded: isTwoHanded(w), acc: 0, shield };
+  const base = { dmg: dmgOf(cfg, w) * honeMul(s), crit: GAME_ITEMS[w]?.critBonus ?? 0, name: nm(w), dual: false, twoHanded: isTwoHanded(w), acc: 0, shield };
   if (o && !shield) {
     const off = dmgOf(cfg, o); const skill = (s.attrs.kavrama?.level ?? 10) + (s.attrs.refleks?.level ?? 10);
     return { ...base, dmg: base.dmg + off * 0.5, crit: Math.max(base.crit, GAME_ITEMS[o]?.critBonus ?? 0), name: `${nm(w)} ve ${nm(o)}`, dual: true, acc: -Math.max(0, 10 - (skill - 20) / 4) };

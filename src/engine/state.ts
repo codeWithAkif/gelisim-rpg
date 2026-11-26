@@ -14,7 +14,7 @@ export const NIGHT_START = 14 * 60;  // 20:00: gece başlar
 export interface AttrState {
   level: number;      // işlenmiş seviye
   pending: number;    // dinlenince işlenecek kazanç (fiziksel)
-  peak: number;       // ulaşılan en yüksek seviye (körelme tabanı için)
+  peak: number;       // ulaşılan en yüksek seviye (körelme kapalı; yalnız kayıt için)
   lastUsedDay: number;
 }
 export interface LogEntry { day: number; minute: number; text: string; kind?: "gain" | "quest" | "battle" | "info" | "warn" }

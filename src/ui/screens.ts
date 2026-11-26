@@ -6,6 +6,7 @@ import { DEFERRED_CATEGORIES, type GainReport } from "../engine/progression";
 import { questList, npc } from "../engine/quests";
 import { maxHp } from "../engine/combat";
 import { maxMana } from "../engine/derived";
+import { healPower } from "../engine/healing";
 import { planSession, SESSION_OPTIONS, wounded, TIME_SCALE, fmtDur } from "../engine/session";
 import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount, pouchesOf, pouchSlots, inTab, INV_TABS, MAX_POUCHES, POUCH_SHARE, type InvTab } from "../engine/inventory";
 import { canSell, dayFactor, PARTNERS, stake, ITEM_VALUES } from "../engine/finance";
@@ -22,7 +23,7 @@ import { collected, seenCount, dailyRequests, searchInfo, canSearch } from "../e
 import { COLLECTIBLES, COLL_KIND_NAMES, FINDS, SEARCH_MINUTES, type CollKind } from "../content/explore";
 import { APP_VERSION } from "../update";
 import { phase, PHASE_ICONS } from "./daylight";
-import { here, place, activityPlace } from "../engine/travel";
+import { here, place, activityPlace, activityOpen } from "../engine/travel";
 import { NPC_PLACE, SHOP_PLACE, PLACES } from "../content/map";
 
 export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number; invTab?: InvTab; bagPage?: "envanter" | "techizat" | "elisi" | "pazar"; jobTab?: "acik" | "biten" | "sonraki"; bodyTab?: string; diyarTab?: string }
@@ -64,22 +65,35 @@ export function alerts(cfg: Config, s: GameState): Alert[] {
   return a.sort((x, y) => (x.level === "red" ? 0 : 1) - (y.level === "red" ? 0 : 1));
 }
 
+/** Kararmaya bu kadar dakika kala uyarı görünür; öncesinde üst şeritte yer kaplamaz. */
+export const DARK_WARN_MIN = 120;
+/** Saat yanındaki kısa zaman notu: yalnız akşam yaklaşınca, gece ve gün bitince. */
+export function timeNote(s: GameState): { text: string; level: "" | "warn" | "red" } | null {
+  const dark = minutesToDark(s); const lf = Math.floor(minutesLeft(s));
+  const hm = (m: number) => m >= 60 ? `${Math.floor(m / 60)} sa ${Math.round(m % 60)} dk` : `${Math.round(m)} dk`;
+  if (lf <= 0) return { text: "gün bitti", level: "red" };
+  if (dark <= 0) return { text: `gece · uyku sınırına ${hm(lf)}`, level: "red" };
+  if (dark <= DARK_WARN_MIN) return { text: `kararmaya ${hm(dark)}`, level: "warn" };
+  return null;
+}
+
 export function statusBar(cfg: Config, s: GameState): string {
-  const late = minutesLeft(s) <= 0;
   const g = vitals(cfg, s).map(v => {
     const f = Math.max(0, Math.min(1, v.value / v.max));
     const st = f < 0.25 ? "low" : f < 0.5 ? "warn" : "";
-    return `<div class="gauge ${st}" title="${v.label}"><span class="gi">${VITAL_ICONS[v.key]}</span>
-      <div class="gw"><div class="gl"><span>${v.label}</span><b>${Math.round(v.value)}${v.key === "hp" || v.key === "mana" ? "/" + v.max : ""}</b></div>
+    const val = `${Math.round(v.value)}${v.key === "hp" || v.key === "mana" ? "/" + v.max : ""}`;
+    return `<div class="gauge ${st}" title="${v.label}: ${val}"><span class="gi">${VITAL_ICONS[v.key]}</span>
+      <div class="gw"><div class="gl"><span class="sr">${v.label}</span><b>${val}</b></div>
       <div class="gb"><div class="gf" style="width:${(f * 100).toFixed(1)}%;background:${v.color}"></div></div></div></div>`;
   }).join("");
-  const al = alerts(cfg, s);
+  const al = alerts(cfg, s); const tn = timeNote(s); const ph = phase(s.minute);
   return `<header class="status">
-    <div class="day">Gün ${s.day}<small>${clock(s)}${late ? " · gün bitti" : ""}</small><span class="phase" title="${phase(s.minute).name}">${PHASE_ICONS[phase(s.minute).icon]}<i>${phase(s.minute).name}</i></span></div>
-    <div class="money"><span class="coin">${VITAL_ICONS.coin}</span>${s.money} bakır<button class="sleepbtn ${isNight(s) || s.energy < 25 ? "hot" : ""}" data-act="sleep" aria-label="Uyu ya da dinlen" title="Uyu ya da dinlen">${ICONS.uyku}</button></div>
-    <div class="darkleft">${(() => { const dark = minutesToDark(s); const hm = (m: number) => `${Math.floor(m / 60)} sa ${Math.round(m % 60)} dk`; const lf = Math.floor(minutesLeft(s));
-      return dark > 0 ? `Kararmaya <b>${hm(dark)}</b>` : lf > 0 ? `<b class="red">Gece</b> · sınıra <b>${hm(lf)}</b>` : `<span class="red">Gün bitti</span>`; })()}</div>
-    <button class="where" data-act="show-place" data-id="${esc(s.journey ? s.journey.to : s.location)}">⌖ ${s.journey ? `Yolda → ${esc(place(s.journey.to)?.name ?? "")}` : esc(here(s).name)}</button>
+    <div class="st-row">
+      <div class="day">Gün ${s.day}<small>${clock(s)}</small><span class="phase" title="${ph.name}" aria-label="${ph.name}">${PHASE_ICONS[ph.icon]}</span></div>
+      <button class="where" data-act="show-place" data-id="${esc(s.journey ? s.journey.to : s.location)}">⌖ ${s.journey ? `Yolda → ${esc(place(s.journey.to)?.name ?? "")}` : esc(here(s).name)}</button>
+      <div class="money"><span class="coin">${VITAL_ICONS.coin}</span>${s.money}<span class="sr"> bakır</span><button class="sleepbtn ${isNight(s) || s.energy < 25 ? "hot" : ""}" data-act="sleep" aria-label="Uyu ya da dinlen" title="Uyu ya da dinlen">${ICONS.uyku}</button></div>
+    </div>
+    ${tn ? `<div class="tnote ${tn.level}">${tn.text}</div>` : ""}
     <div class="vitals">${g}</div>
     ${al.length ? `<div class="alert-strip ${al[0].level}" role="status"><b>!</b><span>${esc(al[0].text)}${al.length > 1 ? ` <i>(+${al.length - 1})</i>` : ""}</span></div>` : ""}
   </header>`;
@@ -232,7 +246,7 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
     if (equippedKey?.startsWith("pouch")) acts.push(`<button class="btn small" data-act="detach" data-id="${equippedKey.slice(5)}">Sök</button>`);
     if (!equippedKey && it.kind === "Çanta") acts.push(`<button class="btn small" data-act="attach" data-id="${esc(selId)}" ${pouchesOf(s).length >= MAX_POUCHES ? "disabled" : ""}>${esc(itemInfo(cfg, bagOf(s)).name)}'na dik (+${pouchSlots(cfg, selId)} göz)</button>`);
     if (it.kind === "Yiyecek") acts.push(`<button class="btn small primary" data-act="eat" data-id="${esc(selId)}">Ye (+${it.satiety} tokluk)</button>`);
-    if (it.heal) acts.push(`<button class="btn small primary" data-act="heal" data-id="${esc(selId)}">Yarayı sar (+${it.heal} can)</button>`);
+    if (it.heal) acts.push(`<button class="btn small primary" data-act="heal" data-id="${esc(selId)}">Yarayı sar (+${Math.round(healPower(cfg, s, selId))} can)</button>`);
     if (!equippedKey && it.kind !== "Çanta") acts.push(`<button class="btn small red" data-act="drop" data-id="${esc(selId)}">Bırak</button>`);
     const val = ITEM_VALUES[selId] ?? it.price; const gm = gearOf(selId);
     const where = gm.bow ? "yay" : gm.shield ? "kalkan · sol el" : gm.hands === 2 ? "iki elli" : gm.hands === 1 ? "tek elli" : gm.part ? ({ bas: "baş", govde: "üst", alt: "alt", el: "eller", taki: "takı" } as const)[gm.part] : "";
@@ -292,15 +306,21 @@ export function calisScreen(cfg: Config, s: GameState, ui: UiState): string {
       ${!best && activityPlace(id) && !activityPlace(id)!.includes(s.location) ? `<div class="row"><button class="btn small blue" data-act="show-place" data-id="${esc(activityPlace(id)![0])}">Haritada göster</button></div>` : ""}</div>`;
   };
   const isMagic = (a: { params?: Record<string, unknown> }) => typeof a.params?.element === "string";
-  const selfActs = cfg.data.activities.filter(a => a.kind === "aktivite" && !isMagic(a)).map(a => row(a.id)).join("");
+  // henüz açılmamış bölgelerin işleri gösterilmez; yalnız sayısı ipucu olarak kalır
+  const open = (a: { id: string }) => activityOpen(s, a.id);
+  const selfAll = cfg.data.activities.filter(a => a.kind === "aktivite" && !isMagic(a));
+  const lessonAll = cfg.data.activities.filter(a => a.kind === "ders" && teacherOf(a.id));
+  const hidden = selfAll.filter(a => !open(a)).length + lessonAll.filter(a => !open(a)).length;
+  const selfActs = selfAll.filter(open).map(a => row(a.id)).join("");
   const magicActs = cfg.data.activities.filter(a => isMagic(a) && s.knownElements.includes(String(a.params!.element))).map(a => row(a.id)).join("");
-  const lessons = cfg.data.activities.filter(a => a.kind === "ders" && teacherOf(a.id)).map(a => row(a.id)).join("");
+  const lessons = lessonAll.filter(open).map(a => row(a.id)).join("");
   return `<div class="page">
     <section class="sec"><h1>Çalış</h1><p class="lede">Bir çalışma seç ve süresini belirle. Oyunda 1 saat, gerçekte 1 dakika sürer. Uzun çalışan çok kazanır ama yorulur; aynı şeyi tekrarlamak giderek daha az kazandırır.</p></section>
     ${res ? `<div class="card flash"><span class="entry-title">${esc(res.title)}</span>${gainList(cfg, res.gains)}${res.note ? `<p class="muted" style="margin:0;font-size:14px">${esc(res.note)}</p>` : ""}</div>` : ""}
     ${magicActs ? `<section class="sec"><h2>Büyü</h2><p class="muted" style="margin:0;font-size:14px">Annenin sayfalarına göre çalış. Büyü de bir beceri: tekrar ettikçe ustalaşırsın.</p><div>${magicActs}</div></section>` : ""}
     <section class="sec"><h2>Kendi başına</h2><div>${selfActs}</div></section>
-    <section class="sec"><h2>Dersler</h2><p class="muted" style="margin:0;font-size:14px">Öğretmenler ancak tanıdıkları birine ders verir. Ücret başlayan her saat için.</p><div>${lessons}</div></section>
+    <section class="sec"><h2>Dersler</h2><p class="muted" style="margin:0;font-size:14px">Öğretmenler ancak tanıdıkları birine ders verir. Ücret başlayan her saat için.</p><div>${lessons}</div>
+      ${hidden ? `<p class="tiny muted" style="margin:6px 0 0">Yeni yerlere vardıkça ${hidden} çalışma daha öğreneceksin.</p>` : ""}</section>
   </div>`;
 }
 

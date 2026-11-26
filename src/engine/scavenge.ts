@@ -15,7 +15,7 @@ import { weaponSet, hasBow, totalArmor, slotsFor } from "./gear";
 import { spellOptions } from "./magic";
 import { trapsOwned, trapEffect } from "./engineering";
 import { petMul } from "./pet";
-import { healOf, aidMul } from "./healing";
+import { healOf, healPower } from "./healing";
 
 /** Harabede büyü karşılıkları: büyü türü, hasar çarpanı, patlama yarıçapı. */
 export type SpellKind = "simsek" | "ates" | "buz" | "camur" | "sarmasik" | "karga" | "kilic";
@@ -489,6 +489,6 @@ export function healRun(cfg: Config, s: GameState, n: Scav, id: string): { ok: b
   if (n.bag[id] > 0) { n.bag[id]--; if (n.bag[id] <= 0) delete n.bag[id]; }
   else if ((s.inventory[id] ?? 0) > 0) { s.inventory[id]--; if (s.inventory[id] <= 0) delete s.inventory[id]; }
   else return { ok: false };
-  const before = n.hp; n.hp = Math.min(n.maxHp, n.hp + h * 1.4 * n.tr.hp * aidMul(s)); const g: GainReport = {}; applyGain(cfg, s, "ilk_yardim", 0.3, g); return { ok: true, healed: Math.round(n.hp - before) };
+  const before = n.hp; n.hp = Math.min(n.maxHp, n.hp + healPower(cfg, s, id) * 1.4 * n.tr.hp); const g: GainReport = {}; applyGain(cfg, s, "ilk_yardim", 0.3, g); return { ok: true, healed: Math.round(n.hp - before) };
 }
 export const healItemsAvailable = (s: GameState, n: Scav) => ["sargi_bezi", "yara_merhemi"].map(id => ({ id, n: (n.bag[id] ?? 0) + (s.inventory[id] ?? 0) })).filter(x => x.n > 0);

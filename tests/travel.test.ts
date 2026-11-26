@@ -56,3 +56,12 @@ test("yoldayken çalışılmaz, pazardan alınmaz; geri dönülebilir", () => {
   expect(finishJourney(cfg, s, half + s.journey!.durMs + 10)).not.toBeNull();
   expect(s.location).toBe("koy_meydani");
 });
+
+test("açılmamış bölgenin çalışmaları gizlidir; bölüm açılınca görünür", async () => {
+  const { activityOpen } = await import("../src/engine/travel");
+  const s = newGame(cfg, 1);
+  expect(activityOpen(s, "kosu")).toBe(true);            // yeri olmayan her yerde yapılır
+  expect(activityOpen(s, "resim")).toBe(true);           // Nuri köyde
+  expect(activityOpen(s, "satranc")).toBe(false);        // Usta Derya Karaçam'da
+  s.story.reached.push("mektup"); expect(activityOpen(s, "satranc")).toBe(true);
+});

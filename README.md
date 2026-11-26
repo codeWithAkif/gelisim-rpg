@@ -2,7 +2,7 @@
 
 Gerçekçi gelişim sistemli, offline, dikey ekran bir mobil RPG.
 Klasik level/XP yok: koştukça daha hızlı koşarsın, resim dersi aldıkça gözlemin keskinleşir,
-anatomi bildikçe kritik vuruşların artar. Kaslar uykuda gelişir; aç uyursan yarım gelişir.
+anatomi bildikçe kritik vuruşların artar. Kaslar uykuda gelişir; aç uyursan yarım gelişir. Öğrendiğin şey körelmez.
 Arayüz, karakterin kendi defteri gibi çizilir.
 
 ## Hikâye

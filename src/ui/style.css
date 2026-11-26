@@ -41,15 +41,20 @@ button { font: inherit; color: inherit; }
 
 /* üst şerit */
 .status {
-  padding: calc(var(--safe-top) + 8px) 16px 8px;
-  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: end;
+  padding: calc(var(--safe-top) + 6px) 16px 8px;
+  display: flex; flex-direction: column; gap: 4px;
   border-bottom: 1.5px solid var(--ink); background: var(--paper);
   position: relative;
 }
 .status::after { content: ""; position: absolute; left: 10px; right: 14px; bottom: -5px; border-bottom: 1px solid var(--ink-soft); opacity: .5; }
-.status .day { font-family: var(--f-hand); font-size: 26px; line-height: 1; font-weight: 700; }
-.status .day small { font-size: 19px; font-weight: 500; color: var(--ink-soft); margin-left: 6px; }
-.status .money { font-family: var(--f-hand); font-size: 21px; text-align: right; }
+/* 1. satır: gün ve saat · konum · para ve uyku */
+.st-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.status .day { font-family: var(--f-hand); font-size: 22px; line-height: 1; font-weight: 700; white-space: nowrap; display: flex; align-items: center; flex-shrink: 0; }
+.status .day small { font-size: 17px; font-weight: 500; color: var(--ink-soft); margin-left: 5px; }
+.status .tnote { font-family: var(--f-hand); font-size: 16px; line-height: 1; color: #A35A12; }
+.status .tnote.red { color: var(--red); }
+.status .money { font-family: var(--f-hand); font-size: 20px; text-align: right; margin-left: auto; white-space: nowrap; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .meters { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin-top: 6px; }
 .meter { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--ink-soft); letter-spacing: .02em; }
 .meter b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -221,10 +226,10 @@ h3 { font-size: 22px; }
 .big-text #app, .big-text .modal, .big-text .battle-panel, .big-text .plan-panel { zoom: 1.12; }
 
 /* göstergeler */
-.vitals { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; margin-top: 6px; }
+.vitals { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; }
 .gauge { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px; align-items: center; }
 .gauge .gi svg { width: 22px; height: 22px; display: block; }
-.gauge .gl { display: flex; justify-content: space-between; gap: 4px; font-size: 11px; color: var(--ink-soft); line-height: 1.1; }
+.gauge .gl { display: flex; justify-content: flex-end; gap: 4px; font-size: 14px; color: var(--ink-soft); line-height: 1.1; }
 .gauge .gl b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 500; }
 .gb { height: 8px; border: 1.2px solid var(--ink); border-radius: 5px 3px 5px 3px; background: rgba(255,255,255,.35); overflow: hidden; margin-top: 2px; }
 .gb.big { height: 14px; }
@@ -266,7 +271,7 @@ h3 { font-size: 22px; }
 .choice .tiny { font-size: 12px; }
 
 /* harita */
-.where { grid-column: 1; justify-self: start; border: 0; background: none; padding: 0; font-family: var(--f-hand); font-size: 18px; color: var(--blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; background: none; padding: 0; font-family: var(--f-hand); font-size: 18px; color: var(--blue); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 main.map-mode { padding: 0; overflow: hidden; position: relative; }
 .map-host, .map-wrap { position: absolute; inset: 0; }
 .map-svg { width: 100%; height: 100%; display: block; touch-action: none; background: #B9CDD0; }
@@ -291,7 +296,6 @@ main.map-mode { padding: 0; overflow: hidden; position: relative; }
 body, .status, .tabs, main, .modal, .battle, .battle-panel, .plan-panel, .session-screen, .intro { transition: background-color 1.2s ease, color 1.2s ease; }
 .day .phase { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; vertical-align: 3px; }
 .day .phase svg { width: 20px; height: 20px; }
-.day .phase i { font-style: normal; font-family: var(--f-hand); font-size: 16px; font-weight: 500; color: var(--ink-soft); }
 .night .alert-strip.amber { background: rgba(217,165,58,.18); color: #F0C878; }
 .night .alert-strip.red { background: rgba(232,144,126,.16); color: #F2A898; }
 .night .gauge .gl b { color: var(--ink); }
@@ -517,9 +521,6 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .name-input { font: 22px var(--f-hand); padding: 6px 10px; border: 1.5px solid var(--ink); border-radius: 8px; background: var(--paper); color: var(--ink); width: 100%; }
 
 /* durum çubuğu: kararmaya kalan süre, uyku düğmesinin altında */
-.darkleft { grid-column: 2; text-align: right; font-family: var(--f-hand); font-size: 16px; color: var(--ink-soft); line-height: 1.1; align-self: center; }
-.darkleft b { font-weight: 700; color: var(--ink); }
-.darkleft b.red { color: var(--red); }
 
 /* işler: tür etiketleri ve takip kartı */
 .kind-chip { display: inline-block; font-family: var(--f-hand); font-size: 16px; line-height: 1; padding: 3px 9px; border-radius: 10px 12px 9px 12px; border: 1.5px solid var(--ink-soft); background: var(--paper-2); white-space: nowrap; }

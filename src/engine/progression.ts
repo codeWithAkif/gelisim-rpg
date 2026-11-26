@@ -1,5 +1,5 @@
 // Gerçekçi gelişim: yaptığın şeyde gelişirsin, özellikler birbirini besler,
-// getiri azalır, fiziksel kazanç dinlenirken işlenir, kullanılmayan beceri körelir.
+// getiri azalır, fiziksel kazanç dinlenirken işlenir. Körelme yok: kullanılmayan beceri kaybolmaz (oyuncu kararı).
 import type { Config } from "./config";
 import { type GameState, DAY_MINUTES, log, minutesLeft, repOf } from "./state";
 import { teacherOf } from "../content/world";

@@ -6,7 +6,8 @@ import { EXTRA_ATTRS } from "../content/attrs";
 export interface Link { w: number }
 export interface Attribute {
   id: string; name: string; cat?: string; base?: number; max?: number; learnRate?: number;
-  diminish?: number; decayRate?: number; decayFloor?: number; desc?: string;
+  diminish?: number; decayRate?: number; decayFloor?: number;   // decay*: editörden gelir, oyunda kullanılmaz (körelme kapalı)
+  desc?: string;
   params?: Record<string, number | string>;
   transfers: { to: string; w: number }[];
   derivedTerms: { to: string; w: number }[];
