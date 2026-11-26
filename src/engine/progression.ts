@@ -91,8 +91,9 @@ export function summarize(cfg: Config, r: GainReport, limit = 3): string {
 export interface SleepReport { applied: GainReport; decayed: GainReport; recovery: number; energy: number }
 
 /** Günü bitirir: dinlenme kazancı işlenir, enerji yenilenir. Uyku hiçbir özelliği köreltmez. */
-export function sleep(cfg: Config, s: GameState): SleepReport {
-  const recovery = s.satiety >= 40 ? 1 : s.satiety >= 15 ? 0.75 : 0.45;
+/** quality: uyunan yerin kalitesi (yatak 1, saman 0.9, çadır 0.8, açıkta 0.65). */
+export function sleep(cfg: Config, s: GameState, quality = 1): SleepReport {
+  const recovery = (s.satiety >= 40 ? 1 : s.satiety >= 15 ? 0.75 : 0.45) * quality;
   const applied: GainReport = {}, decayed: GainReport = {};
   for (const [id, st] of Object.entries(s.attrs)) {
     if (st.pending > 0) {
@@ -102,13 +103,13 @@ export function sleep(cfg: Config, s: GameState): SleepReport {
     }
     // uyku köreltmez: dinlenme yalnız kazancı işler (oyuncu kararı)
   }
-  const energy = s.satiety >= 40 ? 100 : s.satiety >= 15 ? 85 : 65;
+  const energy = Math.round((s.satiety >= 40 ? 100 : s.satiety >= 15 ? 85 : 65) * (0.55 + 0.45 * quality));
   s.energy = energy;
   s.mana = maxMana(cfg, s);
   s.satiety = Math.max(0, s.satiety - 30);
   s.day += 1; s.minute = 0;
   const parts = summarize(cfg, applied);
-  log(s, recovery < 1 ? `Aç uyudun; kasların yarım dinlendi. ${parts}` : `İyi uyudun. Gece işlenen: ${parts}`, recovery < 1 ? "warn" : "gain");
+  log(s, recovery < 0.75 && quality >= 1 ? `Aç uyudun; kasların yarım dinlendi. ${parts}` : `İyi uyudun. Gece işlenen: ${parts}`, recovery < 1 ? "warn" : "gain");
   return { applied, decayed, recovery, energy };
 }
 

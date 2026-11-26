@@ -365,8 +365,8 @@ export function islerScreen(cfg: Config, s: GameState, ui: UiState = {}): string
     ${s.journey ? "" : placePic(s.location, here(s).name, "art-place")}
     <section class="sec card"><div class="entry-head"><h2>Bugün</h2><span class="hand">${clock(s)}</span></div>
       <p style="margin:0">${left > 0 ? `Hava kararmadan <b>${Math.floor(left / 60)} saat ${left % 60} dakika</b> var.` : "Gün bitti. Dinlenmezsen yarın hiçbir şey yapamazsın."}</p>
-      <div class="row"><button class="btn primary" data-act="sleep">${left > 4 * 60 ? "Erken yat" : "Uyu"}</button>
-      <span class="muted tiny">Kaslar uykuda gelişir, yaralar kapanır. Tok uyumak tam dinlenme demek.</span></div></section>
+      <div class="row"><button class="btn primary" data-act="sleep">Uyu ya da dinlen</button>
+      <span class="muted tiny">Nerede uyuduğun önemli: misafir olunan ev güvenli, açıkta uyumak tehlikeli. Dinlenmek enerji verir ama acıktırır.</span></div></section>
     ${exploreCards(cfg, s)}
     <section class="sec"><h1>İşler</h1><p class="lede">${s.region && s.region !== "taspinar" ? "Önce bulunduğun yerin işleri; uzaktakiler aşağıda." : "Köylünün işi küçük, ödülü de küçük olur. Önemli bir iş, onun için değerli bir şey demektir."}</p></section>
     <section class="sec">${list || `<p class="muted" style="margin:0">Şu an açık bir iş yok. Köyü dolaş, insanlarla tanış.</p>`}

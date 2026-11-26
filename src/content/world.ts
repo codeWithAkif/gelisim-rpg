@@ -26,6 +26,7 @@ export const GAME_ITEMS: Record<string, GameItem> = {
   ip: { id: "ip", name: "Kenevir ipi", slot: "Malzeme", stack: 10, price: 1, desc: "Sağlam bir sicim. Dikiş ve tuzak için." },
   bez_torba: { id: "bez_torba", name: "Bez torba", slot: "Çanta", capacity: 8, desc: "Omza asılan kaba bir torba. 8 göz." },
   deri_canta: { id: "deri_canta", name: "Deri çanta", slot: "Çanta", capacity: 12, desc: "Kendi diktiğin, iki bölmeli deri çanta. 12 göz." },
+  cadir: { id: "cadir", name: "Yol çadırı", slot: "Eşya", price: 12, desc: "Keçe ve iki sırık. Açıkta uyumaktan iyidir: yağmuru, rüzgârı keser." },
   ok: { id: "ok", name: "Ok", slot: "Malzeme", stack: 20, price: 1, desc: "Kaz tüylü, demir uçlu av oku. Atınca çoğu zaman kaybolur." },
   kurt_postu: { id: "kurt_postu", name: "Akyele'nin postu", slot: "Zırh", armor: 2, desc: "Kalın, beyaz yeleli bir post. Soğuğu ve dişleri tutar." },
   // keşifle toplananlar (content/explore.ts)
@@ -49,8 +50,8 @@ export const CRAFTS: Craft[] = [
 export const SHOP = ["ekmek", "peynir", "deri", "ip", "ok", "av_yayi"];
 /** Pazarlar: nerede ne satılır. Şehir pazarı daha zengin, daha pahalı. */
 export const MARKETS: Record<string, { name: string; items: string[] }> = {
-  koy_meydani: { name: "Köy pazarı", items: SHOP },
-  karacam: { name: "Karaçam çarşısı", items: ["ekmek", "peynir", "ok", "av_yayi", "deri", "ip", "deri_zirh"] },
+  koy_meydani: { name: "Köy pazarı", items: [...SHOP, "cadir"] },
+  karacam: { name: "Karaçam çarşısı", items: ["ekmek", "peynir", "ok", "av_yayi", "deri", "ip", "deri_zirh", "cadir"] },
   ardic_kul: { name: "Kül mahallesi tezgâhı", items: ["ekmek", "ok"] },
 };
 /** Config eşyalarının köy pazarındaki fiyatı. */

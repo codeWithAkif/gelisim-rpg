@@ -104,7 +104,7 @@ const LEVELS: Record<string, (s: GameState) => View> = {
   ulke: () => ({ cx: 500, cy: 760, w: 1000 }),
 };
 
-export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: MapHooks, saved?: { view?: View; sel?: string }): { state: () => { view: View; sel?: string }; refresh: () => void } {
+export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: MapHooks, saved?: { view?: View; sel?: string; folded?: boolean }): { state: () => { view: View; sel?: string; folded?: boolean }; refresh: () => void } {
   host.innerHTML = `<div class="map-wrap"><svg class="map-svg" aria-label="Harita"><g class="terrain">${terrain()}</g><g class="dyn"></g></svg>
     <div class="map-zoom"><button data-z="koy">Köy</button><button data-z="vadi">Vadi</button><button data-z="ulke">Ülke</button></div>
     <div class="map-card" id="mapCard"></div></div>`;
@@ -112,6 +112,8 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
   const card = host.querySelector<HTMLElement>("#mapCard")!;
   let view: View = saved?.view ?? LEVELS.koy(s);
   let sel: string | undefined = saved?.sel ?? s.location;
+  /** Alttaki kart küçültülebilir: haritaya yer açılır, başlık ve özet kalır. */
+  let folded = saved?.folded ?? false;
   let walker: { x: number; y: number; trail: [number, number][] } | null = null;
   const busy = false;
   /** Yolculuk sürüyorsa figürün yerini ve geçilen izi hesapla. */
@@ -193,7 +195,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     const n = acts.some(x => x.primary) ? null : nextHint(s);
     const nextRow = n && n.id ? `<div class="here-act next"><div><b>${esc(n.label)}</b>${n.sub ? `<div class="tiny muted">${esc(n.sub)}</div>` : ""}</div><button class="btn small blue" data-sel="${n.id}">Göster</button></div>` : "";
     return `<div class="here-acts">${nextRow}${acts.map(x => `<div class="here-act${x.primary ? " main" : ""}"><div><b>${esc(x.label)}</b>${x.sub ? `<div class="tiny muted">${esc(x.sub)}</div>` : ""}${x.disabled ? `<div class="tiny red">${esc(x.disabled)}</div>` : ""}</div>
-      <button class="btn small ${x.primary ? "red" : x.act === "accept" ? "primary" : ""}" data-act="${x.act}" data-id="${esc(x.id)}" ${x.disabled ? "disabled" : ""}>${x.act === "accept" ? "Üstlen" : x.act === "fight" ? "Hazırlan" : x.act === "walk" ? "Yap" : x.act === "deliver" ? "Ver" : x.act === "search" ? "Ara" : x.act === "market" ? "Aç" : x.act === "partner" ? "Görüş" : "Başla"}</button></div>`).join("")}</div>`;
+      <button class="btn small ${x.primary ? "red" : x.act === "accept" ? "primary" : ""}" data-act="${x.act}" data-id="${esc(x.id)}" ${x.disabled ? "disabled" : ""}>${x.act === "accept" ? "Üstlen" : x.act === "fight" ? "Hazırlan" : x.act === "walk" ? "Yap" : x.act === "deliver" ? "Ver" : x.act === "search" ? "Ara" : x.act === "market" ? "Aç" : x.act === "partner" ? "Görüş" : x.act === "sleep" ? "Seç" : "Başla"}</button></div>`).join("")}</div>`;
   }
   function renderCard() {
     if (s.journey) {
@@ -215,14 +217,14 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
     }
     const plan = at ? null : planTravel(cfg, s, sel);
     const peopleRow = people.length ? `<div class="row">${people.map(n => `<span class="person">${personPic(n, 30, known(n.id))}<span class="tiny">${known(n.id) ? esc(n.name) : "?"}</span></span>`).join("")}</div>` : "";
-    card.classList.toggle("here", at);
+    card.classList.toggle("here", at); card.classList.toggle("folded", folded);
     card.innerHTML = at
       // buradayken: önce yapılabilecekler, sonra yer bilgisi
-      ? `<div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">buradasın</span></div>
+      ? `<div class="entry-head fold-head" data-fold="1"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">buradasın${folded ? ` · ${placeActions(cfg, s, s.location).length} seçenek` : ""} <span class="fold-btn" aria-label="${folded ? "Aç" : "Küçült"}">${folded ? "▴" : "▾"}</span></span></div>
         ${hereActions()}
         ${peopleRow}
         <details class="place-more"><summary class="tiny muted">Bu yer hakkında</summary>${placePic(sel, p.name, "art-thumb")}<p class="tiny" style="margin:0">${esc(p.desc)}</p></details>`
-      : `${placePic(sel, p.name, "art-thumb")}<div class="entry-head"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${plan ? `${plan.minutes} dk yol · enerji −${plan.energy}` : ""}</span></div>
+      : `${folded ? "" : placePic(sel, p.name, "art-thumb")}<div class="entry-head fold-head" data-fold="1"><span class="entry-title">${esc(p.name)}</span><span class="entry-meta">${plan ? `${plan.minutes} dk yol` : ""} <span class="fold-btn">${folded ? "▴" : "▾"}</span></span></div>
         <p class="tiny" style="margin:0">${esc(p.desc)}</p>${peopleRow}
         ${(() => { const acts = placeActions(cfg, s, sel); return acts.length ? `<p class="tiny" style="margin:0"><b>Orada:</b> ${acts.slice(0, 3).map(x => esc(x.label)).join(" · ")}${acts.length > 3 ? " …" : ""}</p>` : ""; })()}
         <div class="row"><button class="btn primary" data-go="${sel}" ${plan?.ok && !busy ? "" : "disabled"}>Git</button>${plan && !plan.ok ? `<span class="lock">${esc(plan.reason ?? "")}</span>` : ""}</div>`;
@@ -254,6 +256,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
   svg.addEventListener("wheel", e => { e.preventDefault(); view.w *= Math.exp(e.deltaY * 0.0015); applyView(); }, { passive: false });
 
   host.addEventListener("click", e => {
+    if ((e.target as HTMLElement).closest("[data-fold]")) { folded = !folded; renderCard(); return; }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b || b.disabled) return;
     if (b.dataset.z) { const target = LEVELS[b.dataset.z](s); zoomTo(target); }
     if (b.dataset.go) hooks.onTravel(b.dataset.go);
@@ -270,7 +273,7 @@ export function mountMap(host: HTMLElement, cfg: Config, s: GameState, hooks: Ma
   new ResizeObserver(() => applyView()).observe(svg);
   syncWalker(); applyView(); renderCard();
   return {
-    state: () => ({ view, sel }),
+    state: () => ({ view, sel, folded }),
     refresh: () => {
       syncWalker();
       // yürüyen figür ekrandan çıkmasın

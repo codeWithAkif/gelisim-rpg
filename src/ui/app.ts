@@ -28,6 +28,8 @@ import { sfx, buzz, ambience, unlockAudio } from "./feel";
 import { darkness } from "./daylight";
 import { searchHere, deliverRequest } from "../engine/explore";
 import { sell, partner, stake, invest, withdraw, nightlyFinance } from "../engine/finance";
+import { sleepOptions, sleepAt, rest, type SleepKind } from "../engine/rest";
+import { minutesLeft } from "../engine/state";
 import { itemPic, artUrl } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
@@ -197,18 +199,7 @@ export function startApp(root: HTMLElement) {
       case "buy": { const r = buy(cfg, s, id); sfx(r.ok ? "coin" : "bad"); toast(r.ok ? `${itemInfo(cfg, id).name} aldın.` : r.reason ?? ""); persist(); render(); break; }
       case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }
       case "unequip": { const r = unequip(cfg, s, id as "weapon" | "armor"); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
-      case "sleep": {
-        if (s.journey) { toast("Yoldayken uyuyamazsın."); break; }
-        const hpBefore = s.hp; const rep = sleep(cfg, s); const fin = nightlyFinance(s);
-        const m = maxHp(cfg, s); s.hp = Math.min(m, Math.round(hpBefore + m * 0.6));
-        persist(); render(false);
-        modal(`<h2>Gün ${s.day - 1} bitti</h2><p class="lede">${rep.recovery < 1 ? "Aç yattın; vücudun tam dinlenemedi." : "Tok ve yorgun uyudun. Vücut gece çalıştı."}</p>
-          <h3>Gece işlenen</h3>${gainList(cfg, rep.applied, 8)}
-          ${fin.length ? `<h3>Ortaklıklar</h3>${fin.map(l => `<div class="ledger-row"><small>${esc(l.partner)}</small><span>${esc(l.text)}</span><b class="${l.amount >= 0 ? "green" : "red"}">${l.amount >= 0 ? "+" : ""}${l.amount}</b></div>`).join("")}` : ""}
-`,
-          [{ label: "Güne başla", cls: "primary", fn: () => storyTick() }]);
-        break;
-      }
+      case "sleep": openSleep(); break;
       case "accept": acceptQuest(s, id); sfx("page"); persist(); render(); toast("İşi üstlendin."); break;
       case "walk": doWalk(id); break;
       case "fight": doFight(id); break;
@@ -236,6 +227,36 @@ export function startApp(root: HTMLElement) {
     }
   });
 
+  /** Uyu ya da dinlen: nerede uyuyacağın dinlenmeyi ve gecenin tehlikesini belirler. */
+  function openSleep() {
+    if (s.journey) { toast("Yoldayken uyuyamazsın."); return; }
+    const opts = sleepOptions(s); const left = minutesLeft(s);
+    const pct = (r: number) => r <= 0 ? "güvenli" : r < 0.12 ? "az tehlikeli" : r < 0.25 ? "tehlikeli" : "çok tehlikeli";
+    const btns: { label: string; cls?: string; fn: () => void }[] = [];
+    for (const o of opts) if (o.ok) btns.push({ label: o.kind === "lodging" ? `Burada uyu${o.cost ? ` (${o.cost} bakır)` : ""}` : o.name, cls: o.kind === "lodging" ? "primary" : "", fn: () => doSleep(o.kind) });
+    for (const m of [30, 60, 120]) if (left >= m) btns.push({ label: `${m < 60 ? m + " dk" : m / 60 + " saat"} dinlen`, fn: () => doRest(m) });
+    btns.push({ label: "Vazgeç", fn: () => {} });
+    modal(`<p class="hand muted" style="margin:0">${left > 4 * 60 ? "Daha erken" : "Gün bitiyor"} · ${clockStr()}</p><h2>Uyu ya da dinlen</h2>
+      ${opts.map(o => `<div class="here-act${o.kind === "lodging" && o.ok ? " main" : ""}"><div><b>${esc(o.name)}</b><div class="tiny muted">${esc(o.note)}</div>
+        <div class="tiny">Dinlenme %${Math.round(o.quality * 100)} · ${pct(o.risk)}${o.risk > 0 ? ` (%${Math.round(o.risk * 100)})` : ""}</div>${o.ok ? "" : `<div class="tiny red">${esc(o.reason ?? "")}</div>`}</div></div>`).join("")}
+      <p class="muted tiny" style="margin:0">Dinlenmek zamanı ilerletir: enerjin ve büyü gücün döner ama acıkırsın. Gece kası işler, yarayı uyku kapatır. ${s.pet ? `${esc(s.pet.name)} yanındayken açıkta daha güvendesin.` : ""}</p>`, btns);
+  }
+  function clockStr() { const h = 6 + Math.floor(s.minute / 60), mm = Math.floor(s.minute % 60); return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`; }
+  function doRest(m: number) {
+    const r = rest(cfg, s, m); if ("error" in r) { toast(r.error); return; }
+    sfx("page"); persist(); render();
+    toast(`${r.minutes} dk dinlendin: enerji +${Math.round(r.energy)}, tokluk ${Math.round(r.satiety)}.`);
+  }
+  function doSleep(kind: SleepKind) {
+    const r = sleepAt(cfg, s, kind); if ("error" in r) { toast(r.error); return; }
+    const fin = nightlyFinance(s); const rep = r.report;
+    persist(); render(false); if (r.event) { sfx("hurt"); buzz("medium"); }
+    modal(`<h2>Gün ${s.day - 1} bitti</h2><p class="lede">${esc(r.option.kind === "lodging" ? `Geceyi geçirdin: ${r.option.name}.` : r.option.kind === "tent" ? "Çadırda uyudun." : "Açıkta uyudun.")} ${rep.recovery < 0.75 ? "Tam dinlenemedin." : "Vücut gece çalıştı."}</p>
+      ${r.event ? `<p class="story-after" style="border-color:var(--red)">${esc(r.event.text)}</p>` : ""}
+      <h3>Gece işlenen</h3>${gainList(cfg, rep.applied, 8)}
+      ${fin.length ? `<h3>Ortaklıklar</h3>${fin.map(l => `<div class="ledger-row"><small>${esc(l.partner)}</small><span>${esc(l.text)}</span><b class="${l.amount >= 0 ? "green" : "red"}">${l.amount >= 0 ? "+" : ""}${l.amount}</b></div>`).join("")}` : ""}`,
+      [{ label: "Güne başla", cls: "primary", fn: () => storyTick() }]);
+  }
   /** Ortaklık: şartlar, payın, yatır ya da çek. */
   function openPartner(id: string) {
     const p = partner(id)!; const st = stake(s, id); const lock = p.unlock(s);

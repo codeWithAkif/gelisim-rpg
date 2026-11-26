@@ -400,3 +400,8 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .ledger-row b { font-family: var(--f-hand); font-size: 18px; font-variant-numeric: tabular-nums; }
 .ledger-row b.green { color: var(--green); } .ledger-row b.red { color: var(--red); }
 .update-log { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; -webkit-user-select: text; user-select: text; }
+.fold-head { cursor: pointer; -webkit-user-select: none; user-select: none; }
+.fold-btn { display: inline-block; margin-left: 6px; font-size: 16px; color: var(--ink); padding: 0 6px; border: 1px solid var(--paper-edge); border-radius: 6px; }
+.map-card.folded > :not(.fold-head) { display: none; }
+.map-card.folded { max-height: none; }
+.map-card::before { content: ""; display: block; width: 40px; height: 4px; margin: -4px auto 2px; border-radius: 2px; background: var(--paper-edge); }
