@@ -2,6 +2,7 @@
 import type { Config } from "./config";
 import type { Session } from "./session";
 import type { Journey } from "./journey";
+import { normalizeGear } from "./gear";
 
 export const SAVE_VERSION = 1;
 export const DAY_START_HOUR = 6;     // uyanış
@@ -30,7 +31,11 @@ export interface GameState {
   attrs: Record<string, AttrState>;
   rep: Record<string, Record<string, number>>; // bölge → boyut → değer
   inventory: Record<string, number>;           // eşya → adet
-  equipped: { weapon?: string; armor?: string; bag?: string; pouches?: string[] }; // pouches: ana çantaya dikilmiş ek çantalar
+  equipped: {                                  // kuşam (engine/gear.ts)
+    weapon?: string; offhand?: string; bow?: string;                         // sağ el, sol el, yay
+    head?: string; armor?: string; legs?: string; hands?: string; trinket1?: string; trinket2?: string; // baş, üst, alt, eller, takılar
+    bag?: string; pouches?: string[];                                        // çanta ve ana çantaya dikilmiş ek bölmeler
+  };
   familiarity: Record<string, number>;         // silah → alışkınlık (0–100)
   quests: Record<string, QuestState>;
   metNpcs: string[];
@@ -79,6 +84,7 @@ export function migrate(cfg: Config, s: GameState): GameState {
   s.journal ??= {};
   s.location ??= "koy_meydani"; // eski kayıtlar köyde
   if (!s.equipped.bag) { s.equipped.bag = "bez_torba"; s.inventory.bez_torba = (s.inventory.bez_torba ?? 0) + 1; }
+  normalizeGear(s);
   s.name ??= "Yolcu";
   // eski kayıtlar: açılışı zaten geçmiş say
   s.introDone ??= true;

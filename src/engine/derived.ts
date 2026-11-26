@@ -1,6 +1,7 @@
 // Türetilmiş değerler (kritik, kaçınma, isabet…) = taban + Σ katsayı × özellik,
 // sonra ekipman bonusu, sonra ortam yüzdesi. Anatomi bilgisi hedefin türüne göre seçilir.
 import type { Config } from "./config";
+import { gearBonus } from "./gear";
 import type { GameState } from "./state";
 
 export interface Context {
@@ -26,7 +27,7 @@ function itemBonus(cfg: Config, ctx: Context, target: string): number {
 /** Bir özelliğin bu bağlamdaki etkin değeri. */
 export function effectiveAttr(cfg: Config, s: GameState, id: string, ctx: Context = {}): number {
   const lv = s.attrs[id]?.level ?? 0;
-  return Math.max(0, (lv + itemBonus(cfg, ctx, id)) * (1 + envPct(cfg, ctx, id) / 100));
+  return Math.max(0, (lv + itemBonus(cfg, ctx, id) + gearBonus(s, id)) * (1 + envPct(cfg, ctx, id) / 100));
 }
 
 export interface DerivedBreakdown { value: number; base: number; terms: { name: string; amount: number }[]; envPct: number; items: number }

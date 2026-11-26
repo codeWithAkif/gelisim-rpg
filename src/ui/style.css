@@ -241,7 +241,7 @@ h3 { font-size: 22px; }
 .alert-strip i { font-style: normal; opacity: .7; }
 
 /* çanta */
-.eq-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.eq-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
 .eq-slot { border: 1.5px solid var(--ink); background: rgba(255,255,255,.3); border-radius: 6px 12px 6px 12px; padding: 6px 4px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; min-height: 72px; justify-content: center; }
 .eq-slot .eq-l { font-family: var(--f-hand); font-size: 16px; color: var(--ink-soft); }
 .eq-slot.sel, .cell.sel { box-shadow: 0 0 0 2.5px var(--red); }
@@ -473,3 +473,8 @@ main.book-mode { padding: 0; overflow: hidden; display: flex; }
 .inv-tab.on { background: var(--paper); color: var(--ink); border-color: var(--ink); margin-bottom: -1.5px; padding-bottom: 5px; }
 .nb-skill.armed { box-shadow: 0 0 0 3px var(--red); background: rgba(158,52,35,.1); }
 .nb-tip[hidden] { display: none; }
+/* kuşam */
+.eq-h { margin: 6px 0 2px; font-size: 18px; }
+.eq-row .eq-slot.two { opacity: .5; cursor: default; border-style: dashed; }
+.gear-sum { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--ink-soft); margin: 4px 0; }
+.gear-sum b { color: var(--ink); font-family: var(--f-hand); font-size: 18px; }

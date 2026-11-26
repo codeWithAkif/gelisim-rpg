@@ -9,6 +9,7 @@ import { derived, effectiveAttr, maxMana, type Context } from "./derived";
 import { Rng } from "./rng";
 import { applyGain, realUse, summarize, type GainReport } from "./progression";
 import { attackTimingMods, dodgeMod } from "./timing";
+import { weaponSet, totalArmor, totalDodge, wornIds, hasBow } from "./gear";
 import { ENEMIES, GAME_ITEMS, MAPS, MAP_CHARS, TERRAIN, CONFIG_WEAPON_DAMAGE, CONFIG_ARMOR, WOLF_WORDS, type Terrain, type WeakPoint, type FoeWords } from "../content/world";
 
 export type Weather = "acik" | "yagmur" | "sis";
@@ -253,7 +254,7 @@ export function weatherEnv(b: Battle): string[] {
 export function ctxAt(cfg: Config, s: GameState, b: Battle, u: Unit, species?: "hayvan" | "insan"): Context {
   const t = TERRAIN[b.tiles[u.y][u.x]];
   const envIds = [...weatherEnv(b)]; if (t.env) envIds.push(t.env);
-  const equipped = [s.equipped.weapon, s.equipped.armor].filter((x): x is string => !!x && cfg.item.has(x));
+  const equipped = wornIds(s).filter(x => cfg.item.has(x));
   return { envIds, targetSpecies: species, equipped };
 }
 export function moveRange(cfg: Config, s: GameState, b: Battle, u: Unit): number {
@@ -271,16 +272,9 @@ export function visible(cfg: Config, s: GameState, b: Battle, u: Unit): boolean 
   const p = player(b); return u.side === "player" || dist(p.x, p.y, u.x, u.y) <= sightRange(cfg, s, b);
 }
 
-function weaponDamage(cfg: Config, s: GameState): { dmg: number; crit: number; name: string } {
-  const w = s.equipped.weapon;
-  if (!w) return { dmg: 2, crit: 0, name: "Yumruk" };
-  const gi = GAME_ITEMS[w]; if (gi) return { dmg: gi.damage ?? 3, crit: gi.critBonus ?? 0, name: gi.name };
-  return { dmg: CONFIG_WEAPON_DAMAGE[w] ?? 5, crit: 0, name: cfg.item.get(w)?.name ?? w };
-}
-function playerArmor(s: GameState): number {
-  const a = s.equipped.armor; if (!a) return 0;
-  return GAME_ITEMS[a]?.armor ?? CONFIG_ARMOR[a] ?? 0;
-}
+/** Elindekiler (gear.ts): tek, çift ya da iki elli silah. */
+function weaponDamage(cfg: Config, s: GameState) { return weaponSet(cfg, s); }
+function playerArmor(s: GameState): number { return totalArmor(s); }
 export function knownWeakPoints(cfg: Config, s: GameState, enemyDef: string): WeakPoint[] {
   const seen = s.journal?.[ENEMIES[enemyDef]?.anatomyOf ?? enemyDef] ?? [];
   return ENEMIES[enemyDef].weakPoints.filter(w => seen.includes(w.id));
@@ -300,7 +294,7 @@ export function previewAttack(cfg: Config, s: GameState, b: Battle, target: Unit
   const high = b.tiles[p.y][p.x] === "tepe" && b.tiles[target.y][target.x] !== "tepe";
   const ambush = !target.alert;
   let hit = 58 + effectiveAttr(cfg, s, "kilic", ctx) * 0.6 + effectiveAttr(cfg, s, "refleks", ctx) * 0.2 + fam * 0.1 - d.evasion
-    + (high ? 8 : 0) - (s.energy < 25 ? 10 : 0) - (TERRAIN[b.tiles[p.y][p.x]].env === "camur" ? 8 : 0) + (ambush ? 15 : 0) - (stance === "guclu" ? 15 : 0);
+    + (high ? 8 : 0) - (s.energy < 25 ? 10 : 0) - (TERRAIN[b.tiles[p.y][p.x]].env === "camur" ? 8 : 0) + (ambush ? 15 : 0) - (stance === "guclu" ? 15 : 0) + w.acc;
   const kr = derived(cfg, s, "kritik", ctx);
   let crit = kr.value + w.crit + fam * 0.05;
   const parts = [...kr.terms, { name: "Silah", amount: w.crit }, { name: "Alışkınlık", amount: fam * 0.05 }];
@@ -609,7 +603,7 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
     const blind = (e.blind ?? 0) > 0; if (blind) e.blind!--;
     if (e.alert && dist(e.x, e.y, p.x, p.y) === 1) {
       const ctx = ctxAt(cfg, s, b, p, d.species);
-      const dodge = derived(cfg, s, "kacinma", ctx).value;
+      const dodge = derived(cfg, s, "kacinma", ctx).value + totalDodge(s);
       const hitChance = Math.max(5, Math.min(90, d.accuracy - dodge + (s.energy < 20 ? 10 : 0) - (blind ? 30 : 0) - (p.defending ? 22 : 0) - dodgeMod(b.dodgeQ)));
       const hit = rng.chance(hitChance);
       let dmg = 0;
@@ -664,7 +658,7 @@ function allyTurn(cfg: Config, s: GameState, b: Battle, rng: Rng, out: string[])
 
 /* ---------- ok ---------- */
 export const BOW_RANGE = 5;
-export function hasBow(s: GameState) { return (s.inventory.av_yayi ?? 0) > 0 || s.equipped.weapon === "av_yayi"; }
+export { hasBow };
 export interface ShotPreview { ok: boolean; reason?: string; hit: number; crit: number; dmg: [number, number]; range: number }
 export function previewShot(cfg: Config, s: GameState, b: Battle, target: Unit): ShotPreview {
   const p = player(b); const d = dist(p.x, p.y, target.x, target.y);

@@ -8,6 +8,7 @@ import { load, save, reset } from "../engine/save";
 import { newGame } from "../engine/state";
 import { QUESTS, CRAFTS, ENEMIES } from "../content/world";
 import { itemInfo, equip, unequip, drop, buy, bagOf, attachPouch, detachPouch, type InvTab } from "../engine/inventory";
+import type { GearSlot } from "../engine/gear";
 import { startSession, startCraft, finishSession, fmtDur, type SessionResult } from "../engine/session";
 import { openSessionSheet, openSessionRun } from "./session-view";
 import { mountMap } from "./map-view";
@@ -206,7 +207,7 @@ export function startApp(root: HTMLElement) {
       case "eat": { const it = itemInfo(cfg, id); if (eat(s, id, it.satiety ?? 20)) { toast(`${it.name} yedin. Tokluk +${it.satiety}.`); if (!s.inventory[id]) ui.sel = undefined; persist(); render(); } break; }
       case "buy": { const r = buy(cfg, s, id); sfx(r.ok ? "coin" : "bad"); toast(r.ok ? `${itemInfo(cfg, id).name} aldın.` : r.reason ?? ""); persist(); render(); break; }
       case "drop": { if (drop(cfg, s, id)) { toast(`${itemInfo(cfg, id).name} bırakıldı.`); ui.sel = undefined; persist(); render(); } break; }
-      case "unequip": { const r = unequip(cfg, s, id as "weapon" | "armor"); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
+      case "unequip": { const r = unequip(cfg, s, id as GearSlot); toast(r.ok ? "Çıkardın; çantana koydun." : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
       case "sleep": openSleep(); break;
       case "invtab": ui.invTab = id as InvTab; ui.sel = undefined; sfx("page"); render(); break;
       case "attach": { const r = attachPouch(cfg, s, id); sfx(r.ok ? "thunk" : "bad"); toast(r.ok ? `${itemInfo(cfg, id).name} ana çantaya dikildi: +${r.slots} göz.` : r.reason ?? ""); ui.sel = undefined; persist(); render(); break; }
@@ -216,8 +217,9 @@ export function startApp(root: HTMLElement) {
       case "fight": doFight(id); break;
       case "show-place": tab = "harita"; mapState = { view: mapState?.view ?? { cx: place(id)!.x, cy: place(id)!.y + 70, w: 300 }, sel: id }; if (mapState.view.w > 500 || Math.hypot(mapState.view.cx - place(id)!.x, mapState.view.cy - place(id)!.y) > mapState.view.w / 2) mapState.view = { cx: (place(id)!.x + place(s.location)!.x) / 2, cy: (place(id)!.y + place(s.location)!.y) / 2 + 70, w: 300 }; render(false); break;
       case "equip": {
-        const kind = itemInfo(cfg, id).kind; const r = equip(cfg, s, id);
-        toast(!r.ok ? r.reason ?? "" : kind === "Silah" ? "Yeni silaha alışman zaman alacak." : kind === "Çanta" ? `Artık ${itemInfo(cfg, bagOf(s)).capacity} gözün var.` : "Kuşandın.");
+        const [iid, sl] = id.split("|"); const kind = itemInfo(cfg, iid).kind; const r = equip(cfg, s, iid, sl as GearSlot | undefined);
+        if (r.ok) sfx("thunk");
+        toast(!r.ok ? r.reason ?? "" : kind === "Silah" ? (r.slot === "bow" ? "Yayı sırtına astın; kılıcınla birlikte taşırsın." : "Yeni silaha alışman zaman alacak.") : kind === "Çanta" ? `Artık ${itemInfo(cfg, bagOf(s)).capacity} gözün var.` : "Kuşandın.");
         ui.sel = undefined; persist(); render(); break;
       }
       case "menu": persist(); openTitle(); break;

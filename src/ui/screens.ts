@@ -9,6 +9,7 @@ import { maxMana } from "../engine/derived";
 import { planSession, SESSION_OPTIONS, wounded, TIME_SCALE, fmtDur } from "../engine/session";
 import { itemInfo, stacks, capacity, bagOf, craftCheck, freeCount, pouchesOf, pouchSlots, inTab, INV_TABS, MAX_POUCHES, POUCH_SHARE, type InvTab } from "../engine/inventory";
 import { canSell, dayFactor, PARTNERS, stake, ITEM_VALUES } from "../engine/finance";
+import { gearOf, slotsFor, weaponSet, totalArmor, totalDodge, gearBonus, wornIds, isTwoHanded, WEAR_SLOTS, SLOT_NAMES, type GearSlot } from "../engine/gear";
 import { CHAPTERS, ELEMENT_PAGES } from "../content/story";
 import { NPCS, ENEMIES, teacherOf, MARKETS, CRAFTS } from "../content/world";
 import { esc, inkBar, wolfSketch, humanSketch, bodySketch, VITAL_ICONS } from "./sketch";
@@ -213,18 +214,25 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
   // seçili eşya ayrıntısı
   let selId: string | undefined, equippedKey: string | undefined;
   if (ui.sel?.startsWith("inv:")) selId = st[+ui.sel.slice(4)]?.id;
-  if (ui.sel?.startsWith("eq:")) { equippedKey = ui.sel.slice(3); selId = equippedKey === "weapon" ? s.equipped.weapon : equippedKey === "armor" ? s.equipped.armor : equippedKey.startsWith("pouch") ? pouchesOf(s)[+equippedKey.slice(5)] : bagOf(s); }
+  if (ui.sel?.startsWith("eq:")) { equippedKey = ui.sel.slice(3); selId = equippedKey.startsWith("pouch") ? pouchesOf(s)[+equippedKey.slice(5)] : equippedKey === "bag" ? bagOf(s) : s.equipped[equippedKey as GearSlot]; }
   let detail = `<p class="muted tiny" style="margin:0">Bir eşyaya dokun: ne işe yaradığını gör, kuşan, ye ya da bırak.</p>`;
   if (selId) {
     const it = itemInfo(cfg, selId); const acts: string[] = [];
-    if (!equippedKey && (it.kind === "Silah" || it.kind === "Zırh" || it.kind === "Çanta")) acts.push(`<button class="btn small primary" data-act="equip" data-id="${esc(selId)}">Kuşan</button>`);
+    if (!equippedKey && it.kind === "Çanta") acts.push(`<button class="btn small primary" data-act="equip" data-id="${esc(selId)}">Ana çanta yap</button>`);
+    if (!equippedKey && (it.kind === "Silah" || it.kind === "Zırh" || it.kind === "Takı")) {
+      const ss = slotsFor(selId); const g = gearOf(selId);
+      const lbl = (k: GearSlot) => g.bow ? "Yayı tak" : g.shield ? "Sol ele al" : g.hands === 2 ? "İki elle tut" : k === "weapon" ? "Sağ ele al" : k === "offhand" ? "Sol ele al" : g.part === "taki" ? `Tak${ss.length > 1 ? ` (${k === "trinket1" ? "1" : "2"})` : ""}` : "Giy";
+      for (const k of g.part === "taki" ? [ss.find(x => !s.equipped[x]) ?? ss[0]] : ss) acts.push(`<button class="btn small primary" data-act="equip" data-id="${esc(selId)}|${k}">${lbl(k)}</button>`);
+    }
     if (equippedKey && equippedKey !== "bag" && !equippedKey.startsWith("pouch")) acts.push(`<button class="btn small" data-act="unequip" data-id="${esc(equippedKey)}">Çıkar</button>`);
     if (equippedKey?.startsWith("pouch")) acts.push(`<button class="btn small" data-act="detach" data-id="${equippedKey.slice(5)}">Sök</button>`);
     if (!equippedKey && it.kind === "Çanta") acts.push(`<button class="btn small" data-act="attach" data-id="${esc(selId)}" ${pouchesOf(s).length >= MAX_POUCHES ? "disabled" : ""}>${esc(itemInfo(cfg, bagOf(s)).name)}'na dik (+${pouchSlots(cfg, selId)} göz)</button>`);
     if (it.kind === "Yiyecek") acts.push(`<button class="btn small primary" data-act="eat" data-id="${esc(selId)}">Ye (+${it.satiety} tokluk)</button>`);
     if (!equippedKey && it.kind !== "Çanta") acts.push(`<button class="btn small red" data-act="drop" data-id="${esc(selId)}">Bırak</button>`);
-    const val = ITEM_VALUES[selId];
-    const stats = [it.damage ? `hasar ${it.damage}` : "", val ? `değeri ~${val} bakır` : "", equippedKey?.startsWith("pouch") ? `ek bölme: +${pouchSlots(cfg, selId)} göz` : "", it.armor ? `koruma ${it.armor}` : "", it.capacity ? `${it.capacity} göz` : "", it.satiety ? `tokluk +${it.satiety}` : "",
+    const val = ITEM_VALUES[selId] ?? it.price; const gm = gearOf(selId);
+    const where = gm.bow ? "yay" : gm.shield ? "kalkan · sol el" : gm.hands === 2 ? "iki elli" : gm.hands === 1 ? "tek elli" : gm.part ? ({ bas: "baş", govde: "üst", alt: "alt", el: "eller", taki: "takı" } as const)[gm.part] : "";
+    const bon = Object.entries(gm.bonus ?? {}).map(([a, v]) => `${cfg.attr.get(a)?.name ?? a} ${v > 0 ? "+" : ""}${v}`).join(", ");
+    const stats = [where, it.damage ? `hasar ${it.damage}` : "", (gm.armor ?? it.armor) ? `koruma ${gm.armor ?? it.armor}` : "", gm.dodge ? `kaçınma ${gm.dodge > 0 ? "+" : ""}${gm.dodge}` : "", bon, val ? `değeri ~${val} bakır` : "", equippedKey?.startsWith("pouch") ? `ek bölme: +${pouchSlots(cfg, selId)} göz` : "", it.armor ? `koruma ${it.armor}` : "", it.capacity ? `${it.capacity} göz` : "", it.satiety ? `tokluk +${it.satiety}` : "",
       it.kind === "Silah" && s.familiarity[selId] !== undefined ? `alışkınlık ${Math.round(s.familiarity[selId] ?? 0)}/100` : ""].filter(Boolean).join(" · ");
     detail = `<div class="item-detail">${itemPic(selId, 64)}<div><div class="entry-title">${esc(it.name)}</div><div class="muted tiny">${esc(it.kind)}${stats ? " · " + stats : ""}</div>
       <p style="margin:4px 0 8px;font-size:15px">${esc(it.desc)}</p><div class="row">${acts.join("")}</div></div></div>`;
@@ -239,7 +247,11 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
   return `<div class="page">
     <section class="sec"><div class="entry-head"><h1>Çanta</h1><span class="hand">${st.length}/${cap} göz</span></div>
       <div class="purse"><span class="coin">${VITAL_ICONS.coin}</span><span>Kese: <b>${s.money} bakır</b></span></div>
-      <div class="eq-row">${slot("Silah", s.equipped.weapon, "weapon")}${slot("Giysi", s.equipped.armor, "armor")}${slot("Çanta", bagOf(s), "bag")}${Array.from({ length: MAX_POUCHES }, (_, i) => slot(`Ek ${i + 1}`, pouchesOf(s)[i], "pouch" + i)).join("")}</div>
+      ${(() => { const ws = weaponSet(cfg, s); const bonus = [...new Set(wornIds(s).flatMap(id => Object.keys(gearOf(id).bonus ?? {})))].map(a => `${cfg.attr.get(a)?.name ?? a} ${gearBonus(s, a) > 0 ? "+" : ""}${+gearBonus(s, a).toFixed(1)}`).join(", ");
+        return `<div class="gear-sum"><span>Vuruş <b>${+ws.dmg.toFixed(1)}</b>${ws.dual ? " (çift)" : ws.twoHanded ? " (iki el)" : ""}</span><span>Koruma <b>${totalArmor(s)}</b></span><span>Kaçınma <b>${totalDodge(s) >= 0 ? "+" : ""}${totalDodge(s)}</b></span>${bonus ? `<span>${esc(bonus)}</span>` : ""}</div>`; })()}
+      <h3 class="eq-h">Giyim</h3><div class="eq-row">${WEAR_SLOTS.map(k => slot(SLOT_NAMES[k], s.equipped[k], k)).join("")}</div>
+      <h3 class="eq-h">Eller</h3><div class="eq-row">${slot("Sağ el", s.equipped.weapon, "weapon")}${isTwoHanded(s.equipped.weapon) ? `<div class="eq-slot two"><span class="muted tiny">iki elli</span><span class="eq-l">Sol el</span></div>` : slot("Sol el", s.equipped.offhand, "offhand")}${slot("Yay", s.equipped.bow, "bow")}</div>
+      <h3 class="eq-h">Çanta</h3><div class="eq-row">${slot("Çanta", bagOf(s), "bag")}${Array.from({ length: MAX_POUCHES }, (_, i) => slot(`Ek ${i + 1}`, pouchesOf(s)[i], "pouch" + i)).join("")}</div>
       <p class="muted tiny" style="margin:0">${esc(itemInfo(cfg, bagOf(s)).name)} ${itemInfo(cfg, bagOf(s)).capacity} göz${pouchesOf(s).map(p => ` + ${esc(itemInfo(cfg, p).name)} ${pouchSlots(cfg, p)}`).join("")} = <b>${cap} göz</b>. Boştaki bir çantayı ana çantaya dikersen kendi gözünün ancak %${Math.round(POUCH_SHARE * 100)}'ını katar.</p></section>
     <div class="inv-tabs" role="tablist">${INV_TABS.map(x => { const n = x.id === "hepsi" ? st.length : st.filter(v => inTab(cfg, v.id, x.id)).length;
       return `<button role="tab" class="inv-tab ${tab === x.id ? "on" : ""}" data-act="invtab" data-id="${x.id}" aria-selected="${tab === x.id}">${x.name}<small>${n}</small></button>`; }).join("")}</div>

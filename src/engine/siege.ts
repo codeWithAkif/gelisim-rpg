@@ -11,6 +11,8 @@ import { maxMana } from "./derived";
 import { spellOptions, SPELL_FX } from "./magic";
 import { Rng } from "./rng";
 import { ENEMIES, GAME_ITEMS, CONFIG_WEAPON_DAMAGE } from "../content/world";
+import { weaponSet, totalArmor, hasBow } from "./gear";
+import { config } from "./config";
 
 export const ARENA = { w: 100, h: 140 };
 const CX = ARENA.w / 2, CY = ARENA.h / 2;
@@ -39,10 +41,8 @@ export interface Siege {
 }
 
 /* ---------- kurulum ---------- */
-export function weaponPower(s: GameState): number {
-  const w = s.equipped.weapon; if (!w) return 2;
-  return GAME_ITEMS[w]?.damage ?? CONFIG_WEAPON_DAMAGE[w] ?? 4;
-}
+/** Elindekilerin vuruşu (tek, çift ya da iki elli silah). */
+export function weaponPower(s: GameState): number { return weaponSet(config, s).dmg; }
 /** Kaç barikat kurabilirsin: el becerisi ve kol gücü. */
 export function barricadeBudget(s: GameState): number {
   return 3 + Math.floor(((s.attrs.el_becerisi?.level ?? 10) - 10) / 6) + Math.floor(((s.attrs.ust_govde?.level ?? 10) - 10) / 10);
@@ -101,7 +101,7 @@ function spawn(sg: Siege, def: string, side: number, rng: Rng) {
 export const BOW_COOLDOWN = 0.7;
 export function canShoot(s: GameState, sg: Siege): string | null {
   if (sg.phase !== "fight") return "Savaş başlamadı";
-  if (!((s.inventory.av_yayi ?? 0) > 0 || s.equipped.weapon === "av_yayi")) return "Yayın yok";
+  if (!hasBow(s)) return "Yayın yok";
   if (!(s.inventory.ok ?? 0)) return "Okun kalmadı";
   if (sg.bowCd > 0) return "Yay geriliyor";
   return null;
@@ -257,7 +257,7 @@ export function step(cfg: Config, s: GameState, sg: Siege, dt: number) {
     sg.phase = sg.wave >= sg.def.waves.length ? "won" : "rest";
   }
 }
-function armor(s: GameState) { const a = s.equipped.armor; return a ? GAME_ITEMS[a]?.armor ?? ({ deri_zirh: 3, zincir_zirh: 7 } as Record<string, number>)[a] ?? 0 : 0; }
+function armor(s: GameState) { return totalArmor(s); }
 
 /** Dalga arası: biraz can, mana; bir kazık daha; kırık barikatlar biraz onarılır. */
 export function restBetween(s: GameState, sg: Siege) {

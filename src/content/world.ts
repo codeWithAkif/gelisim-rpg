@@ -2,7 +2,7 @@ import { CHAPTER_MAPS, CHAPTER_QUESTS, CHAPTER_NPCS, CHAPTER_ENEMIES } from "./c
 // Oyun tarafı içerik: config editöründe henüz ekranı olmayan veriler.
 // İleride editöre "Dünya" sekmesi eklenince buradan taşınacak.
 
-export type ItemKind = "Silah" | "Zırh" | "Yiyecek" | "Malzeme" | "Çanta" | "Eşya";
+export type ItemKind = "Silah" | "Zırh" | "Takı" | "Yiyecek" | "Malzeme" | "Çanta" | "Eşya";
 export interface GameItem {
   id: string; name: string; slot: ItemKind;
   damage?: number;        // silah: taban hasar
