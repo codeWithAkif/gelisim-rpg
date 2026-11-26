@@ -55,11 +55,11 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   const cardEl = el.querySelector<HTMLElement>("#scCard")!; const pauseEl = el.querySelector<HTMLElement>("#scPause")!; const tip = el.querySelector<HTMLElement>("#scTip")!;
   let W = 300, H = 400, paused = false, raf = 0, ended = false, last = performance.now(); let shake = 0; let walkT = 0; let lastLockedMsg = 0;
   const rings: { x: number; floor: number; t: number; r: number; color: string }[] = []; const pops: { x: number; floor: number; t: number; text: string; color: string }[] = []; const shots: { a: number; b: number; floor: number; t: number }[] = [];
-  const F = site.floors; const VIEW = 84;
+  const F = site.floors; const VIEW = 110;
   const layout = () => { const r = stage.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + "px"; cv.style.height = H + "px"; g.setTransform(dpr, 0, 0, dpr, 0, 0); };
   const sc = () => W / VIEW; const camX = () => Math.max(VIEW / 2, Math.min(SW - VIEW / 2, n.px));
   const X = (x: number) => (x - camX()) * sc() + W / 2;
-  const fh = () => Math.min(H / F, 150);
+  const fh = () => Math.min(H / F, 200);
   const top = () => (H - fh() * F) / 2;
   const floorBottom = (f: number) => top() + fh() * (F - f);           // f=0 en altta
   const groundY = (f: number) => floorBottom(f) - 10;
@@ -72,6 +72,19 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   }
   function room(f: number, dim: boolean) {
     const y0 = floorBottom(f) - fh(), y1 = floorBottom(f); const ink = css("--ink");
+    const rimg = img("harabe_oda_" + site.place);
+    if (rimg) {
+      // oda panelleri yan yana dizilir (her oda 100 birim); çift odalar aynalanır, böylece kenarlar birbirine uyar
+      for (let k = 0; k < SW / 100; k++) { const x0 = X(k * 100), x1 = X((k + 1) * 100); if (x1 < -2 || x0 > W + 2) continue;
+        g.save(); g.beginPath(); g.rect(x0, y0, x1 - x0, fh()); g.clip(); if (k % 2) { g.translate(x0 + x1, 0); g.scale(-1, 1); } g.drawImage(rimg, k % 2 ? x0 : x0, y0, x1 - x0, fh()); g.restore(); }
+      g.strokeStyle = "rgba(20,16,10,.7)"; g.lineWidth = 2; g.beginPath(); g.moveTo(0, y1 - 10); g.lineTo(W, y1 - 10); g.stroke();
+      const lk0 = n.locks.find(l => l.floor === f);
+      if (lk0 && !lk0.open) { const px = X(lk0.x); g.fillStyle = "#1B150E"; g.fillRect(px - 5, y0 + 5, 10, fh() - 15); g.strokeStyle = "#B08A3A"; g.lineWidth = 3; g.strokeRect(px - 5, y0 + 5, 10, fh() - 15);
+        const cy = y0 + fh() * 0.5; g.fillStyle = "#D9B84A"; g.fillRect(px - 9, cy - 3, 18, 14); g.strokeStyle = "#D9B84A"; g.lineWidth = 3; g.beginPath(); g.arc(px, cy - 3, 6, Math.PI, 0); g.stroke();
+        g.fillStyle = "rgba(0,0,0,.4)"; if (lk0.side === "R") g.fillRect(px + 5, y0, W, fh()); else g.fillRect(-W, y0, px - 5 + W, fh()); }
+      if (dim) { g.fillStyle = "rgba(10,8,6,.6)"; g.fillRect(0, y0, W, fh()); }
+      return;
+    }
     g.fillStyle = f === 0 && site.floors > 1 ? "#6F6450" : "#7C705A"; g.fillRect(0, y0, W, fh());
     // tuğla/tahta çizgileri
     g.strokeStyle = "rgba(0,0,0,.12)"; g.lineWidth = 1; for (let k = 1; k < 5; k++) { g.beginPath(); g.moveTo(0, y0 + (fh() / 5) * k); g.lineTo(W, y0 + (fh() / 5) * k); g.stroke(); }
