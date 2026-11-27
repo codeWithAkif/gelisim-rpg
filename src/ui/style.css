@@ -714,3 +714,17 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .scene .sc-title { text-align: center; animation: scIn 1.4s ease; }
 .scene .sc-big { margin: 0; font-family: var(--f-hand); font-size: 48px; line-height: 1.1; color: #F4E3C1; }
 .scene .sc-small { margin: 8px 0 0; font-family: var(--f-hand); font-size: 24px; color: #E8C98E; opacity: .85; }
+
+/* Hasan'ın dersi: savaş haritasının üstünde konuşma balonu (haritaya dokunmayı engellemez) */
+.battle .coach { position: relative; margin: 4px 8px; z-index: 5; display: none; gap: 8px; align-items: flex-start;
+  padding: 8px 10px; background: var(--paper, #EFE6D2); border: 1.5px solid var(--ink); border-radius: 12px 8px 14px 9px; box-shadow: 2px 3px 0 rgba(0,0,0,.25); pointer-events: none; }
+.battle .coach.on { display: flex; animation: coachIn .35s ease-out; }
+@keyframes coachIn { from { opacity: 0; transform: translateY(-6px); } }
+.battle .coach img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; object-position: 50% 20%; border: 1.5px solid var(--ink); flex: none; }
+.battle .coach .coach-body { flex: 1; min-width: 0; }
+.battle .coach .coach-who { font-size: 20px; line-height: 1; }
+.battle .coach p { margin: 2px 0 0; font-size: 14px; line-height: 1.35; }
+.battle .coach .coach-row { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 4px; }
+.battle .coach button { pointer-events: auto; }
+.battle .coach .coach-skip { background: none; border: 0; color: var(--ink-soft); font: inherit; font-size: 12px; text-decoration: underline; padding: 2px; }
+.gx-tip { font-size: 13px; color: var(--ink-soft); text-align: center; margin: -2px 0 4px; font-style: italic; }
