@@ -100,7 +100,10 @@ oyuncu imza büyüyü bulur. Son sayfa annenin bitiremediği deney.
 
 ## Aşamalar
 
-1. **Finans çekirdeği:** mallar, kervan ticareti, yol tehlikesi, korumalar; berat ve çizelge kapıları; iyi sofra. Testler.
+1. **Finans çekirdeği** (yapıldı): mallar, kervan ticareti, yol tehlikesi, korumalar; berat ve çizelge kapıları; iyi sofra. Testler.
+   Kod: `src/content/trade.ts` (mallar, yollar, belgeler), `src/engine/trade.ts` (kurallar), `src/ui/trade-view.ts` (kervan penceresi),
+   Diyar → Kervan sekmesi. Yalnız gördüğün pazarlarla ticaret yapılır. Korumasız kervan pusuda yükün çoğunu (%85'e kadar) kaybeder.
+   Ölçüm: Bölüm 1 sonundaki bir cep (100 bakır) ve tek korumayla Taşpınar–Karaçam seferleriyle berat parası ~23 günde birikir (görev gelirleri hariç).
 2. **Finans hikâyesi ve adamlar:** Selim'in defteri (4 adım, sahnelerle); adam ustalığı, ücret ve sadakat.
 3. **Büyü sentezi motoru:** madde × biçim, hesap, imza büyüler; denge testi (hiçbir büyü güç sınırını aşmaz).
 4. **Çizerek büyü:** biçim rünleri, savaşta serbest çizim, keşif, ezber; defterde Deney ve Büyüler sayfaları.

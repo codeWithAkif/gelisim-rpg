@@ -46,6 +46,9 @@ import { darkness } from "./daylight";
 import { beginSearch, collectFind, deliverRequest } from "../engine/explore";
 import { openSeek } from "./seek-view";
 import { sell, partner, partnerLock, stake, invest, withdraw, nightlyFinance } from "../engine/finance";
+import { nightlyTrade, buyPaper, hasPaper, feast } from "../engine/trade";
+import { paper } from "../content/trade";
+import { openCaravan } from "./trade-view";
 import { sleepOptions, sleepAt, rest, type SleepKind } from "../engine/rest";
 import { minutesLeft } from "../engine/state";
 import { itemPic, artUrl } from "./art";
@@ -341,6 +344,12 @@ export function startApp(root: HTMLElement) {
         sfx("coin"); buzz("light"); toast(`${itemInfo(cfg, id).name} sattın: +${r.price} bakır`); persist(); render(); break;
       }
       case "partner": openPartner(id); break;
+      case "caravan": openCaravan(s, { persist, render: () => render(), toast }); break;
+      case "paper": { const pp = paper(id); if (!pp) break;
+        modal(`<p class="hand muted" style="margin:0">${esc(pp.seller)}</p><h2>${esc(pp.name)}</h2><p style="margin:0">${esc(pp.desc)}</p><div class="odds"><span>Bedel <b>${pp.cost} bakır</b></span><span>Cebin <b>${s.money}</b></span></div>`,
+          [{ label: `Satın al (${pp.cost})`, cls: "primary", fn: () => { const r = buyPaper(s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? `${pp.name} artık sende.` : r.reason ?? ""); persist(); render(); } }, { label: "Kapat", fn: () => {} }]);
+        break; }
+      case "feast": { const r = feast(s); sfx(r.ok ? "good" : "bad"); toast(r.ok ? "Doyasıya yedin. Bu gece kasların daha çok gelişecek." : r.reason ?? ""); persist(); render(); break; }
       case "scav": doScav(id); break;
       case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;
       case "study": tab = "calis"; sfx("page"); render(false); break;
@@ -400,13 +409,14 @@ export function startApp(root: HTMLElement) {
   }
   function doSleep(kind: SleepKind) {
     const r = sleepAt(cfg, s, kind); if ("error" in r) { toast(r.error); return; }
-    const fin = nightlyFinance(s); const rep = r.report;
+    const fin = nightlyFinance(s); const trade = nightlyTrade(s); const rep = r.report;
     persist(); render(false); if (r.event) { sfx("hurt"); buzz("medium"); }
     modal(`<h2>Gün ${s.day - 1} bitti</h2><p class="lede">${esc(r.option.kind === "lodging" ? `Geceyi geçirdin: ${r.option.name}.` : r.option.kind === "tent" ? "Çadırda uyudun." : "Açıkta uyudun.")} ${rep.recovery < 0.75 ? "Tam dinlenemedin." : "Vücut gece çalıştı."}</p>
       ${r.event ? `<p class="story-after" style="border-color:var(--red)">${esc(r.event.text)}</p>` : ""}
       ${r.estate.length ? `<h3>Diyar</h3>${r.estate.map(x => `<div class="note">${esc(x)}</div>`).join("")}` : ""}
       ${r.pet.length ? `<p class="hand blue" style="margin:0">${r.pet.map(esc).join(" ")}</p>` : ""}
       <h3>Gece işlenen</h3>${gainList(cfg, rep.applied, 8)}
+      ${trade.length ? `<h3>Kervanlar</h3>${trade.map(t => `<div class="ledger-row"><span>${esc(t.text)}</span><b class="${t.profit >= 0 ? "green" : "red"}">${t.profit > 0 ? "+" : ""}${t.profit}</b></div>`).join("")}` : ""}
       ${fin.length ? `<h3>Ortaklıklar</h3>${fin.map(l => `<div class="ledger-row"><small>${esc(l.partner)}</small><span>${esc(l.text)}</span><b class="${l.amount >= 0 ? "green" : "red"}">${l.amount ? `${l.amount > 0 ? "+" : ""}${l.amount}` : ""}</b></div>`).join("")}` : ""}`,
       [{ label: "Güne başla", cls: "primary", fn: () => storyTick() }]);
   }
@@ -494,6 +504,12 @@ export function startApp(root: HTMLElement) {
   function doFight(id: string) {
         const q = QUESTS.find(x => x.id === id)!;
         if (s.energy < 15) { toast("Bu yorgunlukla savaşa giremezsin; dinlen."); return; }
+        // parayla alınan belge gerekiyorsa (geçiş beratı, nöbet çizelgesi) önce o
+        if (q.needPaper && !hasPaper(s, q.needPaper)) { const pp = paper(q.needPaper)!;
+          modal(`<p class="hand muted" style="margin:0">Önce bir belge gerek</p><h2>${esc(pp.name)}</h2><p style="margin:0">${esc(pp.desc)}</p>
+            <p class="hand blue" style="margin:0">${esc(pp.seller)} satıyor: ${pp.cost} bakır. Cebinde ${s.money} var.${s.money < pp.cost ? " Kervanla ticaret yap, adamlarını işe yolla." : ""}</p>`,
+            [{ label: "Kâtibi haritada göster", cls: "primary", fn: () => { tab = "harita"; mapState = { view: { cx: place(pp.place)!.x, cy: place(pp.place)!.y + 70, w: 300 }, sel: pp.place }; render(false); } }, { label: "Kapat", fn: () => {} }]);
+          return; }
         // savaştan önce bir kez oynanan sahne (Hasan pusuyu öğretir, kervanda bekleyiş)
         const pre = q.before;
         if (pre && SCENES[pre] && s.story.flags["sahne_" + pre] === undefined) { s.story.flags["sahne_" + pre] = s.day; persist(); playScene(SCENES[pre], { name: s.name }, () => doFight(id)); return; }

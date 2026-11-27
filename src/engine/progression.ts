@@ -1,5 +1,6 @@
 // Gerçekçi gelişim: yaptığın şeyde gelişirsin, özellikler birbirini besler,
 // getiri azalır, fiziksel kazanç dinlenirken işlenir. Körelme yok: kullanılmayan beceri kaybolmaz (oyuncu kararı).
+import { FEAST_BONUS } from "../content/trade";
 import type { Config } from "./config";
 import { type GameState, DAY_MINUTES, log, minutesLeft, repOf } from "./state";
 import { teacherOf } from "../content/world";
@@ -93,7 +94,9 @@ export interface SleepReport { applied: GainReport; decayed: GainReport; recover
 /** Günü bitirir: dinlenme kazancı işlenir, enerji yenilenir. Uyku hiçbir özelliği köreltmez. */
 /** quality: uyunan yerin kalitesi (yatak 1, saman 0.9, çadır 0.8, açıkta 0.65). */
 export function sleep(cfg: Config, s: GameState, quality = 1): SleepReport {
-  const recovery = (s.satiety >= 40 ? 1 : s.satiety >= 15 ? 0.75 : 0.45) * quality;
+  // zengin sofra: o akşam kurulduysa gece işlenen gelişim fazla (para gelişime dönüşür)
+  const feast = s.feast === s.day ? FEAST_BONUS : 1; delete s.feast;
+  const recovery = (s.satiety >= 40 ? 1 : s.satiety >= 15 ? 0.75 : 0.45) * quality * feast;
   const applied: GainReport = {}, decayed: GainReport = {};
   for (const [id, st] of Object.entries(s.attrs)) {
     if (st.pending > 0) {

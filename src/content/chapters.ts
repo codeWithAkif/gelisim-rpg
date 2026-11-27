@@ -160,8 +160,8 @@ export const CHAPTER_QUESTS: QuestDef[] = [
     afterText: "Defterin son sayfasında, titrek bir yazıyla: \"Ölçer L. — Soğuk Ocak'ta çalıştırılıyor. Kayhan Bey'in emriyle. Kaçarsa taş akışı durur.\" Annen yaşıyor. Ayazkale'de." },
 
   // Bölüm 3: Ayazkale
-  { id: "gecit", after: "k_defter", title: "Kar geçidi", giverNpc: "derya", importance: "onemli", story: true, before: "gecit_once", minutes: 120, at: "ayaz_gecit",
-    text: "\"Ayazkale'ye tek yol geçitten geçer,\" diyor Derya. \"Kar kurtları donan kervanları yiyor; seni de yemeye kalkacaklar. Ateşin varsa yak.\"",
+  { id: "gecit", after: "k_defter", title: "Kar geçidi", giverNpc: "derya", importance: "onemli", story: true, before: "gecit_once", needPaper: "berat", minutes: 120, at: "ayaz_gecit",
+    text: "\"Ayazkale'ye tek yol geçitten geçer,\" diyor Derya. \"Kar kurtları donan kervanları yiyor; seni de yemeye kalkacaklar. Ateşin varsa yak.\" Geçidin ağzında gümrük var: Isı Loncası'nın beratı olmadan geçilmez.",
     battle: { enemies: ["kar_kurdu", "kar_kurdu"], map: "gecit" },
     rewards: { money: 4, gains: { kardiyo: 1, agri: 1 }, note: "Geçidi aştın. Soğuk ciğerlerine işledi ama seni güçlendirdi." },
     afterText: "Geçidin tepesinde Ayazkale göründü: buza gömülü surlar ve ortada mavi bir soğuk sızan kule. Yol kenarında donmuş bir kervan; arabaların hepsi kor taşıyla dolu." },
@@ -194,7 +194,7 @@ export const CHAPTER_QUESTS: QuestDef[] = [
   { id: "saz_sesi", after: "d_kul", title: "Sazın sesi", giverNpc: "kulana", importance: "onemli", story: true, night: true, minutes: 45, at: "ardic_kul", doneText: "Sesi izle",
     text: "Gece Kül mahallesinde bir saz çalıyor. Bu ezgiyi Karaçam'da, bir han kapısında duymuştun.",
     rewards: { gains: { isitme: 0.5, insan_okuma: 0.6 }, note: "Karanlıkta bir ezginin peşinden gittin." } },
-  { id: "saray_yolu", after: "d_yaren", title: "Saray yolu", giverNpc: "kulana", importance: "hayati", story: true, before: "saray_once", minutes: 90, at: "ardic_saray",
+  { id: "saray_yolu", after: "d_yaren", title: "Saray yolu", giverNpc: "kulana", importance: "hayati", story: true, before: "saray_once", needPaper: "cizelge", minutes: 90, at: "ardic_saray",
     text: "Yaren avludan dehlize inen yolu gösterdi; Kül Ana'nın torunları seni damlardan götürecek. Avluda muhafızlar var; mutfağın ışığı yanık.",
     battle: { enemies: ["muhafiz", "muhafiz", "muhafiz"], map: "sokak" },
     rewards: { money: 12, relics: ["kul_ana_muskasi"], note: "Kül Ana'nın torunları muhafızların anahtarını getirdi; Kül Ana boynuna bir muska taktı." },

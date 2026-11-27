@@ -84,7 +84,7 @@ export const CHAPTERS: Chapter[] = [
         text: "Usta Derya, annenin defterine SU sayfasını ekledi: \"Su ısıyı emer, taşır ve geri verir.\" Artık Su çalışabilirsin; ateşle birleşince buhar olur." },
       { id: "k_defter", title: "Annem yaşıyor", hint: "Derya'nın işi: Isı Loncası'nın deposundan kayıt defterini al.", reached: s => done(s, "lonca_defteri"),
         scene: "k_defter",
-        text: "Loncanın kayıtlarını geçen aya kadar annen tutmuş. En altta başka bir el: \"Ölçer L. Soğuk Ocak'ta çalıştırılıyor.\" On iki yıl boyunca öldüğünü sandığın annen kuzeyde, Ayazkale'de. Kar geçidinin yolu açıldı (yayladan kuzeye). Bölüm 2 burada bitiyor." },
+        text: "Loncanın kayıtlarını geçen aya kadar annen tutmuş. En altta başka bir el: \"Ölçer L. Soğuk Ocak'ta çalıştırılıyor.\" On iki yıl boyunca öldüğünü sandığın annen kuzeyde, Ayazkale'de. Kar geçidinin yolu açıldı (yayladan kuzeye), ama geçidin gümrüğü loncanın beratını ister (150 bakır, lonca kâtibi). Bölüm 2 burada bitiyor." },
     ],
   },
   {
@@ -118,7 +118,7 @@ export const CHAPTERS: Chapter[] = [
         text: "Kül Yangını gökten gelmedi; sarayın altından, Sungur'un ilk ocağından çıktı. Ölçerler yangını söndürmeye koştu ve kundakçı diye asıldı. Kül Ana sana annenin son sayfasını verdi: ŞİMŞEK. Gece mahallede tanıdık bir saz çaldı." },
       { id: "d_yaren", title: "Sazın sahibi", hint: "Gece Kül mahallesinde sazın sesini izle.", reached: s => done(s, "saz_sesi"),
         scene: "yaren", accept: "saray_yolu",
-        text: "Arabaları Yaren işaretlemiş, mektupları o yazmış: kızı yedi yaşından beri saray mutfağında, Sungur'un elinde. Her ay bir tutam saç; bu ay gelmedi. Yaren avludan dehlize inen yolu gösterdi." },
+        text: "Arabaları Yaren işaretlemiş, mektupları o yazmış: kızı yedi yaşından beri saray mutfağında, Sungur'un elinde. Her ay bir tutam saç; bu ay gelmedi. Yaren avludan dehlize inen yolu gösterdi; muhafızların nöbet çizelgesini saray kâtibinin yeğeni satıyor (250 bakır)." },
       { id: "d_saray", title: "Dehlizin ağzı", hint: "Saray avlusundaki muhafızları geç.", reached: s => done(s, "saray_yolu"),
         scene: "d_saray", accept: "buyuk_ocak",
         text: "Yaren'in kızını mutfakta buldun; Kül Ana'nın torunları onu annesine götürdü. Avlunun dibinde dehlizin kapısı: taşlarda kırağı, ama hava sıcak. Bütün ülkenin ısısı buraya akıyor." },

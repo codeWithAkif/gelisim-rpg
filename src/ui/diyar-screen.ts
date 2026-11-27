@@ -11,15 +11,17 @@ import { place } from "../engine/travel";
 import { esc, ICONS } from "./sketch";
 import { personPic, itemPic } from "./art";
 import type { UiState } from "./screens";
+import { tradeOpen, tradeOf, cartsFree, nextCartCost, openPosts } from "../engine/trade";
+import { TRADE_POSTS, REGION_NAMES, CART_CAP, good } from "../content/trade";
 
-const TABS: [string, string][] = [["genel", "Genel"], ["ev", "Ev"], ["isletme", "İşletme"], ["adamlar", "Adamlar"], ["pano", "Pano"]];
+const TABS: [string, string][] = [["genel", "Genel"], ["kervan", "Kervan"], ["ev", "Ev"], ["isletme", "İşletme"], ["adamlar", "Adamlar"], ["pano", "Pano"]];
 const STATUS: Record<string, string> = { evde: "evde", yolda: "seninle", gorevde: "görevde", yarali: "yaralı" };
 
 export function diyarScreen(cfg: Config, s: GameState, ui: UiState): string {
-  const open = venturesOpen(s); const tabs = TABS.filter(([id]) => open || (id !== "isletme" && id !== "pano"));
+  const open = venturesOpen(s); const tabs = TABS.filter(([id]) => (open || (id !== "isletme" && id !== "pano")) && (id !== "kervan" || tradeOpen(s)));
   const tab = tabs.some(([id]) => id === ui.diyarTab) ? ui.diyarTab! : "genel";
   const seg = `<div class="seg" role="tablist">${tabs.map(([id, n]) => `<button role="tab" class="${tab === id ? "on" : ""}" data-act="diyartab" data-id="${id}" aria-selected="${tab === id}">${n}</button>`).join("")}</div>`;
-  const body = tab === "ev" ? evTab(cfg, s) : tab === "isletme" ? isletmeTab(cfg, s) : tab === "adamlar" ? adamlarTab(cfg, s) : tab === "pano" ? panoTab(cfg, s) : genelTab(cfg, s);
+  const body = tab === "kervan" ? kervanTab(s) : tab === "ev" ? evTab(cfg, s) : tab === "isletme" ? isletmeTab(cfg, s) : tab === "adamlar" ? adamlarTab(cfg, s) : tab === "pano" ? panoTab(cfg, s) : genelTab(cfg, s);
   return `<div class="page">${seg}${body}</div>`;
 }
 const chips = (cfg: Config, s: GameState, c: { money: number; items: Record<string, number> }) =>
@@ -38,6 +40,23 @@ function genelTab(_cfg: Config, s: GameState): string {
       <p class="tiny muted" style="margin:4px 0 0">Günlük gider: maaş ${wages} + bakım ${upkeep} bakır. Her gece uyuyunca ödenir.</p></section>
     ${e.reports!.length ? `<section class="sec"><h2>Dün gece</h2>${e.reports!.map(x => `<div class="note">${esc(x)}</div>`).join("")}</section>` : ""}
     <section class="sec"><h3>Nereden başlamalı?</h3><p class="tiny muted" style="margin:0">${venturesOpen(s) ? `1) Köy meydanında <b>ev kur</b>. 2) Bir <b>adam tut</b>. 3) Rütbe 2'de <b>işletme</b> kur, adama işletmeyi ver. 4) Tekrarlı işleri <b>Pano</b>'dan adamlarına ata.` : `1) Köy meydanında <b>ev kur</b>: kendi yatağında daha iyi dinlenirsin. 2) Bir <b>adam tut</b>: yanında gezen adam savaşta yardım eder. İşletme ve görev panosu ileride, adın şehre ulaşınca açılır.`}</p></section>`;
+}
+function kervanTab(s: GameState): string {
+  const t = tradeOf(s); const cc = nextCartCost(s);
+  const road = t.caravans.map(c => {
+    const load = Object.entries(c.cargo).map(([id, n]) => `${n} ${good(id)?.name ?? id}`).join(", ");
+    const g = c.guards.map(id => heroDef(id)?.name.split(" ")[0] ?? id).join(", ");
+    return `<div class="entry"><div class="entry-head"><span class="entry-title" style="font-size:20px">${esc(REGION_NAMES[c.from])} → ${esc(REGION_NAMES[c.to])}</span><span class="entry-meta">${c.arrive - s.day <= 0 ? "bu gece varır" : `${c.arrive - s.day} gün sonra`}</span></div>
+      <div class="tiny">${esc(load)} · ${c.paid} bakırlık yük</div><div class="tiny muted">${g ? `Korumalar: ${esc(g)}` : "Korumasız"}</div></div>`;
+  }).join("");
+  const hist = (t.history ?? []).map(h => `<div class="ledger-row"><small>gün ${h.day}</small><span>${esc(h.text)}</span><b class="${h.profit >= 0 ? "green" : "red"}">${h.profit > 0 ? "+" : ""}${h.profit}</b></div>`).join("");
+  const posts = openPosts(s).map(r => esc(place(TRADE_POSTS[r])?.name ?? r)).join(", ");
+  return `<section class="sec"><h1>Kervan</h1><p class="lede">Bir bölgede ucuz al, başkasında pahalı sat. Kervan günlerce yol alır; sen bu arada işine bakarsın.</p>
+    <div class="odds"><span>Araba <b>${t.carts}</b> (${t.carts * CART_CAP} yük)</span><span>Boşta <b>${cartsFree(s)}</b></span><span>Yolda <b>${t.caravans.length}</b></span></div>
+    <p class="tiny muted" style="margin:4px 0 0">Kervan kurmak için bir ticaret yerine git (${posts}) ve haritadaki kartından <b>Kervan kur</b>'u seç.${cc !== null ? ` Sıradaki araba ${cc} bakır.` : ""}
+    İzci pusuyu önceden görür; savaşçı ve okçu saldırıyı karşılar. Korumasız kervan ucuzdur ama soyulur.</p></section>
+    ${road ? `<section class="sec"><h2>Yolda</h2>${road}</section>` : ""}
+    ${hist ? `<section class="sec"><h2>Son seferler</h2>${hist}</section>` : ""}`;
 }
 function evTab(cfg: Config, s: GameState): string {
   const e = est(s); const h = houseOf(s); const lv = e.house ?? 0; const next = HOUSES[lv]; const c = canBuyHouse(cfg, s, s.location);
