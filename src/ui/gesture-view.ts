@@ -70,79 +70,141 @@ function foePicHtml(W: number, H: number, detail: number, art: FoeArt, aimAt?: [
   return `<div class="gx-wolf" style="position:absolute;inset:0">${img + target}</div>`;
 }
 
+/* ---------- saldırı: açığı kes ----------
+ * Kurt yerinde durmaz; gövdesinde kısa süre bir "açık" parlar (halka daralır: süre). Tek bir kesik çekersin.
+ * Açık parlarken içinden geçersen tam vuruş (hasar ×1,5; nişanlıysan zayıf nokta), gövdeye denk gelirsen
+ * sıyırır (×1,1), ıskalarsan hiçbir şey değişmez. Açığın süresi ve boyu karakterin refleks ve kılıç becerisiyle büyür.
+ */
 export function slashPrompt(host: HTMLElement, o: { foe?: string; aimName?: string; aimAt?: [number, number]; aimArtAt?: [number, number]; detail: number; ease: number }): Promise<number> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 0.65);
-    // görsel varsa zayıf nokta görseldeki yerine taşınır (görsel kutuya sığdırılır, ortalanır)
     const art = foeArt(o.foe); const R = fitRect(W, H, art.aspect);
     const toStage = (p: [number, number]): [number, number] => [(R.x + p[0] * R.w) / W, (R.y + p[1] * R.h) / H];
     const aim: [number, number] | undefined = art.url && o.aimArtAt ? toStage(o.aimArtAt) : o.aimAt;
-    o = { ...o, aimAt: aim };
-    const L = layer(host, "slash", o.aimName ? `Kes! ${esc(o.aimName)} hedefinden geçir` : `${esc(art.name)}: üstünden kes!`, W, H, foePicHtml(W, H, o.detail, art, o.aimAt));
-    // gövde: kurt yatay, insan dikey
+    const L = layer(host, "slash", aim ? `${esc(o.aimName ?? "")} açılınca kes!` : `${esc(art.name)}: açık parlayınca kes!`, W, H, foePicHtml(W, H, o.detail, art, aim));
     const bodyPts: [number, number][] = art.human ? [[0.5, 0.25], [0.5, 0.45], [0.5, 0.65], [0.5, 0.85]] : [[0.22, 0.45], [0.42, 0.5], [0.62, 0.5], [0.82, 0.48]];
     const body0 = bodyPts.map(p => { const [x, y] = art.human && art.url ? toStage(p) : p; return { x: x * W, y: y * H, r: (art.human ? R.w * 0.3 : W * 0.11) }; });
-    // hassas nokta küçük; kurt da yerinde durmuyor (çevikliği, senin refleksine karşı)
-    const weak0 = o.aimAt ? { x: o.aimAt[0] * W, y: o.aimAt[1] * H, r: W * 0.042 } : undefined;
     const wolfEl = L.box.querySelector<HTMLElement>(".gx-wolf"); let ox = 0, oy = 0;
-    const sway = () => { if (done) return; const tt = (performance.now() - t0) / 1000; ox = Math.sin(tt * 2.3) * W * 0.07 / o.ease; oy = Math.sin(tt * 3.7 + 1) * H * 0.04 / o.ease; if (wolfEl) wolfEl.style.transform = `translate(${ox}px,${oy}px)`; requestAnimationFrame(sway); };
-    const shift = <T extends { x: number; y: number }>(c: T): T => ({ ...c, x: c.x + ox, y: c.y + oy });
-    let done = false; const t0 = performance.now(); const LIMIT = 2600;
-    requestAnimationFrame(() => sway());
-    const timer = setInterval(() => { if (!done && performance.now() - t0 > LIMIT) finish([], "Geç kaldın"); }, 100);
-    const bar = document.createElement("div"); bar.className = "gx-bar"; L.box.after(bar);
-    const tick = () => { if (done) return; bar.style.width = `${Math.max(0, 100 - (performance.now() - t0) / LIMIT * 100)}%`; requestAnimationFrame(tick); }; tick();
-    const finish = (pts: P[], label?: string) => {
-      if (done) return; done = true; clearInterval(timer);
-      const r = pts.length ? slashScore(pts, body0.map(shift), weak0 && shift(weak0), o.ease) : { q: 0, weak: false };
-      L.g.clearRect(0, 0, W, H); if (pts.length) inkTrail(L.g, pts, r.q > 0 ? L.red : L.ink);
-      if (r.q > 0) { sfx(r.weak || r.q >= 0.95 ? "crit" : "hit"); buzz(r.weak ? "heavy" : "light"); L.el.classList.add("hit"); } else sfx("miss");
-      result(L, r.q, label ?? (r.weak ? "Tam isabet!" : r.q >= 0.75 ? "Temiz kesik" : r.q > 0 ? "Sıyırdı" : "Iska"));
-      void L.close(650).then(() => resolve(r.weak ? 1.25 : r.q));
+    const ease = Math.max(0.8, Math.min(2.5, o.ease));
+    // açıklar: sırayla parlar; süre ve boy beceriyle büyür
+    const litMs = Math.min(900, 360 * ease), gapMs = () => 380 + Math.random() * 420;
+    const rOpen = (aim ? W * 0.05 : W * 0.065) * Math.sqrt(ease);
+    const opens: { x: number; y: number; t0: number; t1: number }[] = [];
+    let tNext = 450 + Math.random() * 300;
+    const LIMIT = 2900; const t0 = performance.now(); let done = false;
+    while (tNext + litMs < LIMIT) {
+      const c = aim ? { x: aim[0] * W, y: aim[1] * H } : (() => { const b = body0[Math.floor(Math.random() * body0.length)]; const a = Math.random() * TAU, d = Math.random() * b.r * 0.6; return { x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d * 0.6 }; })();
+      opens.push({ ...c, t0: tNext, t1: tNext + litMs }); tNext += litMs + gapMs();
+    }
+    let trail: P[] = [];
+    const frame = () => {
+      if (done) return; const now = performance.now() - t0;
+      ox = Math.sin(now / 1000 * 2.3) * W * 0.07 / ease; oy = Math.sin(now / 1000 * 3.7 + 1) * H * 0.04 / ease;
+      if (wolfEl) wolfEl.style.transform = `translate(${ox}px,${oy}px)`;
+      const g = L.g; g.clearRect(0, 0, W, H);
+      for (const op of opens) {
+        if (now < op.t0 - 120 || now > op.t1) continue;
+        const k = now < op.t0 ? 0 : (now - op.t0) / (op.t1 - op.t0);
+        const x = op.x + ox, y = op.y + oy;
+        g.save(); g.globalAlpha = now < op.t0 ? 0.3 : 1;
+        g.fillStyle = "rgba(255,214,110,0.45)"; g.beginPath(); g.arc(x, y, rOpen, 0, TAU); g.fill();
+        g.strokeStyle = "#C98A12"; g.lineWidth = 2.5; g.beginPath(); g.arc(x, y, rOpen * (1 + 1.6 * (1 - k)), 0, TAU); g.stroke();
+        g.restore();
+      }
+      if (trail.length) inkTrail(g, trail, L.ink, 0.85);
+      bar.style.width = `${Math.max(0, 100 - now / LIMIT * 100)}%`;
+      if (now > LIMIT) return finish([], "Geç kaldın");
+      requestAnimationFrame(frame);
     };
-    track(L.cv, pts => { L.g.clearRect(0, 0, W, H); inkTrail(L.g, pts, L.ink, 0.85); if (pts.length % 4 === 0) sfx("draw"); }, pts => finish(pts));
+    const bar = document.createElement("div"); bar.className = "gx-bar"; L.box.after(bar);
+    // her noktanın anındaki kurt kayması (kesik sırasında kurt kımıldar)
+    const offAt = (t: number) => { const tt = (t - t0) / 1000; return { x: Math.sin(tt * 2.3) * W * 0.07 / ease, y: Math.sin(tt * 3.7 + 1) * H * 0.04 / ease }; };
+    const finish = (pts: P[], label?: string) => {
+      if (done) return; done = true;
+      let q = 0; let opened = false;
+      if (pts.length) {
+        const mid = pts[Math.floor(pts.length / 2)].t; const off = offAt(mid);
+        const base = slashScore(pts, body0.map(c => ({ ...c, x: c.x + off.x, y: c.y + off.y })), undefined, ease);
+        // açığın içinden, parladığı anda geçti mi? ne kadar ortasında?
+        let best = 0;
+        for (const p of pts) {
+          const t = p.t - t0; const ofs = offAt(p.t);
+          for (const op of opens) {
+            if (t < op.t0 - 60 || t > op.t1 + 60) continue;
+            const d = Math.hypot(p.x - (op.x + ofs.x), p.y - (op.y + ofs.y));
+            if (d > rOpen * 1.15) continue;
+            best = Math.max(best, 1 - 0.45 * Math.max(0, d / rOpen - 0.35));
+          }
+        }
+        if (best > 0 && base.q > 0) { opened = true; q = best >= 0.8 && base.q >= 0.6 ? (aim ? 1.25 : 1) : 0.75; }
+        else if (base.q > 0) q = 0.35;
+      }
+      L.g.clearRect(0, 0, W, H); if (pts.length) inkTrail(L.g, pts, q > 0 ? L.red : L.ink);
+      if (q > 0) { sfx(q >= 1 ? "crit" : "hit"); buzz(q >= 1 ? "heavy" : "light"); L.el.classList.add("hit"); } else sfx("miss");
+      result(L, Math.min(1, q), label ?? (q > 1 ? "Zayıf noktadan!" : q >= 1 ? "Açığı buldun!" : opened ? "Açığa yakın" : q > 0 ? "Sıyırdı" : "Iska"));
+      void L.close(650).then(() => resolve(q));
+    };
+    track(L.cv, pts => { trail = pts; if (pts.length % 4 === 0) sfx("draw"); }, pts => finish(pts));
+    requestAnimationFrame(frame);
   });
 }
 
-/* ---------- savunma: atılan kurttan kaç ---------- */
-/** from: kurdun oyuncuya göre geldiği yön (derece, ekran). */
+/* ---------- savunma: atılan kurttan yana kaç ----------
+ * Kurt çömelir; bazen çalım atar (atılır gibi yapıp durur). Gerçekten atıldığında, havadayken yana kaydır.
+ * Çalıma kanarsan ya da erken kaçarsan bir şey değişmez; doğru anda yana kaçarsan isabeti düşer, yine de
+ * ısırırsa hasarı azalır. Pencere refleks ve esneklikle genişler.
+ */
 export function dodgePrompt(host: HTMLElement, o: { foe?: string; from: number; ease: number }): Promise<number> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 0.8);
     const art = foeArt(o.foe);
-    const L = layer(host, "dodge", `${esc(art.name)} ${art.human ? "saldırıyor" : "atılıyor"}! Kenara kaç`, W, H);
+    const L = layer(host, "dodge", `${esc(art.name)} ${art.human ? "saldıracak" : "atılacak"}! Atılınca yana kaç`, W, H);
     const cx = W / 2, cy = H / 2; const a = o.from * Math.PI / 180;
     const sx = cx + Math.cos(a) * W * 0.46, sy = cy + Math.sin(a) * H * 0.46;
-    const lead = 350 + Math.random() * 350, dur = 900 + Math.random() * 300; const t0 = performance.now();
+    const ease = Math.max(0.8, Math.min(2.5, o.ease));
+    const feint = Math.random() < 0.55;
+    const crouch = 350 + Math.random() * 400;
+    const feintT = feint ? 420 : 0, pause = feint ? 250 + Math.random() * 450 : 0;
+    const lead = crouch + feintT + pause, dur = 620 + Math.random() * 160;
+    const hw = 0.13 * ease, center = 0.68;                 // kaçış penceresi (atılışın oranı)
+    const t0 = performance.now();
     const away = (o.from + 180) % 360; let done = false; let trail: P[] = [];
     const img = art.attack ?? art.url ? Object.assign(new Image(), { src: (art.attack ?? art.url)! }) : null;
+    const pose = (now: number) => {
+      if (now < crouch) return { p: 0, shake: Math.sin(now / 30) * 2 };
+      if (now < crouch + feintT) { const f = (now - crouch) / feintT; return { p: Math.sin(f * Math.PI) * 0.22, shake: 0 }; }
+      if (now < lead) return { p: 0, shake: Math.sin(now / 25) * 2.5 };
+      return { p: Math.min(1.2, (now - lead) / dur), shake: 0 };
+    };
     const draw = () => {
-      if (done) return; const now = performance.now() - t0; const p = Math.max(0, Math.min(1.2, (now - lead) / dur));
+      if (done) return; const now = performance.now() - t0; const { p, shake } = pose(now);
       const g = L.g; g.clearRect(0, 0, W, H);
-      // oyuncu
       g.fillStyle = L.blue; g.beginPath(); g.arc(cx, cy, 9, 0, 7); g.fill();
-      // kurt: çömelir, sonra yay çizerek atılır
       const e = p * p; const wx = sx + (cx - sx) * e, wy = sy + (cy - sy) * e - Math.sin(Math.min(1, p) * Math.PI) * H * 0.12;
-      const sc = 0.7 + e * 0.6; const shake = p === 0 ? Math.sin(now / 30) * 2 : 0;
-      // kurt oyuncuya bakar: görseller sola bakar, sağdan geliyorsa olduğu gibi
+      const sc = 0.7 + e * 0.6;
       g.save(); g.translate(wx + shake, wy); g.scale((Math.cos(a) > 0 ? 1 : -1) * sc, sc); if (p > 0) g.rotate(-0.25);
       if (img?.complete && img.naturalWidth) { g.filter = art.filter; const w = art.human ? 52 : 96, h = w * img.naturalHeight / img.naturalWidth; g.drawImage(img, -w / 2, art.human ? -h * 0.7 : -30, w, h); g.filter = "none"; } else drawWolf(g, 90, L.ink);
       g.restore();
-      if (p > 0) { g.strokeStyle = L.red; g.globalAlpha = 0.35; g.setLineDash([4, 6]); g.beginPath(); g.moveTo(sx, sy); g.lineTo(cx, cy); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
+      if (now >= lead) { g.strokeStyle = L.red; g.globalAlpha = 0.35; g.setLineDash([4, 6]); g.beginPath(); g.moveTo(sx, sy); g.lineTo(cx, cy); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
       if (trail.length) inkTrail(g, trail, L.blue, 0.8);
-      if (p >= 1.1) return finish([], "Isırdı");
+      if (now >= lead && p >= 1.1) return finish([], "Isırdı");
       requestAnimationFrame(draw);
     };
     const finish = (pts: P[], label?: string) => {
       if (done) return; done = true;
       let q = 0;
       if (pts.length) {
-        const now = pts[pts.length - 1].t - t0; const p = (now - lead) / dur;
-        const sw = swipeOf(pts);
-        const dir = Math.max(dirScore(sw, away, 45 * o.ease, 35), dirScore(sw, away + 90, 40 * o.ease, 35) * 0.85, dirScore(sw, away - 90, 40 * o.ease, 35) * 0.85);
-        const timing = p < 0.2 ? 0 : p < 0.5 ? 0.5 : p <= 1.02 ? 1 : 0;
-        q = dir * timing;
-        label = timing === 0 ? (p < 0.2 ? "Erken davrandın" : "Geç kaldın") : dir === 0 ? "Yanlış yöne" : q >= 0.95 ? "Tam kaçış!" : q >= 0.55 ? "Kaçtın" : "Ucu ucuna";
+        const t = pts[0].t - t0;
+        if (t < lead) label = feint && t >= crouch && t < crouch + feintT + pause ? "Çalıma kandın" : "Erken davrandın";
+        else {
+          const p = (t - lead) / dur; const off = Math.abs(p - center);
+          const timing = off <= hw * 0.5 ? 1 : off <= hw ? 0.75 : off <= hw * 1.7 ? 0.4 : 0;
+          const sw = swipeOf(pts);
+          // yana kaçış en iyisi; geri kaçmak yarım
+          const dir = Math.max(dirScore(sw, away + 90, 40 * ease, 35), dirScore(sw, away - 90, 40 * ease, 35), dirScore(sw, away, 35 * ease, 35) * 0.6);
+          q = dir * timing;
+          label = timing === 0 ? (p < center ? "Erken davrandın" : "Geç kaldın") : dir === 0 ? "Yanlış yöne" : q >= 0.95 ? "Tam kaçış!" : q >= 0.55 ? "Yana kaçtın" : "Ucu ucuna";
+        }
       }
       if (q === 0) { sfx("hurt"); buzz("heavy"); } else sfx("whoosh");
       result(L, q, label ?? "Isırdı");

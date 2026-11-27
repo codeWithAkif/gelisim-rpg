@@ -8,7 +8,7 @@ import { type GameState, hourOf, log, DAY_MINUTES } from "./state";
 import { derived, effectiveAttr, maxMana, type Context } from "./derived";
 import { Rng } from "./rng";
 import { applyGain, realUse, summarize, type GainReport } from "./progression";
-import { attackTimingMods, dodgeMod } from "./timing";
+import { attackTimingMods, dodgeMods } from "./timing";
 import { weaponSet, totalArmor, totalDodge, wornIds, hasBow } from "./gear";
 import { trapEffect, trapsOwned } from "./engineering";
 import { petMul } from "./pet";
@@ -45,6 +45,8 @@ export interface Battle {
   w: number; h: number; tiles: Terrain[][];
   /** Düşman turundan önce oynanan kaçınma komutunun sonucu (0–1); tur sonunda silinir. */
   dodgeQ?: number;
+  /** Fark edilmeden yanına vardın: ilk vuruşun iki kat hasar. */
+  firstStrike?: boolean;
   weather: Weather; night: boolean;
   wind: { dir: number; strength: number };   // dir: rüzgârın estiği yön (0 = doğu, saat yönünde 60°)
   units: Unit[]; turn: number;
@@ -228,8 +230,19 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
     const d = ENEMIES[id]; const [x, y] = spots[i];
     units.push({ uid: "e" + i, side: "enemy", def: id, name: d.scale ? d.name : `${d.name} ${i + 1}`, x, y, hp: d.hp, maxHp: d.hp, moveLeft: 0, acted: false, slowed: 0, alert: (night || !!plan.ambushed) && !plan.surprise });
   });
+  // gizlice yaklaştın: uyuyan kurtlardan birinin dibindesin; ilk vuruş iki kat
+  if (plan.surprise) {
+    const pu = units[0]; const box = { w: m.rows[0].length, h: m.rows.length };
+    const free = (x: number, y: number) => inside(box, x, y) && !TERRAIN[MAP_CHARS[m.rows[y][x]] ?? "cayir"].blocks && !units.some(u => u.x === x && u.y === y);
+    const prey = units.filter(u => u.side === "enemy").sort((a, c) => dist(a.x, a.y, st.at[0], st.at[1]) - dist(c.x, c.y, st.at[0], st.at[1]));
+    for (const e of prey) {
+      const spot = neighbors(box, e.x, e.y).filter(([x, y]) => free(x, y)).sort((a, c) => dist(a[0], a[1], st.at[0], st.at[1]) - dist(c[0], c[1], st.at[0], st.at[1]))[0];
+      if (spot) { pu.x = spot[0]; pu.y = spot[1]; break; }
+    }
+  }
+  const at: XY = [units[0].x, units[0].y];
   if (s.pet) {
-    const d = ENEMIES[s.pet.id]; const free = [[st.at[0] - 1, st.at[1]], [st.at[0] + 1, st.at[1]], [st.at[0], st.at[1] - 1], [st.at[0], st.at[1] + 1]]
+    const d = ENEMIES[s.pet.id]; const free = [[at[0] - 1, at[1]], [at[0] + 1, at[1]], [at[0], at[1] - 1], [at[0], at[1] + 1]]
       .find(([x, y]) => inside({ w: m.rows[0].length, h: m.rows.length }, x, y) && m.rows[y][x] !== "=" && !units.some(u => u.x === x && u.y === y));
     if (d && free) { const hp = petHp(s); units.push({ uid: "pet", side: "ally", def: s.pet.id, name: s.pet.name, x: free[0], y: free[1], hp, maxHp: hp, moveLeft: 0, acted: false, slowed: 0 }); }
   }
@@ -237,7 +250,7 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
   const hids = [...new Set([...partyHeroes(s).map(h => h.id), ...(plan.helpers ?? [])])].slice(0, 4);
   for (const hid of hids) {
     const h = heroOf(s, hid), hd = heroDef(hid); if (!h || !hd) continue;
-    const spot = [...neighbors({ w: m.rows[0].length, h: m.rows.length }, st.at[0], st.at[1]), ...[[st.at[0] - 2, st.at[1]], [st.at[0] + 2, st.at[1]]] as XY[]]
+    const spot = [...neighbors({ w: m.rows[0].length, h: m.rows.length }, at[0], at[1]), ...[[at[0] - 2, at[1]], [at[0] + 2, at[1]]] as XY[]]
       .find(([x, y]) => inside({ w: m.rows[0].length, h: m.rows.length }, x, y) && !TERRAIN[MAP_CHARS[m.rows[y][x]] ?? "cayir"].blocks && !units.some(u => u.x === x && u.y === y));
     if (spot) { const hp = Math.min(heroStats(h).maxHp, Math.max(8, h.hp)); units.push({ uid: "h:" + hid, side: "ally", def: "h_" + hd.role, name: hd.name, x: spot[0], y: spot[1], hp, maxHp: heroStats(h).maxHp, moveLeft: 0, acted: false, slowed: 0 }); }
   }
@@ -247,11 +260,11 @@ export function createBattle(cfg: Config, s: GameState, mapId: string, enemyIds:
     w: tiles[0].length, h: tiles.length, tiles, weather, night, wind: sc.wind, units, turn: 1, phase: "player",
     seed: rng.seed, log: [], events: [],
     stats: { attacks: 0, hits: 0, crits: 0, observed: 0, dmgTaken: 0, moves: 0, casts: 0, castMastery: {}, ambushes: 0, pushes: 0 }, questId,
-    fire: {}, walls: {}, traps, trapInfo, torch: { has: plan.torch, thrown: false }, flock: m.flock,
+    fire: {}, walls: {}, traps, trapInfo, torch: { has: plan.torch, thrown: false }, flock: m.flock, firstStrike: !!plan.surprise,
   };
   startPlayerTurn(cfg, s, b);
   const W = foeWords(enemyIds);
-  const opening = plan.surprise ? `Gizlice yaklaştın; ${W.pl} seni fark etmedi. İlk vuruş senin.` : plan.ambushed ? `${cap(W.one)} yolunu kesti; gözünü senden ayırmıyor.` : night ? `Gece; ${W.pl} ${W.hunt}.` : `Gündüz; ${W.pl} ${W.rest}, seni fark etmediler.`;
+  const opening = plan.surprise ? `Sürünerek yanına kadar geldin; ${W.pl} seni fark etmedi. İlk vuruşun iki kat.` : plan.ambushed ? `${cap(W.one)} yolunu kesti; gözünü senden ayırmıyor.` : night ? `Gece; ${W.pl} ${W.hunt}.` : `Gündüz; ${W.pl} ${W.rest}, seni fark etmediler.`;
   b.log.unshift(`${opening} ${weather === "yagmur" ? "Yağmur yağıyor." : weather === "sis" ? "Sis var." : "Hava açık."}`);
   return b;
 }
@@ -318,7 +331,8 @@ export function previewAttack(cfg: Config, s: GameState, b: Battle, target: Unit
   hit = Math.max(5, Math.min(95, hit));
   crit = Math.max(0, Math.min(80, crit));
   const base = (w.dmg + effectiveAttr(cfg, s, "ust_govde", ctx) * 0.08) * (stance === "guclu" ? 1.5 : 1);
-  return { hit, crit, dmg: [Math.max(1, Math.round(base * 0.8 - d.armor)), Math.max(1, Math.round(base * 1.2 - d.armor))], critParts: parts.filter(x => Math.abs(x.amount) >= 0.05), ambush };
+  const k = ambush && b.firstStrike ? 2 : 1;
+  return { hit, crit, dmg: [Math.max(1, Math.round(base * 0.8 - d.armor)) * k, Math.max(1, Math.round(base * 1.2 - d.armor)) * k], critParts: parts.filter(x => Math.abs(x.amount) >= 0.05), ambush };
 }
 
 /* ---------- hareket ---------- */
@@ -410,10 +424,14 @@ export function playerAttack(cfg: Config, s: GameState, b: Battle, target: Unit,
     let dmg = rng.int(pv.dmg[0], pv.dmg[1]);
     const wp = aim ? d.weakPoints.find(x => x.id === aim) : undefined;
     if (crit) { dmg = Math.round(dmg * 1.8); b.stats.crits++; if (wp?.effect === "slow") target.slowed = 3; }
+    // saldırı oyunu: iyi kesik hasarı artırır
+    const plain = dmg; dmg = Math.max(1, Math.round(dmg * tm.dmg)); const extra = dmg - plain;
     target.hp = Math.max(0, target.hp - dmg);
-    res = { hit: true, crit, dmg, text: `${pv.ambush ? "Pusu! " : ""}${crit ? `Kritik! ${wp ? wp.name + " hedefine " : ""}${dmg} hasar.` : `${target.name} ${dmg} hasar aldı.`}` };
+    const first = pv.ambush && b.firstStrike;
+    res = { hit: true, crit, dmg, text: `${first ? "Sinsi vuruş! Çift hasar. " : pv.ambush ? "Pusu! " : ""}${crit ? `Kritik! ${wp ? wp.name + " hedefine " : ""}${dmg} hasar.` : `${target.name} ${dmg} hasar aldı.`}${extra > 0 ? ` (kesik +${extra})` : ""}` };
   }
   b.events.push({ k: "attack", uid: p.uid, target: target.uid, hit: res.hit, crit: res.crit, dmg: res.dmg, power: stance === "guclu", ambush: pv.ambush });
+  b.firstStrike = false;
   if (res.hit) res.text += moraleCheck(b, target);
   b.seed = rng.seed; b.log.unshift(res.text);
   detect(b, true);
@@ -626,13 +644,15 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
     if (e.alert && dist(e.x, e.y, p.x, p.y) === 1) {
       const ctx = ctxAt(cfg, s, b, p, d.species);
       const dodge = derived(cfg, s, "kacinma", ctx).value + totalDodge(s);
-      const hitChance = Math.max(5, Math.min(90, d.accuracy - dodge + (s.energy < 20 ? 10 : 0) - (blind ? 30 : 0) - (p.defending ? 22 : 0) - dodgeMod(b.dodgeQ)));
+      const dm = dodgeMods(b.dodgeQ);   // kaçınma oyunu: isabet ve hasar düşer
+      const hitChance = Math.max(5, Math.min(90, d.accuracy - dodge + (s.energy < 20 ? 10 : 0) - (blind ? 30 : 0) - (p.defending ? 22 : 0) - dm.hit));
       const hit = rng.chance(hitChance);
       let dmg = 0;
       if (hit) {
-        dmg = Math.max(1, rng.int(d.damage[0], d.damage[1]) - playerArmor(s) - (p.defending ? 1 : 0));
+        const full = Math.max(1, rng.int(d.damage[0], d.damage[1]) - playerArmor(s) - (p.defending ? 1 : 0));
+        dmg = Math.max(1, Math.round(full * dm.dmg));
         p.hp = Math.max(0, p.hp - dmg); b.stats.dmgTaken += dmg;
-        out.push(`${e.name} ısırdı: ${dmg} hasar.`);
+        out.push(`${e.name} ısırdı: ${dmg} hasar.${dmg < full ? ` (yana kaçtın, ${full - dmg} az)` : ""}`);
       } else out.push(p.defending ? `${e.name} atıldı; değneğe çarpıp geri sekti.` : `${e.name} atıldı, son anda kaçtın.`);
       b.events.push({ k: "attack", uid: e.uid, target: p.uid, hit, crit: false, dmg });
       if (p.hp <= 0) break;

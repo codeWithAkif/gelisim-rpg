@@ -2,9 +2,9 @@
 import { test, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
 import { newGame, type GameState } from "../src/engine/state";
-import { grade, rhythmScore, sessionBoost, sessionRounds, attackWindow, miniEase, attackTimingMods, dodgeMod, miniFor } from "../src/engine/timing";
+import { grade, rhythmScore, sessionBoost, sessionRounds, attackWindow, miniEase, attackTimingMods, dodgeMod, dodgeMods, miniFor } from "../src/engine/timing";
 import { startSession, recordPlay, finishSession, roundsLeft } from "../src/engine/session";
-import { createBattle, player, enemies, playerAttack, enemyTurn, dist, willBeAttacked } from "../src/engine/combat";
+import { createBattle, player, enemies, playerAttack, enemyTurn, dist, willBeAttacked, previewAttack, DEFAULT_PLAN } from "../src/engine/combat";
 
 test("not: tam an, iyi, erken/geç, kaçırdın", () => {
   expect(grade(0.01, 0.1).q).toBe(1);
@@ -69,11 +69,17 @@ test("savaşta zamanlama: iyi oynayan oyuncu daha sık kazanır ama kurt hâlâ 
     return w / n;
   };
   const none = rate(), poor = rate(0), great = rate(1), good = rate(0.7);
+  expect(good).toBeGreaterThan(none);
   expect(great).toBeGreaterThan(none + 0.15);
   expect(great).toBeLessThan(0.97);
-  expect(poor).toBeLessThan(none + 0.02);
-  expect(attackTimingMods(undefined)).toEqual({ hit: 0, crit: 0 });
+  // başaramamak hiçbir şeyi değiştirmez (ceza yok)
+  expect(poor).toBe(none);
+  expect(attackTimingMods(undefined)).toEqual({ hit: 0, crit: 0, dmg: 1 });
+  expect(attackTimingMods(0)).toEqual({ hit: 0, crit: 0, dmg: 1 });
+  expect(attackTimingMods(1).dmg).toBeGreaterThan(attackTimingMods(0.7).dmg);
   expect(dodgeMod(1)).toBeGreaterThan(dodgeMod(0.7));
+  expect(dodgeMods(0)).toEqual({ hit: 0, dmg: 1 });
+  expect(dodgeMods(1).dmg).toBeLessThan(dodgeMods(0.7).dmg);
 });
 
 test("saldırı önceden bilinir ve bilmek sonucu değiştirmez", () => {
@@ -81,4 +87,21 @@ test("saldırı önceden bilinir ve bilmek sonucu değiştirmez", () => {
   const before = JSON.stringify(b);
   willBeAttacked(cfg, s, b);
   expect(JSON.stringify(b)).toBe(before);
+});
+
+test("gizlice yaklaşınca uyuyan bir kurdun dibinde başlarsın; ilk vuruş iki kat, sonra normal", () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = newGame(cfg, seed);
+    const b = createBattle(cfg, s, "mera", ["kurt", "kurt"], seed * 17, undefined, { ...DEFAULT_PLAN, surprise: true });
+    const p = player(b);
+    const near = enemies(b).filter(e => dist(p.x, p.y, e.x, e.y) === 1);
+    expect(near.length, `seed ${seed}`).toBeGreaterThan(0);
+    expect(enemies(b).every(e => !e.alert)).toBe(true);
+    const t = near[0];
+    const once = previewAttack(cfg, s, b, t);
+    const plain = previewAttack(cfg, s, { ...b, firstStrike: false }, t);
+    expect(once.dmg[1]).toBe(plain.dmg[1] * 2);
+    playerAttack(cfg, s, b, t);
+    expect(b.firstStrike).toBe(false);
+  }
 });

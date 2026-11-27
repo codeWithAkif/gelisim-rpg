@@ -284,7 +284,8 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     h.innerHTML = `<div class="modal"><h2>Haritayı okumak</h2>
       <p><b class="blue">Mavi tarama</b>: bu tur yürüyebileceğin yerler.</p>
       <p><b class="red">Kırmızı gölge</b>: düşmanların bir sonraki turda saldırabileceği yerler. Ne kadar koyu, o kadar çok düşman.</p>
-      <p><b>z</b>: düşman seni henüz fark etmedi. Fark edilmeden yanına varırsan pusu kurarsın: isabet +15, kritik +25. Uzun ot ve ağaç seni saklar, rüzgâr kokunu taşır, yağmur kokunu bastırır.</p>
+      <p><b>z</b>: düşman seni henüz fark etmedi. Fark edilmeden yanına varırsan pusu kurarsın: isabet +15, kritik +25. Gizlenip yaklaştıysan ilk vuruşun iki kat.</p>
+      <p><b>Saldır</b>: kurdun üstünde açık parlayınca içinden kes; iyi kesik hasarı artırır. <b>Kaç</b>: kurt atıldığında, havadayken yana kaydır; çalımına kanma. İyi kaçış isabeti ve hasarı düşürür. Başaramamak bir şey değiştirmez. Uzun ot ve ağaç seni saklar, rüzgâr kokunu taşır, yağmur kokunu bastırır.</p>
       <p><b>İt</b>: düşmanı bir altıgen geri iter. Arkası ateşse yanar, dereyse sersemler, çamursa saplanır.</p>
       <p><b>Savun</b>: turu harcarsın ama düşmanın isabeti düşer.</p>
       <div class="row"><button class="btn primary">Tamam</button></div></div>`;
