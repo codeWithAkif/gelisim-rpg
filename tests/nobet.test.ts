@@ -78,3 +78,29 @@ test("sayfa çevirme, erken dalga çağırma ve yiyecekle kule iyileştirme", ()
   expect(rerollCards(s, n)).toBe(true); expect(n.rerolls).toBe(1); expect(n.offer.length).toBeGreaterThan(0); expect(n.offer.some(x => !old.includes(x))).toBe(true);
   const dmg0 = n.dmg; n.offer = ["ofke"]; pickCard(s, n, "ofke"); expect(n.dmg).toBeGreaterThan(dmg0);
 });
+
+test("uzun dayanmak karşılığını verir: gelişim dalgayla azalan hızda büyür, kese büyür, lider gözlem yazdırır, eşikler ün getirir", async () => {
+  const { ENEMIES } = await import("../src/content/world");
+  const { repOf } = await import("../src/engine/state");
+  const run = (w: number, bosses: string[] = []) => {
+    const s = fresh(); const n = createNobet(cfg, s, nobetSite("yayla")!, 1);
+    n.wave = w + 1; n.waveLeft = 1; n.stats.shots = 20 + w * 12; n.stats.bossDefs = bosses;
+    for (let k = 5; k <= w; k += 5) { const l = milestoneReward(n.site, k, new Rng(k)); n.loot.money += l.money; }
+    return { s, r: finishNobet(cfg, s, n) };
+  };
+  const g5 = run(5).r.gains.okculuk!, g20 = run(20).r.gains.okculuk!, g30 = run(30).r.gains.okculuk!;
+  console.log("okçuluk 5/20/30:", g5.toFixed(2), g20.toFixed(2), g30.toFixed(2));
+  expect(g20).toBeGreaterThan(g5 * 1.5); expect(g30).toBeGreaterThan(g20);
+  expect(g30 - g20).toBeLessThan(g20 - g5);                       // azalan hız
+  // kese: 30 dalga, 5 dalgadan çok daha fazla para
+  expect(run(30).r.loot.money).toBeGreaterThan(run(5).r.loot.money * 15);
+  // lider: Akyele kurdun zayıf noktalarından birini açar
+  const { s, r } = run(10, ["akyele"]);
+  expect(s.journal.kurt?.length).toBe(1); expect(r.notes.some(t => /Gözlemler/.test(t))).toBe(true);
+  expect(ENEMIES.kurt.weakPoints.map(w => w.id)).toContain(s.journal.kurt![0]);
+  // eşik: 10. dalga ün getirir, bir kez
+  expect(repOf(s, "taspinar", "taninirlik")).toBeGreaterThanOrEqual(2);
+  const before = repOf(s, "taspinar", "taninirlik");
+  const n2 = createNobet(cfg, s, nobetSite("yayla")!, 2); n2.wave = 12; n2.waveLeft = 1; finishNobet(cfg, s, n2);
+  expect(repOf(s, "taspinar", "taninirlik")).toBe(before);
+});
