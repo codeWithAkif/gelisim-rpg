@@ -677,6 +677,9 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
   radial-gradient(ellipse 60% 40% at 30% 40%, rgba(200,200,195,.22), transparent 70%),
   radial-gradient(ellipse 70% 45% at 75% 60%, rgba(200,200,195,.2), transparent 70%); animation: scFog 14s ease-in-out infinite alternate; }
 @keyframes scFog { to { transform: translateX(-6%) scale(1.08); } }
+/* sarnıç: sis yerine zifiri karanlık, ışık suyun yansıması gibi mavimsi */
+.scene.fog.damla::after { background: radial-gradient(ellipse 80% 50% at 50% 70%, rgba(40,60,80,.25), rgba(0,0,0,.55) 75%); animation: none; }
+.scene.damla .sc-half i { background: radial-gradient(circle, rgba(170,200,225,.5), rgba(170,200,225,0) 70%); }
 .scene .sc-fog { position: absolute; inset: 7vh 0; z-index: 2; display: flex; }
 .scene .sc-half { flex: 1; background: transparent; border: 0; position: relative; }
 .scene .sc-half i { position: absolute; top: 34%; width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, rgba(244,214,150,.55), rgba(244,214,150,0) 70%); opacity: 0; }

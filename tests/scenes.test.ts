@@ -41,12 +41,15 @@ test("sis: çan iki yandan gelir, aynı yandan üst üste üç kez gelmez; tohum
   expect(fill("{ad}… Buralı değil.", "Akif")).toBe("Akif… Buralı değil."); expect(fill("{ad}", "")).toBe("Yolcu");
 });
 
-test("işlere bağlı sahneler ve sahnede söz verilen işler var; Bölüm 1'in bütün ana sayfaları sahne", () => {
+test("işlere bağlı sahneler ve sahnede söz verilen işler var; Bölüm 1 ve 2'nin bütün ana sayfaları sahne", () => {
   for (const q of QUESTS) if (q.scene) expect(SCENES[q.scene], q.id).toBeTruthy();
   const ids = new Set(QUESTS.map(q => q.id));
   for (const ch of CHAPTERS) for (const m of ch.milestones) if (m.accept) expect(ids.has(m.accept), m.id).toBe(true);
-  const b1 = CHAPTERS.find(c => c.id === "b1")!;
-  for (const m of b1.milestones) expect(m.scene, m.id).toBeTruthy();
+  for (const q of QUESTS) if (q.before) expect(SCENES[q.before], q.id).toBeTruthy();
+  for (const ch of ["b1", "b2"]) for (const m of CHAPTERS.find(c => c.id === ch)!.milestones) expect(m.scene, m.id).toBeTruthy();
+  const b2end = SCENES.k_defter.beats[SCENES.k_defter.beats.length - 1];
+  expect(b2end.t).toBe("baslik");
+  expect(SCENES.k_derya.beats.some(b => b.t === "sis" && b.tur === "damla")).toBe(true);
   const last = SCENES.mektup.beats[SCENES.mektup.beats.length - 1];
   expect(last.t).toBe("baslik");
 });

@@ -34,7 +34,7 @@ Sahneler `src/content/scenes.ts` içinde saf veridir. Her sahne bir dizi "vuruş
 | `soz("hasan", "…")` | Konuşma. Konuşan `SPEAKERS` içinde tanımlı olmalı (ad ve portre). `"sen"` oyuncudur. |
 | `{ t: "bekle", ms: 900 }` | Sessiz bir an. |
 | `{ t: "ad" }` | Oyuncunun adını sorar. Metinde `{ad}` yerine ad konur. |
-| `{ t: "sis" }` | Oynanan an (çanın sesini izleme). Yeni oynanan anlar `scene-view.ts`'e eklenir. |
+| `{ t: "sis" }` | Oynanan an: sesin geldiği yana dokunarak ilerle (sisin içinde çan). `{ t: "sis", tur: "damla" }` karanlık sarnıçta su sesi. Yeni oynanan anlar `scene-view.ts`'e eklenir. |
 | `{ t: "gorsel", art: "yer_yayla", gece: true }` | Görseli gece gibi karartır (aynı yerin gece hâli için yeni çizim gerekmez). |
 | `{ t: "tek", id: "harabe_uluma", vol: 0.8 }` | Tek seferlik ses: uluma, uzaktan kurtlar. Dosya `src/assets/ses/` içinde. |
 | `{ t: "incele", prompt: "…", spots: [{ x, y, label, text }] }` | Oyuncu görselin üstünde parlayan yerlere dokunarak inceler; hepsi bulununca sahne sürer. Gizemi oyuncunun kendisi bulsun. |
@@ -45,6 +45,7 @@ Bir hikâye sayfasını (`src/content/story.ts` içindeki kilometre taşı) sahn
 Sahnede bir işe söz veriliyorsa (`"Yarın gece orada bekleyelim"`) `accept: "<iş>"` ile o iş kendiliğinden üstlenilir.
 Ana hikâyenin işlerine (`src/content/world.ts`) `story: true` ver: "Ana görev" diye görünür, ödül penceresi araya girmez.
 Gece geçen işlere `night: true` ver: gündüz başlanırsa akşam beklenir.
+Savaştan önce bir kez oynanacak bir an için işe `before: "<sahne kimliği>"` ver (Kurt avı → `pusu`, Kervan yolu → `kervan_once`).
 Bir iş bitince ödül penceresi yerine sahne oynasın istiyorsan işe `scene: "<sahne kimliği>"` ver (örnek: Kurtların izi → `karaca`).
 
 ## Bölüm 1 örneği
@@ -56,6 +57,18 @@ Her adım bir soru bırakır; rütbe ve ev ancak annenin izi bulununca gelir.
 Sonrası: Zehra (annenin ATEŞ yaprağı) → ilk kıvılcım → ateş ve kurt (Hasan gördü) → yan hikâye: donmuş karaca,
 Akyele → annenin mektubu ("Kuzeyde değil, aramızda.") → "Bölüm 1 sona erdi" kartı. Bölüm 1'in bütün sayfaları sahnedir;
 `tests/scenes.test.ts` bunu denetler. Diğer bölümler de aynı kuralla yazılmalı.
+
+## Bölüm 2 örneği
+
+"Bölüm 2 · Karaçam" kartı → varış (inceleme: yazın ortasında kar, kürkler, ışık sızan sepetler) → Hancı Yaren →
+**Kor taşları** (Selim'in dükkânı; inceleme: taş ısı çekiyor, mum alevi taşa eğiliyor, kar tanesi mührü) →
+**İşaretli arabalar** (gece, inceleme: tebeşir çarpı, izler hana giriyor, balkonda biri) →
+**Kervan yolu** (önce `kervan_once`: işaretli arabanın içinde bekleyiş, ıslıklar; sonra savaş) →
+haydudun notu, Selim annesini anlatır → **Sarnıçtaki ses** (karanlıkta su sesini izle, Usta Derya, SU) →
+**Loncanın defteri** → kayıtları annem tutmuş, en altta başka bir el: "Ölçer L." → "Bölüm 2 sona erdi" kartı.
+
+Açık bırakılan soru (sonraki bölümler için): arabaları kim işaretliyor? İşaretleyen hanın içinden çıktı;
+balkondaki mum söndü. Bu cevap Bölüm 3 ya da 4'te verilmeli.
 
 ## Kontrol listesi
 

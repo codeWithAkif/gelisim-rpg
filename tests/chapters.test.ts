@@ -49,7 +49,7 @@ test("bölüm 2 → 3 → 4: yerler açılır, elementler öğrenilir, hikâye b
 
   arrive(s, "karacam"); expect(s.region).toBe("karacam"); advanceStory(s);
   expect(currentChapter(s).id).toBe("b2");
-  for (const q of ["selim_dukkan", "kervan", "sarnic", "lonca_defteri"]) finish(s, q);
+  for (const q of ["selim_dukkan", "isaretli_arabalar", "kervan", "sarnic", "lonca_defteri"]) finish(s, q);
   expect(s.knownElements).toContain("el_su");
   expect(isOpen(ak, s)).toBe(true); expect(currentChapter(s).id).toBe("b3");
 

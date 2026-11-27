@@ -494,8 +494,9 @@ export function startApp(root: HTMLElement) {
   function doFight(id: string) {
         const q = QUESTS.find(x => x.id === id)!;
         if (s.energy < 15) { toast("Bu yorgunlukla savaşa giremezsin; dinlen."); return; }
-        // ilk pusudan önce Hasan öğretir (bir kez)
-        if (id === "kurt" && s.story.flags.sahne_pusu === undefined) { s.story.flags.sahne_pusu = s.day; persist(); playScene(SCENES.pusu, { name: s.name }, () => doFight(id)); return; }
+        // savaştan önce bir kez oynanan sahne (Hasan pusuyu öğretir, kervanda bekleyiş)
+        const pre = q.before;
+        if (pre && SCENES[pre] && s.story.flags["sahne_" + pre] === undefined) { s.story.flags["sahne_" + pre] = s.day; persist(); playScene(SCENES[pre], { name: s.name }, () => doFight(id)); return; }
         const siegeEnd = (won: boolean, gains: Record<string, number>, foes?: string[], hs: string[] = []) => {
           let extra = heroLinesHtml(afterBattle(s, hs, won ? "won" : "lost"));
           if (won) { const r = completeQuest(cfg, s, id, foes ? bonusOf(s, q.battle!.enemies, foes) : bonusOf(s, [], [])); extra = `<h3>Ödül</h3>${rewardHtml(r)}`; }

@@ -136,6 +136,7 @@ export interface QuestDef {
   story?: boolean;       // ana hikâyenin işi: "Ana görev" diye görünür, ödül penceresi yerine sahne gelir
   night?: boolean;       // gece yapılır: gündüz başlanırsa akşam beklenir (saat ilerler)
   scene?: string;        // bitince ödül penceresi yerine bu sahne oynar (content/scenes.ts)
+  before?: string;       // savaştan önce bir kez oynanan sahne (ör. Hasan pusuyu öğretir)
 }
 export const QUESTS: QuestDef[] = [
   {
@@ -149,7 +150,7 @@ export const QUESTS: QuestDef[] = [
     rewards: { items: { ekmek: 1 }, note: "Sabah Hasan ateşte bir tas çorba ısıttı, yanına ekmek koydu." },
   },
   {
-    id: "kurt", title: "Sürüye dadanan kurtlar", giverNpc: "hasan", importance: "onemli", story: true, minutes: 90, requires: ["agil_nobet"], at: "yayla",
+    id: "kurt", title: "Sürüye dadanan kurtlar", giverNpc: "hasan", importance: "onemli", story: true, before: "pusu", minutes: 90, requires: ["agil_nobet"], at: "yayla",
     text: "Donmuş kuzunun yanındaki izler meradaki kayalıklara gidiyor. Hasan: \"Yarın gece orada pusu kuralım.\"",
     battle: { enemies: ["kurt", "kurt"], map: "mera" },
     rewards: { items: { temiz_giysi: 1, el_yapimi_bicak: 1 }, note: "Temiz giysi ve kendi yaptığı bıçak. Bir çoban için büyük fedakârlık." },

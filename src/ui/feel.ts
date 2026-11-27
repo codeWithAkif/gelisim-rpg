@@ -166,14 +166,16 @@ export function sceneAmbience(layers: { id: string; vol: number }[] | null) {
   startAmb("sahne|" + layers.map(l => l.id + l.vol).join(","), layers, false);
 }
 /** Sis oyunu: koyun çanlarından kısa bir parça, verilen yandan (-1 sol … 1 sağ). */
-export function bellCue(pan: number) {
+export function bellCue(pan: number, kind: "can" | "damla" = "can") {
   if (!settings().sound) return;
   const c = ac(); if (!c || !master) return;
-  void ambBuf(c, "koyun").then(buf => {
+  // çan: koyun çanı kaydından bir parça; damla: dere kaydından kısa, tek yanlı bir şırıltı
+  const [id, len, vol] = kind === "damla" ? ["dere", 1.3, 1.4] as const : ["koyun", 2.6, 1.1] as const;
+  void ambBuf(c, id).then(buf => {
     if (!buf) return;
     const src = c.createBufferSource(); src.buffer = buf; const p = c.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan));
-    const g = c.createGain(); const t = c.currentTime; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1.1, t + 0.15); g.gain.setTargetAtTime(0, t + 1.6, 0.25);
-    src.connect(g).connect(p).connect(master!); src.start(t, Math.random() * Math.max(0, buf.duration - 3), 2.6);
+    const g = c.createGain(); const t = c.currentTime; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.12); g.gain.setTargetAtTime(0, t + len - 0.9, 0.22);
+    src.connect(g).connect(p).connect(master!); src.start(t, Math.random() * Math.max(0, buf.duration - len - 0.5), len);
   });
 }
 
