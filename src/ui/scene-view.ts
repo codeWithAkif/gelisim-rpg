@@ -82,19 +82,26 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
     });
   };
 
-  /* ---------- sis: çanın sesini izle ---------- */
-  const fog = () => {
-    busy = true; tapHint.classList.remove("on"); el.classList.add("fog");
+  /* ---------- sesi izle: sisin içinde çan, karanlık sarnıçta su damlası ---------- */
+  const FOG = {
+    can: { cls: "fog", intro: "Sis o kadar koyu ki elimi göremiyorum. Bir yerden çan sesi geliyor.",
+      steps: ["Ses yaklaşıyor. Bir çan daha.", "Taşlara basa basa ilerliyorum. Çan yine çalıyor."], done: "Çan sesi artık hemen önümde. Sis aralanıyor.", wrong: "Hayır… ses öbür yandan geliyor." },
+    damla: { cls: "fog damla", intro: "Göz gözü görmüyor. Bir yerden su şırıldıyor.",
+      steps: ["Duvara tutuna tutuna ilerliyorum. Su yine şırıldadı.", "Ayağım suya değdi. Ses artık çok yakın."], done: "Kemerlerin arasından titrek bir ışık sızıyor.", wrong: "Hayır… su öbür yandan." },
+  };
+  const fog = (kind: "can" | "damla") => {
+    const F = FOG[kind];
+    busy = true; tapHint.classList.remove("on"); el.className += " " + F.cls;
     const sides = sisSides(opts.seed ?? Date.now()); let r = 0;
-    stage.innerHTML = `<div class="sc-line anlatici center"><p class="sc-text">Sis o kadar koyu ki elimi göremiyorum. Bir yerden çan sesi geliyor.</p>
+    stage.innerHTML = `<div class="sc-line anlatici center"><p class="sc-text">${esc(F.intro)}</p>
       <p class="sc-sub">Sesin geldiği yana dokun.</p></div>`;
     const halves = document.createElement("div"); halves.className = "sc-fog";
     halves.innerHTML = `<button class="sc-half l" data-side="0" aria-label="Sol"><i></i></button><button class="sc-half r" data-side="1" aria-label="Sağ"><i></i></button>
       <button class="btn small sc-again" data-s="again">Sesi yeniden dinle</button>`;
     el.appendChild(halves);
     const cue = () => {
-      const side = sides[r]; bellCue(side ? 0.9 : -0.9);
-      // sesi duyamayan için: o yanda belli belirsiz bir fener ışığı
+      const side = sides[r]; bellCue(side ? 0.9 : -0.9, kind);
+      // sesi duyamayan için: o yanda belli belirsiz bir ışık
       const glow = halves.querySelector<HTMLElement>(side ? ".r i" : ".l i")!; glow.classList.remove("on"); void glow.offsetWidth; glow.classList.add("on");
     };
     const say = (t: string) => { const p = stage.querySelector<HTMLElement>(".sc-text"); if (p) p.textContent = t; };
@@ -106,10 +113,10 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
       const b = t.closest<HTMLElement>("[data-side]"); if (!b) return;
       if (+b.dataset.side! === sides[r]) {
         r++; stepsBurst();
-        if (r >= sides.length) { say("Çan sesi artık hemen önümde. Sis aralanıyor."); setTimeout(() => { halves.remove(); el.classList.remove("fog"); busy = false; next(); }, 1600); return; }
-        say(["Ses yaklaşıyor. Bir çan daha.", "Taşlara basa basa ilerliyorum. Çan yine çalıyor."][r - 1] ?? "Yaklaşıyorum.");
+        if (r >= sides.length) { say(F.done); setTimeout(() => { halves.remove(); el.classList.remove("fog", "damla"); busy = false; next(); }, 1600); return; }
+        say(F.steps[r - 1] ?? "Yaklaşıyorum.");
         setTimeout(cue, 1100);
-      } else { say("Hayır… ses öbür yandan geliyor."); sfx("bad"); setTimeout(cue, 900); }
+      } else { say(F.wrong); sfx("bad"); setTimeout(cue, 900); }
     });
   };
 
@@ -127,7 +134,7 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
       if (b.t === "baslik") { el.classList.add("titlecard"); stage.innerHTML = `<div class="sc-line sc-title"><p class="sc-big">${esc(b.text)}</p>${b.sub ? `<p class="sc-small">${esc(b.sub)}</p>` : ""}</div>`; tapHint.classList.add("on"); return; }
       if (b.t === "bekle") { waiting = true; stage.innerHTML = ""; setTimeout(() => { waiting = false; next(); }, b.ms * Math.max(0.3, speed || 0.3)); return; }
       if (b.t === "ad") { askName(); return; }
-      if (b.t === "sis") { fog(); return; }
+      if (b.t === "sis") { fog(b.tur ?? "can"); return; }
       show(b); return;
     }
     finish();
@@ -140,7 +147,7 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
       while (++i < scene.beats.length) {
         const b = scene.beats[i];
         if (b.t === "ses") sceneAmbience(b.layers); else if (b.t === "gorsel") setArt(b.art, !!b.gece);
-        else if (b.t === "ad") { askName(); return; } else if (b.t === "sis") { fog(); return; } else if (b.t === "incele") { inspect(b.prompt, b.spots); return; }
+        else if (b.t === "ad") { askName(); return; } else if (b.t === "sis") { fog(b.tur ?? "can"); return; } else if (b.t === "incele") { inspect(b.prompt, b.spots); return; }
       }
       finish(); return;
     }
