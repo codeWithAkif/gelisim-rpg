@@ -67,8 +67,21 @@ Akyele → annenin mektubu ("Kuzeyde değil, aramızda.") → "Bölüm 1 sona er
 haydudun notu, Selim annesini anlatır → **Sarnıçtaki ses** (karanlıkta su sesini izle, Usta Derya, SU) →
 **Loncanın defteri** → kayıtları annem tutmuş, en altta başka bir el: "Ölçer L." → "Bölüm 2 sona erdi" kartı.
 
-Açık bırakılan soru (sonraki bölümler için): arabaları kim işaretliyor? İşaretleyen hanın içinden çıktı;
-balkondaki mum söndü. Bu cevap Bölüm 3 ya da 4'te verilmeli.
+## Bölüm 3 örneği
+
+**Kar geçidi** (önce `gecit_once`: "Bölüm 3 · Ayazkale" kartı, donmuş kervan; tekerlekte aynı tebeşir çarpı, uluma;
+sonra savaş) → geçidin tepesi: aşağı akan soğuk, tüten tek baca → **Kalenin mutfağı** (yamak; inceleme: ocağın başında
+kırağı, kuleden sızan soğuk, yarısı yanmış mektup ve saz çizimi) → **Gizli merdiven** (gece, inceleme: duvarlarda annenin
+formülleri, çentikler) → **Kuledeki kadın** (önce `kule_once`: yukarıdan tanıdık ezgi) → Annem: önce tanımaz, sonra
+defteri görür; AYAZ → **Soğuk Ocak** (önce `ocak_once`: Kayhan ocağın başında) → buzlar damlar, Kayhan Sungur'u söyler,
+annem kalır, TOPRAK → "Bölüm 3 sona erdi" kartı.
+
+## Açık bırakılan iz (Bölüm 4 için)
+
+Arabaları kim işaretliyor? Bölüm 2'de işaretleyen hanın içinden çıktı, balkondaki mum söndü. Bölüm 3'te geçitteki
+donmuş kervanda aynı çarpı, mutfakta "Karaçam hanından" mektubun altında bir saz çizimi; annem de "Karaçam hanındaki
+kadına sırtını dönme" dedi. Her şey Hancı Yaren'i gösteriyor. Bölüm 4 bunu çözmeli: Yaren gerçekten Sungur'un adamı mı,
+yoksa birisi onun sazını kullanıp onu mu suçlatıyor? Cevap oyuncuya bir yüzleşme sahnesiyle verilmeli.
 
 ## Kontrol listesi
 

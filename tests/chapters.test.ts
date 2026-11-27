@@ -54,7 +54,7 @@ test("bölüm 2 → 3 → 4: yerler açılır, elementler öğrenilir, hikâye b
   expect(isOpen(ak, s)).toBe(true); expect(currentChapter(s).id).toBe("b3");
 
   arrive(s, "ayaz_gecit"); finish(s, "gecit");
-  arrive(s, "ayaz_mutfak"); finish(s, "mutfak");
+  arrive(s, "ayaz_mutfak"); finish(s, "mutfak"); expect(isOpen(place("ayaz_kule")!, s)).toBe(false); finish(s, "gizli_merdiven");
   expect(isOpen(place("ayaz_kule")!, s)).toBe(true);
   finish(s, "kule"); expect(s.knownElements).toContain("el_ayaz"); expect(s.relics).toContain("annenin_kalemi");
   finish(s, "soguk_ocak"); expect(isOpen(ar, s)).toBe(true); expect(currentChapter(s).id).toBe("b4");
