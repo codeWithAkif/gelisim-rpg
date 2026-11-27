@@ -7,7 +7,7 @@ import type { Spell } from "../engine/config";
 export type FormId = "top" | "duvar" | "akinti" | "zincir" | "perde" | "firlat";
 export interface Form { id: FormId; name: string; rune: string; suffix: string; desc: string; cost: number; diff: number }
 export const FORMS: Form[] = [
-  { id: "top", name: "Top", rune: "Daire", suffix: "topu", desc: "Tek hedefe vurur.", cost: 0, diff: 0 },
+  { id: "top", name: "Top", rune: "Hilal", suffix: "topu", desc: "Tek hedefe vurur.", cost: 0, diff: 0 },
   { id: "duvar", name: "Duvar", rune: "Yatay çizgi", suffix: "duvarı", desc: "Önüne engel kurar.", cost: 4, diff: 4 },
   { id: "akinti", name: "Akıntı", rune: "Köşe", suffix: "akıntısı", desc: "Yere yayılır; alan ve yavaşlatma.", cost: 5, diff: 6 },
   { id: "zincir", name: "Zincir", rune: "Sekiz", suffix: "zinciri", desc: "Hedeften hedefe sıçrar.", cost: 5, diff: 8 },

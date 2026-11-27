@@ -1,6 +1,6 @@
 // Savaşta parmak hareketleri: kurdun üstünden kesik çekmek, atılan kurttan kaçmak,
 // büyünün işaretini çizmek, kurdu sürükleyip itmek. Hepsi kısa bir katmanda oynanır, 0–1 kalite döner.
-import { slashScore, dirScore, swipeOf, runeScore, RUNES, type P } from "../engine/gesture";
+import { slashScore, dirScore, swipeOf, runeScore, recognize, RUNES, type P } from "../engine/gesture";
 import { wolfSketch, esc, WOLF_OUTLINE } from "./sketch";
 import { artUrl } from "./art";
 import { sfx, buzz } from "./feel";
@@ -258,6 +258,45 @@ export function runePrompt(host: HTMLElement, o: { runes: string[]; ease: number
     lbl.textContent = o.runes.length > 1 ? `1. işaret: ${RUNES[o.runes[0]].name}` : `${esc(o.spellName)}: ${RUNES[o.runes[0]].name} işaretini çiz`;
     track(L.cv, pts => { trail = pts; if (pts.length % 5 === 0) sfx("draw"); }, pts => next(pts));
     requestAnimationFrame(draw);
+  });
+}
+
+/* ---------- serbest büyü: işaretleri aklından çiz ---------- */
+/** Maddenin işaretlerini sırayla, en sonda biçim işaretini çizersin. Biçim çizilince büyü tamamlanır.
+ * Rehber yok: dizi akılda tutulur. Dönen: tanınan işaretler ve en zayıf çizimin kalitesi; vazgeçilirse null. */
+export function castDrawPrompt(host: HTMLElement, o: { allowed: string[]; ease: number; limitMs: number }): Promise<{ runes: string[]; q: number; timeout?: boolean } | null> {
+  return new Promise(resolve => {
+    const [W, H] = stageSize(host, 1);
+    const L = layer(host, "rune cast", "Büyü çiz: maddenin işaretleri, en sonda biçim", W, H);
+    const chips = document.createElement("div"); chips.className = "cast-seq"; L.box.after(chips);
+    const bar = document.createElement("div"); bar.className = "gx-bar"; chips.after(bar);
+    const row = document.createElement("div"); row.className = "row cast-row";
+    row.innerHTML = `<button class="btn small" data-c="undo">Sil</button><button class="btn small" data-c="cancel">Vazgeç</button>`; bar.after(row);
+    const runes: string[] = []; const qs: number[] = []; let trail: P[] = []; let done = false; const t0 = performance.now();
+    const show = () => { chips.innerHTML = runes.length ? runes.map(id => `<span class="chip ${id.startsWith("f_") ? "on" : ""}">${esc(RUNES[id].name)}</span>`).join("<span class='muted'>·</span>") : `<span class="tiny muted">Henüz işaret yok.</span>`; };
+    const end = (v: { runes: string[]; q: number; timeout?: boolean } | null) => { if (done) return; done = true; void L.close(v ? 600 : 200).then(() => resolve(v)); };
+    const draw = () => {
+      if (done) return; const g = L.g; g.clearRect(0, 0, W, H);
+      if (trail.length) inkTrail(g, trail, L.ink);
+      const left = 1 - (performance.now() - t0) / o.limitMs; bar.style.width = `${Math.max(0, left * 100)}%`;
+      if (left <= 0) { result(L, 0, "Zaman doldu"); return end({ runes, q: Math.min(1, ...qs), timeout: true }); }
+      requestAnimationFrame(draw);
+    };
+    track(L.cv, pts => { trail = pts; if (pts.length % 5 === 0) sfx("draw"); }, pts => {
+      trail = [];
+      const r = recognize(pts, o.allowed, o.ease);
+      const res = L.el.querySelector<HTMLElement>(".qt-result")!;
+      if (r.q < 0.35) { res.textContent = "Anlaşılmadı; yeniden çiz"; res.dataset.q = "0"; sfx("bad"); return; }
+      runes.push(r.id); qs.push(r.q); show(); sfx("spark"); if (r.q >= 0.8) buzz("light");
+      res.textContent = `${RUNES[r.id].name}${r.q >= 0.8 ? ": kusursuz" : ""}`; res.dataset.q = r.q >= 0.8 ? "1" : "g";
+      if (r.id.startsWith("f_")) { sfx("fire"); buzz("medium"); end({ runes, q: Math.min(...qs) }); }
+    });
+    row.addEventListener("click", e => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>("[data-c]"); if (!b) return; e.stopPropagation();
+      if (b.dataset.c === "undo") { runes.pop(); qs.pop(); show(); sfx("tap"); }
+      if (b.dataset.c === "cancel") end(null);
+    });
+    show(); requestAnimationFrame(draw);
   });
 }
 

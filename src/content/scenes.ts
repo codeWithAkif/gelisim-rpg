@@ -169,6 +169,7 @@ export const SCENES: Record<string, Scene> = {
     m("Avucumda bir an için gerçek bir alev durdu."),
     m("Nefesim titredi; alev de titredi. Söndüğünde avucum hâlâ sıcaktı."),
     m("Sönen ateş bir yere gider. Bu sefer benim avucuma geldi."),
+    anne("Önce alev, sonra hilal: ateş top olur. Biçimi değiştir, ateş başka bir şey olur."),
   ] },
 
   /** Ateş ve kurt: büyüyle kazanılan ilk savaş; Hasan gördü; köyde fısıltı. */

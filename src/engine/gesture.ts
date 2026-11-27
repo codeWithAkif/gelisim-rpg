@@ -60,7 +60,16 @@ export const RUNES: Record<string, { name: string; pts: [number, number][] }> = 
   el_hava: { name: "Girdap", pts: Array.from({ length: 25 }, (_, i) => { const a = i / 24 * Math.PI * 3.2, r = 0.08 + i / 24 * 0.42; return [0.5 + Math.cos(a) * r, 0.5 + Math.sin(a) * r] as [number, number]; }) },
   el_ayaz: { name: "Kristal", pts: [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5], [0.5, 0]] },
   el_simsek: { name: "Yıldırım", pts: [[0.65, 0], [0.2, 0.5], [0.75, 0.5], [0.3, 1]] },
+  // biçim işaretleri: büyünün en son çizilen işareti (content/synthesis.ts FORMS)
+  f_top: { name: "Hilal", pts: Array.from({ length: 19 }, (_, i) => { const a = -Math.PI * 0.25 - i / 18 * Math.PI * 1.5; return [0.5 + Math.cos(a) * 0.5, 0.5 - Math.sin(a) * 0.5] as [number, number]; }) },
+  f_duvar: { name: "Yatay çizgi", pts: [[0, 0.5], [1, 0.5]] },
+  f_perde: { name: "Dikey çizgi", pts: [[0.5, 0], [0.5, 1]] },
+  f_akinti: { name: "Köşe", pts: [[0, 0], [0, 1], [1, 1]] },
+  f_zincir: { name: "Sekiz", pts: Array.from({ length: 33 }, (_, i) => { const t = i / 32 * Math.PI * 2; return [0.5 + Math.sin(t) * 0.5, 0.5 + Math.sin(2 * t) * 0.3] as [number, number]; }) },
+  f_firlat: { name: "Çatı", pts: [[0, 1], [0.5, 0], [1, 1]] },
 };
+export const ELEMENT_RUNES = ["el_ates", "el_su", "el_toprak", "el_hava", "el_ayaz", "el_simsek"];
+export const FORM_RUNES = ["f_top", "f_duvar", "f_akinti", "f_zincir", "f_perde", "f_firlat"];
 function resample(pts: { x: number; y: number }[], n: number): { x: number; y: number }[] {
   const I = pathLength(pts) / (n - 1); if (!I) return Array(n).fill(pts[0]);
   const src = pts.map(p => ({ x: p.x, y: p.y })); const out = [src[0]]; let D = 0;

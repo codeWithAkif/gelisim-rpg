@@ -55,7 +55,7 @@ export const CHAPTERS: Chapter[] = [
         text: "Zehra eski bir sandığı açtı. İçinde annenin elinden çıkmış tek bir yaprak: ATEŞ. \"Isı, maddenin titreşimidir. Titreşimi tek noktada topla; nefesin yakıtındır.\" Defterine yeni bir sayfa eklendi. Artık Ateş çalışabilirsin: Sıradaki adım kartındaki \"Ateş çalış\" ya da haritada bir yere dokunup Çalış." },
       { id: "kivilcim", title: "İlk kıvılcım", hint: "Ateş çalış: Ateş büyün 5 olunca avucunda ilk alev yanar. Her yerde çalışabilirsin.", reached: s => (s.attrs.ates?.level ?? 0) >= 5, scene: "kivilcim",
         go: { act: "session-pick", id: "calisma_ates", button: "Ateş çalış" },
-        text: "Avucunda bir an için gerçek bir alev durdu. Nefesin titredi, alev de titredi. Ateş topu artık savaşta kullanılabilir." },
+        text: "Avucunda bir an için gerçek bir alev durdu. Nefesin titredi, alev de titredi. Ateş topu artık savaşta kullanılabilir: Büyü çiz, önce Alev işareti, sonra Hilal. Diziler Defter → Büyüler sayfasında; orada yeni büyüler de deneyebilirsin." },
       { id: "ates_kurt", title: "Ateş ve kurt", hint: "Bir savaşı büyü kullanarak kazan (Defter → Görevler: Meraya devriye).", reached: s => (s.story.flags.buyuluZafer ?? 0) > 0, scene: "ates_kurt",
         effects: { flag: "zaferGun" },
         text: "Kurtlar ateşi görünce dağıldı. Hasan uzaktan bakıp bir dua mırıldandı. Köyde biri yasak bir şey gördüğünü fısıldıyor." },

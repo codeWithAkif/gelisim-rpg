@@ -49,6 +49,8 @@ import { sell, partner, partnerLock, stake, invest, withdraw, nightlyFinance } f
 import { nightlyTrade, buyPaper, hasPaper, feast } from "../engine/trade";
 import { paper } from "../content/trade";
 import { openCaravan } from "./trade-view";
+import { experiment } from "../engine/synthesis";
+import type { FormId } from "../content/synthesis";
 import { sleepOptions, sleepAt, rest, type SleepKind } from "../engine/rest";
 import { minutesLeft } from "../engine/state";
 import { itemPic, artUrl } from "./art";
@@ -349,6 +351,13 @@ export function startApp(root: HTMLElement) {
         modal(`<p class="hand muted" style="margin:0">${esc(pp.seller)}</p><h2>${esc(pp.name)}</h2><p style="margin:0">${esc(pp.desc)}</p><div class="odds"><span>Bedel <b>${pp.cost} bakır</b></span><span>Cebin <b>${s.money}</b></span></div>`,
           [{ label: `Satın al (${pp.cost})`, cls: "primary", fn: () => { const r = buyPaper(s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? `${pp.name} artık sende.` : r.reason ?? ""); persist(); render(); } }, { label: "Kapat", fn: () => {} }]);
         break; }
+      case "exp-el": { const e = (ui.exp ??= { els: [] }); e.els = e.els.includes(id) ? e.els.filter(x => x !== id) : [...e.els, id].slice(-3); sfx("tap"); render(false); break; }
+      case "exp-form": { const e = (ui.exp ??= { els: [] }); e.form = e.form === id ? undefined : id; sfx("tap"); render(false); break; }
+      case "exp-try": { const e = (ui.exp ??= { els: [] }); if (!e.form) break;
+        const r = experiment(cfg, s, e.els, e.form as FormId);
+        if ("error" in r) { toast(r.error); sfx("bad"); break; }
+        e.last = { kind: r.kind, text: r.text }; sfx(r.kind === "yeni" ? "perfect" : r.kind === "patladi" ? "hurt" : r.kind === "bilinen" ? "good" : "bad"); if (r.kind === "yeni") buzz("heavy");
+        persist(); render(false); break; }
       case "feast": { const r = feast(s); sfx(r.ok ? "good" : "bad"); toast(r.ok ? "Doyasıya yedin. Bu gece kasların daha çok gelişecek." : r.reason ?? ""); persist(); render(); break; }
       case "scav": doScav(id); break;
       case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;

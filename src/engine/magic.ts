@@ -156,3 +156,10 @@ export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string,
   if (player(b).hp <= 0) b.phase = "lost"; else if (enemies(b).length === 0) b.phase = "won";
   return text;
 }
+
+/** Çizilen dizi bir büyü etmediyse: tur gider, biraz mana yanar (ezber zorlasın). */
+export function failedCast(s: GameState, b: Battle, reason: string): string {
+  const p = player(b); if (b.phase !== "player" || p.acted) return "";
+  p.acted = true; s.mana = Math.max(0, s.mana - 3); b.stats.casts++;
+  const text = `Büyü söndü. ${reason}`; b.log.unshift(text); return text;
+}

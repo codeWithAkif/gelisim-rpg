@@ -739,3 +739,9 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .cv-row .cv-step { display: flex; align-items: center; gap: 6px; }
 .cv-row .cv-step b { min-width: 18px; text-align: center; }
 .cv-row .cv-step .btn { padding: 2px 10px; }
+/* serbest büyü çizimi */
+.qt.cast .cast-seq { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: center; min-height: 28px; margin: 4px 0; }
+.qt.cast .cast-row { justify-content: center; margin-top: 6px; }
+.rune-glyph { display: inline-block; vertical-align: middle; }
+.spell-seq { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.spell-seq .sep { color: var(--ink-soft); }

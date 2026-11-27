@@ -1,5 +1,9 @@
 // Ekranlar. Bilgi sayfaları: Defter (Görevler dahil), Vücut. Karar sayfaları: Çanta, Harita (Çalış yer kartından açılır).
 // Her ekran HTML üretir; tıklamalar app.ts'deki data-act işleyicilerine gider.
+import { RUNES } from "../engine/gesture";
+import { spellSequence, cellCount, EXPERIMENT } from "../engine/synthesis";
+import { FORMS } from "../content/synthesis";
+import { spellOptions } from "../engine/magic";
 import { openSideStories } from "../engine/story";
 import type { Config } from "../engine/config";
 import { type GameState, clock, minutesLeft, minutesToDark, repOf, isNight } from "../engine/state";
@@ -30,7 +34,9 @@ import { phase, PHASE_ICONS } from "./daylight";
 import { here, place, activityPlace, activityOpen, activityHere } from "../engine/travel";
 import { NPC_PLACE, SHOP_PLACE, PLACES } from "../content/map";
 
-export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number; invTab?: InvTab; bagPage?: "envanter" | "techizat" | "elisi" | "pazar"; jobTab?: "acik" | "biten" | "sonraki"; bodyTab?: string; diyarTab?: string }
+export interface UiState { lastResult?: { title: string; gains: GainReport; note?: string; at: number }; sel?: string; showDone?: boolean; page?: number; invTab?: InvTab; bagPage?: "envanter" | "techizat" | "elisi" | "pazar"; jobTab?: "acik" | "biten" | "sonraki"; bodyTab?: string; diyarTab?: string;
+  /** Defterdeki deney: seçilen işaretler, biçim ve son sonuç. */
+  exp?: { els: string[]; form?: string; last?: { kind: string; text: string } } }
 
 const fmt = (v: number) => (Math.abs(v) < 0.01 ? v.toFixed(3) : Math.abs(v) < 0.1 ? v.toFixed(2) : v.toFixed(1));
 const catColor = (cfg: Config, id?: string) => cfg.cat.get(id ?? "")?.color ?? "var(--pencil)";
@@ -141,6 +147,7 @@ export function defterScreen(cfg: Config, s: GameState, page = 0, ui: UiState = 
     { title: "Koleksiyon", html: collectionSection(s) },
   ];
   if (s.knownElements.length) pages.push({ title: "Annem", html: `<section class="sec"><h2>Annemin sayfaları</h2>${motherPic()}${s.knownElements.map(id => { const e = cfg.element.get(id); return `<div class="page-sheet" style="border-left-color:${esc(e?.color ?? "var(--red)")}"><div class="ttl">${esc(e?.name ?? id)}</div><p style="margin:0" class="hand blue">${esc(ELEMENT_PAGES[id] ?? e?.desc ?? "")}</p></div>`; }).join("")}</section>` });
+  if (s.knownElements.length) pages.push({ title: "Büyüler", html: spellsPage(cfg, s, ui) });
   if (relics.length) pages.push({ title: "Kadim", html: `<section class="sec"><h2>Kadim eşyalar</h2><p class="muted tiny" style="margin:0">Taşıdığın sürece güçleri seninle.</p>${relics.map(r => `<div class="relic-card"><div class="relic-glow"></div><div><h3>${esc(r.name)}</h3><p class="tiny" style="margin:0">${esc(r.desc)}</p><p class="hand green" style="margin:0">${Object.entries(r.boosts).map(([a, n]) => `${esc(cfg.attr.get(a)?.name ?? a)} +${n}`).join(" · ")}</p><p class="muted tiny" style="margin:0">${esc(r.source)}</p></div></div>`).join("")}</section>` });
   const humanMarks = (s.journal.insan ?? []).map(id => ENEMIES.haydut.weakPoints.find(w => w.id === id)!).filter(Boolean);
   const humanCard = s.journal.insan !== undefined ? `<div class="card"><div class="entry-head"><span class="entry-title">İnsan</span><span class="entry-meta">${humanMarks.length}/${ENEMIES.haydut.weakPoints.length} zayıf nokta</span></div>
@@ -515,4 +522,32 @@ function petPage(_cfg: Config, s: GameState): string {
   const shops = Object.values(PET_TYPES).filter(x => x.shop);
   main += `<section class="sec"><h2>Yavru bulmak</h2><p class="muted tiny" style="margin:0">Yavruları ilgili yerlerde bulursun; bir sorun çıkmaması için önce yer ayırmalısın.</p>${shops.map(x => `<div class="entry"><div class="item-detail">${petArt(x.id, 44, "dur", ENEMIES[x.id]?.tint ?? "")}<div><div class="entry-head"><span class="entry-title">${esc(x.species)}</span><span class="entry-meta">${x.price} bakır</span></div><div class="tiny muted">${esc(x.role)} · ${esc(x.desc)}</div><div class="tiny">Nerede: ${esc(place(x.shop!)?.name ?? x.shop!)}</div></div></div></div>`).join("")}</section>`;
   return main;
+}
+
+/* ---------------- Büyüler (Defter sayfası): bildiğin dizilerin listesi ve deney ---------------- */
+/** Bir işaretin küçük çizimi (annenin defterindeki gibi). */
+export function runeSvg(id: string, size = 26): string {
+  const r = RUNES[id]; if (!r) return "";
+  const pts = r.pts.map(([x, y]) => `${(2 + x * 20).toFixed(1)},${(2 + y * 20).toFixed(1)}`).join(" ");
+  return `<svg class="rune-glyph" width="${size}" height="${size}" viewBox="0 0 24 24" aria-label="${esc(r.name)}"><polyline points="${pts}" fill="none" stroke="${id.startsWith("f_") ? "var(--red)" : "var(--blue)"}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+function seqHtml(els: string[], form: string): string {
+  return `<span class="spell-seq">${[...els, "f_" + form].map(id => `${runeSvg(id)}<span class="tiny">${esc(RUNES[id]?.name ?? id)}</span>`).join(`<span class="sep">·</span>`)}</span>`;
+}
+function spellsPage(cfg: Config, s: GameState, ui: UiState): string {
+  const opts = spellOptions(cfg, { ...s, mana: 999 } as GameState);
+  const rows = opts.map(o => { const q = spellSequence(o.spell.id); return `<div class="entry"><div class="entry-head"><span class="entry-title" style="font-size:20px">${esc(o.spell.name)}</span><span class="entry-meta">mana ${o.spell.manaCost ?? 0}${o.ok ? "" : ` · ${esc(o.reason ?? "")}`}</span></div>
+    ${q ? seqHtml(q.els, q.form) : `<span class="tiny muted">Kadim eşyayla gelir; işaretini eşya bilir.</span>`}<div class="tiny muted">${esc(o.spell.effect ?? "")}</div></div>`; }).join("");
+  const total = cellCount(); const found = opts.filter(o => spellSequence(o.spell.id)).length;
+  const e = ui.exp ?? { els: [] };
+  const elChips = s.knownElements.map(id => `<button class="chip ${e.els.includes(id) ? "on" : ""}" data-act="exp-el" data-id="${id}">${runeSvg(id, 20)} ${esc(RUNES[id]?.name ?? id)}</button>`).join("");
+  const formChips = FORMS.map(f => `<button class="chip ${e.form === f.id ? "on" : ""}" data-act="exp-form" data-id="${f.id}">${runeSvg("f_" + f.id, 20)} ${esc(f.name)}</button>`).join("");
+  return `<section class="sec"><h2>Büyüler</h2>
+    <p class="muted tiny" style="margin:0">Savaşta "Büyü çiz" ile maddenin işaretlerini, en sonda biçimin işaretini çizersin. Savaşta dizi görünmez: aklında tut.
+    Bildiğin ${found} büyü; annenin hesabına göre ${total} büyü var.</p>${rows || `<p class="hand blue" style="margin:0">Henüz bir büyü bilmiyorsun.</p>`}</section>
+    <section class="sec"><h2>Deney</h2><p class="muted tiny" style="margin:0">Bir ya da birkaç işaret seç, sonra bir biçim. Deney ${EXPERIMENT.mana} mana ve ${EXPERIMENT.minutes} dakika ister.
+      Çalışırsa deftere yazılır; uymazsa söner ve nedenini söyler; birbirini iten işaretler elinde patlar.</p>
+      <h3>Madde</h3><div class="chips">${elChips}</div><h3>Biçim</h3><div class="chips">${formChips}</div>
+      <div class="row" style="margin-top:6px"><button class="btn primary" data-act="exp-try" ${e.els.length && e.form ? "" : "disabled"}>Dene · mana ${Math.floor(s.mana)}</button></div>
+      ${e.last ? `<p class="${e.last.kind === "yeni" ? "hand blue" : e.last.kind === "patladi" ? "red" : ""}" style="margin:4px 0 0">${esc(e.last.text)}</p>` : ""}</section>`;
 }
