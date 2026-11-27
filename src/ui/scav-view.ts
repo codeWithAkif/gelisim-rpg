@@ -336,6 +336,6 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
     if (n.phase === "over") { end(); return; }
     draw(now); hud(); raf = requestAnimationFrame(loop);
   };
-  layout(); harabeAudio(true); tip.hidden = false; tip.textContent = `${site.name}. Bekçiler uyuyor; yaklaşırsan uyanırlar. Kutunun yanında dur: kendiliğinden arar.`; setTimeout(() => { tip.hidden = true; }, 4500);
+  layout(); harabeAudio(true, site.foes.includes("kurt")); tip.hidden = false; tip.textContent = `${site.name}. Bekçiler uyuyor; yaklaşırsan uyanırlar. Kutunun yanında dur: kendiliğinden arar.`; setTimeout(() => { tip.hidden = true; }, 4500);
   raf = requestAnimationFrame(loop); void itemPic; void walkT;
 }

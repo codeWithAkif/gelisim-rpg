@@ -120,7 +120,7 @@ function stopAmb() {
   setTimeout(() => { a.srcs.forEach(x => { try { x.stop(); } catch { /* */ } }); a.gain.disconnect(); }, 2500);
 }
 /** Bir katman grubunu kurar (öncekini söndürerek). */
-function startAmb(key: string, layers: { id: string; vol: number }[], owls: boolean) {
+function startAmb(key: string, layers: { id: string; vol: number }[], owls: boolean, wolves = false) {
   if (amb && amb.key === key) return;
   stopAmb();
   const c = ac(); if (!c || !master) return;
@@ -134,9 +134,11 @@ function startAmb(key: string, layers: { id: string; vol: number }[], owls: bool
     src.start(0, Math.random() * buf.duration);   // her seferinde başka bir yerinden
     me.srcs.push(src);
   });
-  if (owls) me.timer = window.setInterval(() => {
-    if (amb !== me || Math.random() > 0.12) return;
-    const id = Math.random() < 0.5 ? "baykus_1" : "baykus_2";
+  if (owls || wolves) me.timer = window.setInterval(() => {
+    if (amb !== me) return;
+    // baykuş ya da uzaktan kurt sesi: arada bir, rastgele yönden
+    const r = Math.random(); const id = wolves && r < 0.06 ? "kurt_uzak" : owls && r > 0.88 ? (Math.random() < 0.5 ? "baykus_1" : "baykus_2") : null;
+    if (!id) return;
     void ambBuf(c, id).then(buf => {
       if (!buf || amb !== me) return;
       const src = c.createBufferSource(); src.buffer = buf; const pan = c.createStereoPanner(); pan.pan.value = Math.random() * 1.4 - 0.7;
@@ -154,7 +156,7 @@ export function ambience(on: boolean, night = false, scape: Scape = { kind: "yay
   const want = on && settings().ambient && settings().sound && !document.hidden;
   if (!want) { stopAmb(); return; }
   const plan = ambientPlan(scape, night);
-  startAmb(`${scape.kind}|${scape.cold}|${night}`, playableLayers(plan, ambientAvailable()), plan.owls);
+  startAmb(`${scape.kind}|${scape.cold}|${night}`, playableLayers(plan, ambientAvailable()), plan.owls, plan.wolves);
 }
 /** Sahnenin sesi: verilen katmanlar çalar; null sahne bitti demektir (oyunun sesi geri gelir). */
 export function sceneAmbience(layers: { id: string; vol: number }[] | null) {
@@ -178,19 +180,41 @@ export function bellCue(pan: number) {
 /* ---------- harabe: ürkütücü müzik, ayak sesi, uluma (src/assets/ses/harabe_*.ogg) ---------- */
 const HARABE_FILES = import.meta.glob("../assets/ses/harabe_*.ogg", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
 for (const [path, url] of Object.entries(HARABE_FILES)) ORTAM[path.split("/").pop()!.replace(/\.ogg$/, "")] = url;
-type HarabeAudio = { music?: AudioBufferSourceNode; steps?: AudioBufferSourceNode; stepGain: GainNode; out: GainNode };
+type HarabeAudio = { music?: AudioBufferSourceNode; steps?: AudioBufferSourceNode; stepGain: GainNode; out: GainNode; timer?: number };
 let harabe: HarabeAudio | null = null;
 const harabeNow = (): HarabeAudio | null => harabe;
 /** Harabeye girince müzik ve (yürürken açılan) ayak sesi kurulur; çıkınca söner. */
-export function harabeAudio(on: boolean) {
+export function harabeAudio(on: boolean, wolves = false) {
   const c = ac(); if (!c || !master) return;
-  if (!on) { if (harabe) { const h = harabe; harabe = null; h.out.gain.setTargetAtTime(0, c.currentTime, 0.4); setTimeout(() => { try { h.music?.stop(); h.steps?.stop(); } catch { /* */ } h.out.disconnect(); }, 1800); } return; }
+  if (!on) { if (harabe) { const h = harabe; harabe = null; clearInterval(h.timer); h.out.gain.setTargetAtTime(0, c.currentTime, 0.4); setTimeout(() => { try { h.music?.stop(); h.steps?.stop(); } catch { /* */ } h.out.disconnect(); }, 1800); } return; }
   if (harabe || !settings().sound) return;
   const out = c.createGain(); out.gain.value = 0; out.connect(master); out.gain.setTargetAtTime(1, c.currentTime, 1);
   const stepGain = c.createGain(); stepGain.gain.value = 0; stepGain.connect(out);
   const me: HarabeAudio = { stepGain, out }; harabe = me;
-  if (settings().music) void ambBuf(c, "harabe_muzik").then(buf => { if (!buf || harabeNow() !== me) return; const src = c.createBufferSource(); src.buffer = buf; src.loop = true; const g = c.createGain(); g.gain.value = 0.45; src.connect(g).connect(out); src.start(0, Math.random() * buf.duration); me.music = src; });
+  if (settings().music) void ambBuf(c, "harabe_muzik").then(buf => { if (!buf || harabeNow() !== me) return; const src = c.createBufferSource(); src.buffer = buf; src.loop = true; const g = c.createGain(); g.gain.value = 0.28; src.connect(g).connect(out); src.start(0, Math.random() * buf.duration); me.music = src; });
   void ambBuf(c, "harabe_ayak").then(buf => { if (!buf || harabeNow() !== me) return; const src = c.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(stepGain); src.start(0, Math.random() * buf.duration); me.steps = src; });
+  // kurtlu harabede arada bir uzaktan uluma (fark edilmeden önce de içeride bir şeyler olduğunu söyler)
+  if (wolves) me.timer = window.setInterval(() => { if (harabeNow() !== me || Math.random() > 0.08) return; void ambBuf(c, "kurt_uzak").then(buf => { if (!buf || harabeNow() !== me) return; const src = c.createBufferSource(); src.buffer = buf; const p = c.createStereoPanner(); p.pan.value = Math.random() * 1.6 - 0.8; const g = c.createGain(); g.gain.value = 0.5; src.connect(g).connect(p).connect(out); src.start(); }); }, 3000);
+}
+/** Yolculukta toprak yolda ayak sesi: yürürken döner, durunca kesilir. */
+let road: { src: AudioBufferSourceNode; g: GainNode } | null = null; let roadOn = false;
+export function travelSteps(on: boolean) {
+  const c = ctx; on = on && settings().sound;
+  if (on === roadOn) return; roadOn = on;
+  if (!c) { if (on) ac(); }
+  const cc = ac(); if (!cc || !master) return;
+  if (on) {
+    if (road) { road.g.gain.setTargetAtTime(1, cc.currentTime, 0.1); return; }
+    void ambBuf(cc, "ayak_toprak").then(buf => {
+      if (!buf || !roadOn || road) return; const src = cc.createBufferSource(); src.buffer = buf; src.loop = true; const g = cc.createGain(); g.gain.value = 0;
+      src.connect(g).connect(master!); src.start(0, Math.random() * buf.duration); g.gain.setTargetAtTime(1, cc.currentTime, 0.1); road = { src, g };
+    });
+  } else if (road) { const r = road; road = null; r.g.gain.setTargetAtTime(0, cc.currentTime, 0.15); setTimeout(() => { try { r.src.stop(); } catch { /* */ } r.g.disconnect(); }, 800); }
+}
+/** Birkaç adım (sis oyununda doğru yöne yürüyünce). */
+export function stepsBurst() {
+  if (!settings().sound) return; const c = ac(); if (!c || !master) return;
+  void ambBuf(c, "ayak_toprak").then(buf => { if (!buf) return; const src = c.createBufferSource(); src.buffer = buf; const g = c.createGain(); const t = c.currentTime; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1.1, t + 0.05); g.gain.setTargetAtTime(0, t + 1.3, 0.15); src.connect(g).connect(master!); src.start(t, Math.random() * Math.max(0, buf.duration - 2), 1.9); });
 }
 /** Yürürken ayak sesi duyulur, durunca kesilir. */
 export function harabeSteps(moving: boolean) { const c = ctx; if (!harabe || !c) return; harabe.stepGain.gain.setTargetAtTime(moving ? 0.8 : 0, c.currentTime, moving ? 0.05 : 0.08); }

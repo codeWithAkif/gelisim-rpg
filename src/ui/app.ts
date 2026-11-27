@@ -39,7 +39,7 @@ import { applyDaylight } from "./daylight";
 import { notifyAt, clearNotify } from "../notify";
 import { showTitle } from "./title";
 import { applySettings } from "./settings";
-import { sfx, buzz, ambience, unlockAudio } from "./feel";
+import { sfx, buzz, ambience, unlockAudio, travelSteps } from "./feel";
 import { playMusic } from "./music";
 import { scapeOf, musicCandidates } from "../engine/soundscape";
 import { darkness } from "./daylight";
@@ -540,11 +540,11 @@ export function startApp(root: HTMLElement) {
   /* ---------- yolculuk: her saniye ilerleme, sürpriz ve varış ---------- */
   let eventOpen = false;
   function journeyTick() {
-    if (!s.journey || eventOpen) return;
+    if (!s.journey || eventOpen) { travelSteps(false); return; }
     const now = Date.now();
     const due = dueEvent(s, now);
     if (due) {
-      pauseJourney(s, now); persist(); eventOpen = true; sfx("page"); buzz("light");
+      travelSteps(false); pauseJourney(s, now); persist(); eventOpen = true; sfx("page"); buzz("light");
       if (tab !== "harita") { tab = "harita"; render(false); } else mapApi?.refresh();
       const opts = due.def.choices.map(c => ({ ...c, ok: canUseChoice(s, c.need) }));
       const bg = document.createElement("div"); bg.className = "modal-bg";
@@ -586,13 +586,13 @@ export function startApp(root: HTMLElement) {
     }
     const arrived = finishJourney(cfg, s, now);
     if (arrived) {
-      persist(); mapApi = undefined; mapState = { view: { cx: place(arrived.to)!.x, cy: place(arrived.to)!.y + 55, w: 230 }, sel: arrived.to };
+      travelSteps(false); persist(); mapApi = undefined; mapState = { view: { cx: place(arrived.to)!.x, cy: place(arrived.to)!.y + 55, w: 230 }, sel: arrived.to };
       render(); toast(`Vardın: ${place(arrived.to)!.name}.`); sfx("good"); storyTick(); return;
     }
     if (tab === "harita") mapApi?.refresh();
     else root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
     applyDaylight(s.minute);
-    if (s.journey.pausedAt === undefined && !document.hidden) { sfx("step"); setTimeout(() => sfx("step"), 480); }
+    travelSteps(s.journey.pausedAt === undefined && !document.hidden);   // toprak yolda ayak sesi
   }
   window.setInterval(journeyTick, 1000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) journeyTick(); });

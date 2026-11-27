@@ -4,7 +4,7 @@
 import { type Scene, type Beat, SPEAKERS, sisSides, fill } from "../content/scenes";
 import { artUrl } from "./art";
 import { esc } from "./sketch";
-import { sfx, sceneAmbience, bellCue } from "./feel";
+import { sfx, sceneAmbience, bellCue, stepsBurst } from "./feel";
 import { animScale } from "./settings";
 
 export interface SceneOpts { name?: string; seed?: number; onName?: (name: string) => void }
@@ -87,7 +87,7 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
       if (t.closest("[data-s=again]")) { cue(); return; }
       const b = t.closest<HTMLElement>("[data-side]"); if (!b) return;
       if (+b.dataset.side! === sides[r]) {
-        r++; sfx("step"); setTimeout(() => sfx("step"), 380);
+        r++; stepsBurst();
         if (r >= sides.length) { say("Çan sesi artık hemen önümde. Sis aralanıyor."); setTimeout(() => { halves.remove(); el.classList.remove("fog"); busy = false; next(); }, 1600); return; }
         say(["Ses yaklaşıyor. Bir çan daha.", "Taşlara basa basa ilerliyorum. Çan yine çalıyor."][r - 1] ?? "Yaklaşıyorum.");
         setTimeout(cue, 1100);
