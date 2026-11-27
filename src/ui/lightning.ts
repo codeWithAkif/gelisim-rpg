@@ -64,3 +64,17 @@ export function drawImpact(g: CanvasRenderingContext2D, i: Impact, now: number):
     g.strokeStyle = `rgba(255,255,255,${1 - k})`; g.lineWidth = 1.8; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
   g.restore(); return true;
 }
+
+/** Zincir şimşek: kahramanın elinden (pts[0]) hedeften hedefe. Sahne kendi ekran koordinatlarını verir. */
+export function chainFx(pts: Pt[], seed: number, now: number, r: number, dur = 380): { bolts: BoltFx[]; impacts: Impact[] } {
+  const bolts: BoltFx[] = chain(pts, seed).map(c => ({ b: c.bolt, t0: now, delay: c.delay, dur }));
+  const impacts = pts.slice(1).map(([x, y], i) => Object.assign(impact(x, y, r, seed + i, now), { t0: now + i * 70 }));
+  return { bolts, impacts };
+}
+/** Yıldırım: üstten aşağı, her hedefe ayrı ayrı (en çok beş). topY ekranın üstü. */
+export function skyFx(targets: Pt[], topY: number, seed: number, now: number, r: number, dur = 520): { bolts: BoltFx[]; impacts: Impact[] } {
+  const ts = targets.slice(0, 5);
+  const bolts: BoltFx[] = ts.map((t, i) => ({ b: skyBolt(t, topY, seed + i * 7), t0: now, delay: i * 80, dur }));
+  const impacts = ts.map(([x, y], i) => Object.assign(impact(x, y, r, seed + i, now), { t0: now + i * 80 }));
+  return { bolts, impacts };
+}

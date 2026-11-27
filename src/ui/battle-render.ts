@@ -4,7 +4,7 @@ import { TERRAIN, ENEMIES, type Terrain } from "../content/world";
 import type { Unit, Weather, XY } from "../engine/combat";
 import { animScale } from "./settings";
 import { artUrl } from "./art";
-import { chain, drawBolt, drawImpact, impact, type BoltFx, type Impact, type Pt } from "./lightning";
+import { chainFx, skyFx, drawBolt, drawImpact, type BoltFx, type Impact, type Pt } from "./lightning";
 
 const SQ3 = Math.sqrt(3);
 const TAU = Math.PI * 2;
@@ -149,9 +149,15 @@ export class MapRenderer {
     const a = this.center(...from); const pts: Pt[] = [[a.cx, a.cy - this.size * 0.6]];
     for (const u of uids) { const d = this.ds.get(u); if (d) pts.push([d.x, d.y - this.size * 0.5]); }
     if (pts.length < 2) return; const now = performance.now(); const seed = (now | 0) % 9973;
-    for (const c of chain(pts, seed)) this.bolts.push({ b: c.bolt, t0: now, delay: c.delay, dur: 420 });
-    pts.slice(1).forEach(([x, y], i) => this.impacts.push(Object.assign(impact(x, y, this.size * 0.9, seed + i, now), { t0: now + i * 70 })));
+    const fx = chainFx(pts, seed, now, this.size * 0.9, 420); this.bolts.push(...fx.bolts); this.impacts.push(...fx.impacts);
     this.whiteFlash = 0.8; this.shake(5, 260);
+  }
+  /** Yıldırım: üstten aşağı, her vurulana ayrı ayrı. */
+  sky(uids: string[]) {
+    const pts: Pt[] = []; for (const u of uids) { const d = this.ds.get(u); if (d) pts.push([d.x, d.y - this.size * 0.3]); }
+    if (!pts.length) return; const now = performance.now(); const seed = (now | 0) % 9973;
+    const fx = skyFx(pts, -10, seed, now, this.size * 0.9); this.bolts.push(...fx.bolts); this.impacts.push(...fx.impacts);
+    this.whiteFlash = 1; this.shake(7, 300);
   }
   splat(x: number, y: number, r: number, color: string) { this.splats.push({ x, y, r, t0: performance.now(), color, seed: Math.random() * 1000 }); if (this.splats.length > 30) this.splats.shift(); }
   async animProjectile(from: XY, to: XY, kind: Projectile["kind"]) {

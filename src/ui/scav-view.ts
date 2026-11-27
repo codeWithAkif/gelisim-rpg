@@ -1,5 +1,6 @@
 // Harabe araması ekranı: yan kesit, çok katlı yapı. Dokun: oraya yürür; mercek simgesine dokun: arar; çıkışa varınca çıkarsın.
 import { castDrawPrompt } from "./gesture-view";
+import { chainFx, skyFx, drawBolt, drawImpact, type BoltFx, type Impact, type Pt } from "./lightning";
 import { settings } from "./settings";
 import { skillEase } from "../engine/timing";
 import { synthesize } from "../engine/synthesis";
@@ -89,6 +90,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
   const cv = el.querySelector("canvas")!; const stage = el.querySelector<HTMLElement>(".siege-stage")!; const g = cv.getContext("2d")!;
   const pauseEl = el.querySelector<HTMLElement>("#scPause")!; const tip = el.querySelector<HTMLElement>("#scTip")!;
   let W = 300, H = 400, paused = false, raf = 0, ended = false, last = performance.now(); let shake = 0; let walkT = 0; let lastLockedMsg = 0;
+  const bolts: BoltFx[] = []; const bimpacts: Impact[] = [];
   const rings: { x: number; floor: number; t: number; r: number; color: string }[] = []; const pops: { x: number; floor: number; t: number; text: string; color: string }[] = []; const shots: { a: number; b: number; floor: number; t: number }[] = [];
   const F = site.floors; const VIEW = 110;
   const layout = () => { const r = stage.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + "px"; cv.style.height = H + "px"; g.setTransform(dpr, 0, 0, dpr, 0, 0); };
@@ -223,11 +225,13 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       { const w = 44, hx = X(x) - w / 2, hy = gy(fl) - 20 * sc() - 14; g.fillStyle = "rgba(20,16,10,.85)"; g.fillRect(hx - 1, hy - 1, w + 2, 8); g.fillStyle = n.hp / n.maxHp < 0.3 ? "#E0483A" : "#D9503A"; g.fillRect(hx, hy, w * Math.max(0, n.hp / n.maxHp), 6);
         g.fillStyle = "#F2E7C9"; g.font = "700 11px sans-serif"; g.textAlign = "center"; g.fillText(`${Math.round(n.hp)}`, X(x), hy - 3); }
       if (n.searchId) { g.fillStyle = "#F1C14A"; g.font = `700 ${Math.max(14, sc() * 2)}px Caveat, cursive`; g.textAlign = "center"; g.fillText("aranıyor…", X(x), gy(fl) - 20 * sc() - 28); } }
-    for (const pj of n.proj) { const x = X(pj.x), y = gy(pj.floor) - 11 * sc(); const col = pj.kind === "buz" ? ["#BFE6FA", "#6BB6E0"] : pj.kind === "ates" ? ["#FFE08A", "#E8602A"] : pj.kind === "simsek" ? ["#FFFFFF", "#7FA8FF"] : ["#E4D3FF", "#8A6BE0"];
+    for (const pj of n.proj) { if (pj.bolt) continue; const x = X(pj.x), y = gy(pj.floor) - 11 * sc(); const col = pj.kind === "buz" ? ["#BFE6FA", "#6BB6E0"] : pj.kind === "ates" ? ["#FFE08A", "#E8602A"] : pj.kind === "simsek" ? ["#FFFFFF", "#7FA8FF"] : ["#E4D3FF", "#8A6BE0"];
       for (let k = 4; k >= 1; k--) { g.globalAlpha = 0.14 * (5 - k); g.fillStyle = col[1]; g.beginPath(); g.arc(x - pj.dir * k * 6, y, 6 + (5 - k), 0, 7); g.fill(); }
       g.globalAlpha = 1; const gr = g.createRadialGradient(x, y, 1, x, y, 11); gr.addColorStop(0, col[0]); gr.addColorStop(1, col[1]); g.fillStyle = gr; g.beginPath(); g.arc(x, y, 10 + Math.sin(now / 60) * 1.5, 0, 7); g.fill(); }
     for (const sh of [...shots]) { const a = Math.max(0, (now - sh.t) / 160); if (a > 1) { shots.splice(shots.indexOf(sh), 1); continue; } g.strokeStyle = `rgba(255,245,210,${1 - a})`; g.lineWidth = 2; g.beginPath(); g.moveTo(X(sh.a), gy(sh.floor) - 12 * sc()); g.lineTo(X(sh.b), gy(sh.floor) - 8 * sc()); g.stroke(); }
     for (const r of [...rings]) { const a = Math.max(0, (now - r.t) / 500); if (a > 1) { rings.splice(rings.indexOf(r), 1); continue; } g.strokeStyle = `${r.color}${(1 - a).toFixed(2)})`; g.lineWidth = 4; g.beginPath(); g.ellipse(X(r.x), gy(r.floor) - 8 * sc(), Math.max(0.1, r.r * sc() * a), Math.max(0.1, r.r * sc() * 0.5 * a), 0, 0, 7); g.stroke(); }
+    for (let i = bolts.length - 1; i >= 0; i--) if (!drawBolt(g, bolts[i], now, Math.max(0.8, sc() / 4.5))) bolts.splice(i, 1);
+    for (let i = bimpacts.length - 1; i >= 0; i--) if (!drawImpact(g, bimpacts[i], now)) bimpacts.splice(i, 1);
     if (aim && Math.hypot(aim.dx, aim.dy) > 0.25) {
       const rv = { dx: -aim.dx, dy: -aim.dy }; const tg = aimTarget(n, rv); const hx = X(n.px), hy = gy(n.py) - 11 * sc(); const len = 90 + Math.hypot(aim.dx, aim.dy) * 60; const ty = tg.floor === n.floor ? 0 : (tg.floor > n.floor ? -1 : 1);
       g.save(); g.setLineDash([8, 6]); g.strokeStyle = "rgba(255,240,180,.9)"; g.lineWidth = 3; g.beginPath(); g.moveTo(hx, hy);
@@ -270,7 +274,14 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       if (f.k === "raid") { tip.hidden = false; tip.textContent = f.last ? `Son baskın! ${f.n} düşman geliyor` : `Baskın! ${f.n} düşman geliyor`; setTimeout(() => { tip.hidden = true; }, 2200); sfx("beat"); buzz("medium"); }
       if (f.k === "shot") { shots.push({ a: f.from, b: f.to, floor: f.floor, t: now }); sfx("whoosh"); }
       if (f.k === "trap") { rings.push({ x: f.x, floor: f.floor, t: now, r: 14, color: "rgba(241,193,74," }); sfx("thunk"); pops.push({ x: f.x, floor: f.floor, t: now, text: "Tuzak!", color: "#F1C14A" }); }
-      if (f.k === "spell") { rings.push({ x: f.x, floor: f.floor, t: now, r: f.r, color: f.kind === "buz" ? "rgba(159,211,232," : f.kind === "ates" ? "rgba(230,110,50," : "rgba(160,140,255," }); sfx("crit"); buzz("heavy"); shake = 8; }
+      if (f.k === "spell" && f.bolt) {
+        // şimşek: zincir kahramanın elinden hedeften hedefe; yıldırım üstten aşağı (barikat, nöbet ve altıgen savaşla aynı kural)
+        const seed = (now | 0) % 9973; const ix = X(f.x), iy = gy(f.floor) - 8 * sc();
+        const near = n.foes.filter(q => q.floor === f.floor && Math.abs(q.x - f.x) < f.r && Math.abs(q.x - f.x) > 1).slice(0, 3).map(q => [X(q.x), gy(q.floor) - 8 * sc()] as Pt);
+        if (f.bolt === "chain") { const fx = chainFx([[X(n.px), gy(n.floor) - 12 * sc()], [ix, iy], ...near], seed, now, sc() * 4); bolts.push(...fx.bolts); bimpacts.push(...fx.impacts); }
+        else { const fx = skyFx([[ix, iy], ...near], -10, seed, now, sc() * 5); bolts.push(...fx.bolts); bimpacts.push(...fx.impacts); }
+        sfx("thunder"); buzz("heavy"); shake = 8;
+      } else if (f.k === "spell") { rings.push({ x: f.x, floor: f.floor, t: now, r: f.r, color: f.kind === "buz" ? "rgba(159,211,232," : f.kind === "ates" ? "rgba(230,110,50," : "rgba(160,140,255," }); sfx("crit"); buzz("heavy"); shake = 8; }
       if (f.k === "bite") sfx("hit");
       if (f.k === "cast") buzz("light");
       if (f.k === "dodge") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Sıyrıldın", color: "#9BD36B" }); sfx("whoosh"); }

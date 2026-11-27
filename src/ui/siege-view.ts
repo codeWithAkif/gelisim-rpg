@@ -14,7 +14,7 @@ import { artUrl } from "./art";
 import { esc } from "./sketch";
 import { sfx, buzz } from "./feel";
 import { quad, drawQuad, walkFrame, gait } from "./anim";
-import { chain, drawBolt, drawImpact, impact, type BoltFx, type Impact, type Pt } from "./lightning";
+import { chainFx, skyFx, drawBolt, drawImpact, impact, type BoltFx, type Impact, type Pt } from "./lightning";
 import { castDrawPrompt } from "./gesture-view";
 import { drawFlames, drawEmbers, type Ember } from "./fire-fx";
 import { SPELL_FX } from "../engine/magic";
@@ -275,10 +275,15 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
       if (f.k === "bar" && f.broken) { sfx("clang"); buzz("light"); }
       if (f.k === "cast" && f.from) streaks.push({ x1: f.from[0], y1: f.from[1], x2: f.x, y2: f.y, t: now });
       if (f.k === "cast") {
-        if (f.chain) { const pts: Pt[] = [[X(CX), Y(CY) - scale * 8], ...f.chain.map(([x, y]) => [X(x), Y(y) - scale * 4] as Pt)]; const seed = (now | 0) % 9973;
+        if (f.chain && f.bolt === "sky") {
+          // yıldırım: üstten aşağı, her vurulana ayrı
+          const seed = (now | 0) % 9973; const tg: Pt[] = (f.chain.length ? f.chain : [[f.x, f.y] as [number, number]]).map(([x, y]) => [X(x), Y(y) - scale * 3] as Pt);
+          const fx = skyFx(tg, -10, seed, now, scale * 6); lbolts.push(...fx.bolts); limpacts.push(...fx.impacts); sfx("thunder"); wflash = 1; }
+        else if (f.chain) {
+          // zincir şimşek: kahramanın elinden hedeften hedefe
+          const pts: Pt[] = [[X(CX), Y(CY) - scale * 8], ...f.chain.map(([x, y]) => [X(x), Y(y) - scale * 4] as Pt)]; const seed = (now | 0) % 9973;
           if (pts.length < 2) pts.push([X(f.x), Y(f.y)]);
-          for (const c of chain(pts, seed)) lbolts.push({ b: c.bolt, t0: now, delay: c.delay, dur: 380 });
-          pts.slice(1).forEach(([x, y], i) => limpacts.push(Object.assign(impact(x, y, scale * 5, seed + i, now), { t0: now + i * 70 }))); sfx("thunder"); wflash = 0.7; }
+          const fx = chainFx(pts, seed, now, scale * 5); lbolts.push(...fx.bolts); limpacts.push(...fx.impacts); sfx("thunder"); wflash = 0.7; }
         else if (f.fire) { limpacts.push(Object.assign(impact(X(f.x), Y(f.y), f.r * scale, (now | 0) % 997, now), { color: "255,150,60" })); sfx("fire"); }
         else limpacts.push(Object.assign(impact(X(f.x), Y(f.y), f.r * scale * 0.8, (now | 0) % 997, now), { color: "150,200,150" }));
       }

@@ -27,7 +27,7 @@ import { GAME_ITEMS } from "../content/world";
 export const lootText = (l: Loot) => [l.money ? `${l.money} bakır` : "", ...Object.entries(l.items).map(([k, v]) => `${GAME_ITEMS[k]?.name ?? k}${v > 1 ? " ×" + v : ""}`)].filter(Boolean).join(", ");
 import { sfx, buzz } from "./feel";
 import { quad, drawQuad, walkFrame, bowFrame, gait } from "./anim";
-import { chain, skyBolt, drawBolt, drawImpact, impact, type BoltFx, type Impact } from "./lightning";
+import { chain, chainFx, skyFx, skyBolt, drawBolt, drawImpact, impact, type BoltFx, type Impact, type Pt } from "./lightning";
 
 const imgCache = new Map<string, HTMLImageElement | null>();
 const img = (key: string) => { if (!imgCache.has(key)) { const u = artUrl(key); imgCache.set(key, u ? Object.assign(new Image(), { src: u }) : null); } const i = imgCache.get(key)!; return i && i.complete && i.naturalWidth ? i : null; };
@@ -422,8 +422,14 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       if (f.k === "spell" && f.wall) { pops.push({ x: f.x, y: f.y - 8, t: now, text: n.spells[f.id]?.name ?? "", color: C("--blue"), dur: 1000 }); }
       else if (f.k === "spell") {
         if (f.kind === "simsek") {
-          const px = X(f.x), py = Y(f.y); bolts.push({ b: skyBolt([px, py], -10, (now | 0) % 9973), t0: now, delay: 0, dur: 520 }); impacts.push(impact(px, py, f.r * scale, (now | 0) % 997, now)); whiteFlash = 1; sfx("thunder");
-          for (const id of f.hits.slice(0, 5)) { const t = n.foes.find(q => q.id === id); if (t) impacts.push(impact(X(t.x), Y(t.y), scale * 5, id, now + 60)); }
+          const pts = f.pts?.length ? f.pts : [[f.x, f.y] as [number, number]]; const seed = (now | 0) % 9973;
+          if (n.spells[f.id]?.bolt === "chain") {
+            // zincir şimşek: kulenin tepesindeki kahramanın elinden hedeften hedefe
+            const px: Pt[] = [[X(TOWER.x), Y(TOWER.y - 8)], ...pts.map(([x, y]) => [X(x), Y(y) - scale * 2] as Pt)]; const fx = chainFx(px, seed, now, scale * 5); bolts.push(...fx.bolts); impacts.push(...fx.impacts); whiteFlash = 0.7; sfx("thunder");
+          } else {
+            // yıldırım: üstten aşağı, her vurulana ayrı
+            const fx = skyFx(pts.map(([x, y]) => [X(x), Y(y) - scale * 2] as Pt), -10, seed, now, scale * 6); bolts.push(...fx.bolts); impacts.push(...fx.impacts); whiteFlash = 1; sfx("thunder");
+          }
         }
         else if (f.kind === "kilic") blades.push({ x: f.x, y: f.y, x2: f.x2!, y2: f.y2!, t: now });
         else if (f.kind === "sarmasik" || f.kind === "camur") vines.push({ x: f.x, y: f.y, r: f.r, t: now });
