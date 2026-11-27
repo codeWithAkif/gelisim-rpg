@@ -133,16 +133,23 @@ export interface QuestDef {
   afterText?: string;    // bitince ne öğrendin (hikâye)
   at: string;            // işin yapıldığı yer (haber verilecek kişi ya da savaş alanı)
   doneText?: string;     // yerinde yapılınca düğme metni
+  story?: boolean;       // ana hikâyenin işi: "Ana görev" diye görünür, ödül penceresi yerine sahne gelir
+  night?: boolean;       // gece yapılır: gündüz başlanırsa akşam beklenir (saat ilerler)
 }
 export const QUESTS: QuestDef[] = [
   {
-    id: "mesaj", title: "Muhtara haber", giverNpc: "hasan", importance: "basit", minutes: 15, at: "koy_meydani", doneText: "Haberi ver",
-    text: "Hasan sürüyü bırakamıyor. Kurt izlerini köydeki muhtara haber vermeni istiyor. Yayladan köy meydanına inmen gerek.",
+    id: "mesaj", title: "Muhtara haber", giverNpc: "hasan", importance: "basit", story: true, minutes: 15, at: "koy_meydani", doneText: "Ayşe'ye anlat",
+    text: "Hasan sürüyü bırakamıyor. Her gece eksilen kuzuları köydeki muhtar Ayşe'ye anlatmanı istiyor. Yayladan köy meydanına inmen gerek.",
     rewards: { items: { ekmek: 1, peynir: 1 }, note: "Ekmek ve peynir. Hasan'ın verebileceği bu kadar." },
   },
   {
-    id: "kurt", title: "Sürüye dadanan kurtlar", giverNpc: "hasan", importance: "onemli", minutes: 90, requires: ["mesaj"], at: "yayla",
-    text: "İki kurt her gece bir kuzu kapıyor. Hasan yalvarıyor: 'Onları uzak tut, elimde ne varsa senin.'",
+    id: "agil_nobet", title: "Ağılda nöbet", giverNpc: "hasan", importance: "onemli", story: true, night: true, minutes: 120, requires: ["mesaj"], at: "yayla", doneText: "Nöbet tut",
+    text: "Muhtar Ayşe kurdu kendi gözünle görmeni istedi. Hasan'la gece ağılın başında bekleyeceksin.",
+    rewards: { items: { ekmek: 1 }, note: "Sabah Hasan ateşte bir tas çorba ısıttı, yanına ekmek koydu." },
+  },
+  {
+    id: "kurt", title: "Sürüye dadanan kurtlar", giverNpc: "hasan", importance: "onemli", story: true, minutes: 90, requires: ["agil_nobet"], at: "yayla",
+    text: "Donmuş kuzunun yanındaki izler meradaki kayalıklara gidiyor. Hasan: \"Yarın gece orada pusu kuralım.\"",
     battle: { enemies: ["kurt", "kurt"], map: "mera" },
     rewards: { items: { temiz_giysi: 1, el_yapimi_bicak: 1 }, note: "Temiz giysi ve kendi yaptığı bıçak. Bir çoban için büyük fedakârlık." },
   },

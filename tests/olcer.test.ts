@@ -1,4 +1,4 @@
-// Ölçer işi: ısı kaybolmaz, bir yere gider. Bulmacalar çözülebilir, sıkı ve karakterle kolaylaşır.
+// Ölçer işi: sönen ateş başka bir ocakta yanar (ısı korunur). Bulmacalar çözülebilir, sıkı ve karakterle kolaylaşır.
 import { test, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
 import { newGame } from "../src/engine/state";

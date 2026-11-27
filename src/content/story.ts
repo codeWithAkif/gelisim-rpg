@@ -4,7 +4,7 @@
 // Annen bir Ölçer'di: büyüyü dua değil hesap olarak gören, ateşin ve suyun kurallarını ölçen
 // bir loncanın üyesi. On iki yıl önce başkent Ardıç bir gecede yandı (Kül Yangını); kral suçu
 // Ölçerlere yükledi, büyüyü yasakladı. Annen o gece kayboldu. O günden beri kışlar uzuyor.
-// Annenin defterindeki son cümle: "Isı kaybolmaz. Bir yere gider."
+// Annenin defterindeki son cümle: "Sönen her ateş, başka bir ocakta yanar."
 // Gerçek: biri ülkenin ısısını çekip bir yerde topluyor. Kül Yangını, bu ısının bir anda
 // başkente boşaldığı bir deneyin sonucuydu. Oyuncu köylüden krala doğru tanınırlık kazanarak
 // ısının nereye gittiğini ve annesine ne olduğunu bulur.
@@ -16,7 +16,7 @@ export interface IntroPage { art: "defter" | "yangin" | "kar" | "yol"; title: st
 export const INTRO: IntroPage[] = [
   { art: "defter", title: "Annemin defteri", text: "Annem bir Ölçer'di. Ateşin neden yandığını, suyun neden donduğunu ölçer, bu deftere yazardı. Büyü onun için dua değil, hesaptı." },
   { art: "yangin", title: "Kül Yangını", text: "On iki yıl önce başkent Ardıç bir gecede yandı. Kral suçu Ölçerlere yükledi. Defterleri yakıldı, büyü yasaklandı. Annem o gece ortadan kayboldu." },
-  { art: "kar", title: "Uzayan kışlar", text: "O günden beri her kış bir öncekinden uzun. Kuzeyde göller yazın bile çözülmüyor. Annemin defterinin son yazılı sayfasında tek bir cümle var: \"Isı kaybolmaz. Bir yere gider.\"" },
+  { art: "kar", title: "Uzayan kışlar", text: "O günden beri her kış bir öncekinden uzun. Kuzeyde göller yazın bile çözülmüyor. Annemin defterinin son yazılı sayfasında tek bir cümle var: \"Sönen her ateş, başka bir ocakta yanar.\"" },
   { art: "yol", title: "Taşpınar yolu", text: "Defterin gerisi boş. Elimde bir çoban değneği, cebimde altı bakır var. Annemin son mektubu Taşpınar'dan gönderilmişti. Dağ yolundan vadiye iniyorum." },
 ];
 
@@ -27,6 +27,8 @@ export interface Milestone {
   text: string;                      // ulaşınca açılan sayfa
   effects?: { learnElement?: string; items?: Record<string, number>; flag?: string };
   side?: boolean;                    // yan hikâye: bölümün bitmesini beklemez
+  scene?: string;                    // varsa "Yeni sayfa" penceresi yerine bu sahne oynar (content/scenes.ts)
+  accept?: string;                   // sahne bitince bu iş kendiliğinden üstlenilir (sahnede söz verildiyse)
 }
 export interface Chapter { id: string; title: string; place: string; milestones: Milestone[]; soon?: boolean }
 
@@ -37,11 +39,13 @@ export const CHAPTERS: Chapter[] = [
   {
     id: "b1", title: "Bölüm 1: Kıvılcım", place: "Taşpınar",
     milestones: [
-      { id: "varis", title: "Taşpınar'a varış", hint: "", reached: s => s.introDone,
+      { id: "varis", title: "Taşpınar'a varış", hint: "", reached: s => s.introDone, scene: "varis",
         text: "Dağ yolu bir yaylaya çıkıyor. Yaşlı bir çoban sürüsünü topluyor; gözleri yorgun, geceleri uyumadığı belli. Adı Hasan. Aşağıda vadide Taşpınar köyü görünüyor." },
-      { id: "ilk_is", title: "İlk iş", hint: "Hasan'dan işi al, sonra Harita'dan köy meydanına in ve muhtara haber ver.", reached: s => done(s, "mesaj"),
+      { id: "ilk_is", title: "İlk iş", hint: "Köy meydanına in, muhtar Ayşe'ye olanları anlat.", reached: s => done(s, "mesaj"), scene: "ayse",
         text: "Muhtar Ayşe haberi dinledi, sonra uzun uzun yüzüne baktı. \"Seni bir yerden tanıyor gibiyim,\" dedi. Sonra vazgeçti." },
-      { id: "suru", title: "Sürünün bekçisi", hint: "Hasan'ın sürüsüne dadanan kurtları uzaklaştır.", reached: s => done(s, "kurt"),
+      { id: "donmus_kuzu", title: "Donmuş kuzu", hint: "Yaylaya dön; Hasan'la gece ağılda nöbet tut.", reached: s => done(s, "agil_nobet"), scene: "donmus_kuzu", accept: "kurt",
+        text: "Kuzu ısırılmamıştı; donmuştu. Basılan toprak donmuş, yazın ortasında ağılın duvarında kırağı. Kurt kuzuyu yer; dondurmaz." },
+      { id: "suru", title: "Sürünün bekçisi", hint: "Hasan'la meradaki kayalıklarda pusu kur; kurtları sürüden uzaklaştır.", reached: s => done(s, "kurt"), scene: "suru",
         text: "Köyde adın anılmaya başladı. Muhtar Ayşe seni çağırttı: \"On iki yıl önce buraya bir kadın geldi. Bir defteri vardı; seninkine benziyordu. Şifacı Zehra'ya bir şey bıraktı.\"" },
       { id: "iz", title: "Annenin izi", hint: "Muhtardan işi al; Zehra'nın evi yaylaya çıkan patikada.", reached: s => done(s, "annenin_izi"),
         effects: { learnElement: "el_ates" },
@@ -100,7 +104,7 @@ export const CHAPTERS: Chapter[] = [
         text: "Avlunun dibinde dehlizin kapısı. Duvarlarda kırağı var, ama hava sıcak: bütün ülkenin ısısı buraya akıyor." },
       { id: "d_bahar", title: "Bahar", hint: "Büyük Ocak'ı kır.", reached: s => done(s, "buyuk_ocak"),
         effects: { learnElement: "el_hava" },
-        text: "Ocak kırıldığında ısı patlamadı; dağıldı. Ardıç'a ılık bir yağmur yağdı, Ayazkale'nin buzları çözüldü, Taşpınar'da kayısılar çiçek açtı. Annenin defterinin son boş sayfasına sen yazdın: \"Isı kaybolmaz. Bir yere gider. Ve geri döner.\" SON. (Defterin açık kalıyor: dolaşmaya, öğrenmeye devam edebilirsin.)" },
+        text: "Ocak kırıldığında ısı patlamadı; dağıldı. Ardıç'a ılık bir yağmur yağdı, Ayazkale'nin buzları çözüldü, Taşpınar'da kayısılar çiçek açtı. Annenin defterinin son boş sayfasına sen yazdın: \"Sönen her ateş başka bir ocakta yanar. Ve bir gün evine döner.\" SON. (Defterin açık kalıyor: dolaşmaya, öğrenmeye devam edebilirsin.)" },
     ],
   },
 ];

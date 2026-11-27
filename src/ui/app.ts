@@ -35,12 +35,11 @@ import { addItem } from "../engine/inventory";
 import { isNight } from "../engine/state";
 import type { BattleOutcome } from "../engine/combat";
 import { SIEGES, escalate } from "../engine/siege";
-import { showIntro } from "./intro";
 import { applyDaylight } from "./daylight";
 import { notifyAt, clearNotify } from "../notify";
 import { showTitle } from "./title";
 import { applySettings } from "./settings";
-import { sfx, buzz, ambience, unlockAudio } from "./feel";
+import { sfx, buzz, ambience, unlockAudio, travelSteps } from "./feel";
 import { playMusic } from "./music";
 import { scapeOf, musicCandidates } from "../engine/soundscape";
 import { darkness } from "./daylight";
@@ -53,6 +52,8 @@ import { itemPic, artUrl } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 import { newUnlocks } from "../engine/unlocks";
+import { playScene } from "./scene-view";
+import { SCENES } from "../content/scenes";
 import { crossedThresholds } from "../engine/thresholds";
 
 // "calis" alt çubukta yok: Harita'daki yer kartından açılır, geri düğmesiyle haritaya döner.
@@ -196,10 +197,29 @@ export function startApp(root: HTMLElement) {
   }
   /** Yeni kilometre taşlarını ve ilk kez açılan sistemleri sırayla "Yeni sayfa" olarak gösterir. */
   function storyTick(after?: () => void) {
-    const fresh: { id: string; title: string; text: string }[] = [...advanceStory(s), ...newUnlocks(s)];
+    // sahnesi olan sayfalar pencere yerine sahne olarak oynar; zaten oynandıysa (açılış gibi) atlanır
+    const story = advanceStory(s);
+    const scened = story.filter(m => m.scene && SCENES[m.scene]);
+    const fresh: { id: string; title: string; text: string }[] = [...story.filter(m => !(m.scene && SCENES[m.scene])), ...newUnlocks(s)];
+    const toPlay = scened.filter(m => s.story.flags["sahne_" + m.id] === undefined);
     // aşılan eşikler tek sayfada: "Artık …"
     const th = crossedThresholds(cfg, s);
     if (th.length) fresh.push({ id: "esik", title: "Artık yapabildiğin", text: th.map(t => "Artık " + t.text + ".").join(" ") });
+    persist(); if (story.length) render();   // hikâye ilerlediyse defter hemen güncellensin
+    // önce sahneler sırayla, sonra kalan sayfalar
+    const playScenes = (k: number) => {
+      if (k >= toPlay.length) { showPages(fresh, after); return; }
+      const m = toPlay[k]; s.story.flags["sahne_" + m.id] = s.day; persist();
+      playScene(SCENES[m.scene!], { name: s.name }, () => {
+        // sahnede söz verilen iş kendiliğinden üstlenilir
+        if (m.accept && s.quests[m.accept]?.status !== "aktif" && !(s.quests[m.accept]?.count)) { acceptQuest(s, m.accept); persist(); render(); }
+        playScenes(k + 1);
+      });
+    };
+    playScenes(0);
+  }
+  /** "Yeni sayfa" pencereleri: birden çoksa tek özet. */
+  function showPages(fresh: { id: string; title: string; text: string }[], after?: () => void) {
     if (!fresh.length) { after?.(); return; }
     persist(); render();
     // birden fazla sayfa birden açıldıysa (eski kayıt, art arda olaylar) tek özet pencere
@@ -350,10 +370,10 @@ export function startApp(root: HTMLElement) {
       const items = Object.entries(r.items).map(([k, v]) => `${itemInfo(cfg, k).name}${v > 1 ? " ×" + v : ""}`);
       const lost = Object.entries(r.lostItems).map(([k, v]) => `${itemInfo(cfg, k).name}${v > 1 ? " ×" + v : ""}`);
       modal(`<p class="hand ${r.result === "exit" ? "muted" : "red"}" style="margin:0">Harabe araması</p><h2>${r.result === "exit" ? "Sağ salim çıktın" : "Yaralı kaçtın"}</h2>
-        <p style="margin:0">${r.result === "exit" ? "Bulduklarını çıkışa kadar getirdin." : "Baskın seni yere serdi; çantandakiler harabede kaldı."}</p>
-        <div class="odds"><span>Aranan yer <b>${r.searched}</b></span><span>Baskın <b>${r.waves}</b></span><span>Süre <b>${r.minutes} dk</b></span></div>
+        <p style="margin:0">${r.result === "exit" ? "Bulduklarını çıkışa kadar getirdin." : "Baskın seni yere serdi. Çantan düştüğün yerde kaldı; geri dönüp alabilirsin."}</p>
+        <div class="odds"><span>Bu sefer aranan <b>${r.searched}</b></span><span>Harabede boşaltılan <b>${r.progress.done}/${r.progress.total}</b></span><span>Baskın <b>${r.waves}</b></span><span>Süre <b>${r.minutes} dk</b></span></div>
         ${items.length || r.money ? `<p class="hand blue" style="margin:0">Getirdiklerin: ${esc([...(r.money ? [`${r.money} bakır`] : []), ...items].join(", "))}</p>` : `<p class="tiny muted" style="margin:0">Eli boş döndün.</p>`}
-        ${lost.length ? `<p class="tiny red" style="margin:0">Kaybolan: ${esc(lost.join(", "))}</p>` : ""}
+        ${lost.length ? `<p class="tiny red" style="margin:0">Harabede kalan: ${esc(lost.join(", "))}</p>` : ""}
         ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
         <h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
     });
@@ -438,6 +458,8 @@ export function startApp(root: HTMLElement) {
         const r = walkQuest(cfg, s, id);
         if ("error" in r) { toast(r.error); return; }
         persist(); render();
+        // ana hikâye işinde ödül penceresi araya girmez: sahne oynar, ödül kısa bir notla gelir
+        if (QUESTS.find(q => q.id === id)?.story) { toast(r.note ?? "İş bitti."); storyTick(); return; }
         sfx(r.relics.length ? "perfect" : "page");
         modal(`<h2>${esc(QUESTS.find(q => q.id === id)!.title)}</h2>${rewardHtml(r)}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
         return;
@@ -470,6 +492,8 @@ export function startApp(root: HTMLElement) {
   function doFight(id: string) {
         const q = QUESTS.find(x => x.id === id)!;
         if (s.energy < 15) { toast("Bu yorgunlukla savaşa giremezsin; dinlen."); return; }
+        // ilk pusudan önce Hasan öğretir (bir kez)
+        if (id === "kurt" && s.story.flags.sahne_pusu === undefined) { s.story.flags.sahne_pusu = s.day; persist(); playScene(SCENES.pusu, { name: s.name }, () => doFight(id)); return; }
         const siegeEnd = (won: boolean, gains: Record<string, number>, foes?: string[], hs: string[] = []) => {
           let extra = heroLinesHtml(afterBattle(s, hs, won ? "won" : "lost"));
           if (won) { const r = completeQuest(cfg, s, id, foes ? bonusOf(s, q.battle!.enemies, foes) : bonusOf(s, [], [])); extra = `<h3>Ödül</h3>${rewardHtml(r)}`; }
@@ -524,11 +548,11 @@ export function startApp(root: HTMLElement) {
   /* ---------- yolculuk: her saniye ilerleme, sürpriz ve varış ---------- */
   let eventOpen = false;
   function journeyTick() {
-    if (!s.journey || eventOpen) return;
+    if (!s.journey || eventOpen) { travelSteps(false); return; }
     const now = Date.now();
     const due = dueEvent(s, now);
     if (due) {
-      pauseJourney(s, now); persist(); eventOpen = true; sfx("page"); buzz("light");
+      travelSteps(false); pauseJourney(s, now); persist(); eventOpen = true; sfx("page"); buzz("light");
       if (tab !== "harita") { tab = "harita"; render(false); } else mapApi?.refresh();
       const opts = due.def.choices.map(c => ({ ...c, ok: canUseChoice(s, c.need) }));
       const bg = document.createElement("div"); bg.className = "modal-bg";
@@ -570,19 +594,26 @@ export function startApp(root: HTMLElement) {
     }
     const arrived = finishJourney(cfg, s, now);
     if (arrived) {
-      persist(); mapApi = undefined; mapState = { view: { cx: place(arrived.to)!.x, cy: place(arrived.to)!.y + 55, w: 230 }, sel: arrived.to };
+      travelSteps(false); persist(); mapApi = undefined; mapState = { view: { cx: place(arrived.to)!.x, cy: place(arrived.to)!.y + 55, w: 230 }, sel: arrived.to };
       render(); toast(`Vardın: ${place(arrived.to)!.name}.`); sfx("good"); storyTick(); return;
     }
     if (tab === "harita") mapApi?.refresh();
     else root.querySelector("#statusSlot")!.innerHTML = statusBar(cfg, s);
     applyDaylight(s.minute);
-    if (s.journey.pausedAt === undefined && !document.hidden) { sfx("step"); setTimeout(() => sfx("step"), 480); }
+    travelSteps(s.journey.pausedAt === undefined && !document.hidden);   // toprak yolda ayak sesi
   }
   window.setInterval(journeyTick, 1000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) journeyTick(); });
 
+  /** Açılış: soğuk açılış sahnesi, sonra sisin içinde Hasan (ad orada sorulur). Hasan'ın işi üstlenilir. */
   function beginIntro() {
-    showIntro(name => { s.name = name; s.introDone = true; persist(); render(false); storyTick(); });
+    playScene(SCENES.acilis, { seed: s.seed }, () => {
+      playScene(SCENES.varis, { onName: n => { s.name = n; } }, () => {
+        s.introDone = true; s.story.flags.sahne_varis = s.day;
+        if (s.quests.mesaj?.status !== "aktif") acceptQuest(s, "mesaj");
+        persist(); render(false); storyTick();
+      });
+    });
   }
 
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });

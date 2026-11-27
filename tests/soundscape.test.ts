@@ -48,3 +48,14 @@ test("ortam: gece açıkta cırcır, gündüz yaylada koyun çanları; Ayazkale'
   expect(ambientPlan(scapeOf(at("koru")), true).owls).toBe(true); expect(ambientPlan(scapeOf(at("koru")), false).owls).toBe(false);
   expect(ambientPlan(scapeOf(at("karacam")), true).owls).toBe(false);
 });
+
+test("uzaktan kurt sesi koruda her zaman, yaylada ve derede gece; gece koru ve derede orman müziği; harabe sesleri var", async () => {
+  const { ambientPlan } = await import("../src/engine/soundscape");
+  const { readdirSync } = await import("node:fs");
+  expect(ambientPlan(scapeOf(at("koru")), false).wolves).toBe(true); expect(ambientPlan(scapeOf(at("yayla")), false).wolves).toBe(false);
+  expect(ambientPlan(scapeOf(at("yayla")), true).wolves).toBe(true); expect(ambientPlan(scapeOf(at("karacam")), true).wolves).toBe(false);
+  expect(ambientPlan(scapeOf(at("dere")), true).layers.map(l => l.id)).toContain("muzik_orman");
+  expect(ambientPlan(scapeOf(at("dere")), false).layers.map(l => l.id)).not.toContain("muzik_orman");
+  const files = readdirSync("src/assets/ses");
+  for (const f of ["harabe_ayak.ogg", "harabe_uluma.ogg", "harabe_muzik.ogg", "ortam_kurt_uzak.ogg", "ortam_ayak_toprak.ogg"]) expect(files).toContain(f);
+});

@@ -1,6 +1,6 @@
 // Bölüm 2–4 içeriği: yerler, yollar, kişiler, düşmanlar, savaş haritaları, görevler ve hikâye sayfaları.
 // Ana hikâye: Annem bir Ölçer'di. On iki yıl önce başkent Ardıç bir gecede yandı ve suç Ölçerlere yüklendi.
-// O günden beri kışlar uzuyor. "Isı kaybolmaz. Bir yere gider." Isıyı kim, nereye çekiyor?
+// O günden beri kışlar uzuyor. "Sönen her ateş, başka bir ocakta yanar." Kimin ocağında?
 //  B2 Karaçam: kor taşları ticareti → taşlar Ayazkale'den geliyor → annem yaşıyor, Soğuk Ocak'ta tutsak.
 //  B3 Ayazkale: Kayhan Bey'in Soğuk Ocak'ı toprağın ısısını taşa çekiyor → annemi kurtar → asıl ocak Ardıç'ın altında.
 //  B4 Ardıç: Vezir Sungur'un Büyük Ocak'ı; Kül Yangını onun ilk denemesiydi → ocağı kır, ısı geri döner, bahar gelir.
@@ -191,10 +191,10 @@ export const CHAPTER_QUESTS: QuestDef[] = [
     rewards: { money: 12, relics: ["kul_ana_muskasi"], note: "Kül Ana'nın torunları muhafızların anahtarını getirdi; Kül Ana boynuna bir muska taktı." },
     afterText: "Avlunun dibinde, nöbetçilerin bile bakmadığı bir kapı: dehlizin ağzı. İçeriden uğultu geliyor; duvarlarda kırağı, ama hava sıcak. Isı buraya akıyor." },
   { id: "buyuk_ocak", after: "d_saray", title: "Büyük Ocak", giverNpc: "kulana", importance: "hayati", minutes: 120, at: "ardic_dehliz",
-    text: "Dehlizin dibinde Büyük Ocak: bütün ülkenin ısısını içine çeken mavi bir girdap. Başında Vezir Sungur. \"Isı kaybolmaz,\" diyor gülümseyerek. \"Bir yere gider. Bana.\"",
+    text: "Dehlizin dibinde Büyük Ocak: bütün ülkenin ısısını içine çeken mavi bir girdap. Başında Vezir Sungur. \"Sönen her ateş,\" diyor gülümseyerek, \"başka bir ocakta yanar. Benimkinde.\"",
     battle: { enemies: ["sungur", "muhafiz", "muhafiz"], map: "dehliz" },
     rewards: { money: 40, relics: ["buyuk_kor"], note: "Büyük Ocak kırıldı. Elinde, onun kalbinden kalan son kor." },
-    afterText: "Ocak çatladığında içindeki ısı patlamadı; dağıldı. Dehlizden çıktığında Ardıç'ın üstüne ılık bir yağmur yağıyordu. Kuzeyde Ayazkale'nin buzları çözülüyor, Taşpınar'da kayısılar yeniden çiçek açacak. Isı kaybolmadı. Geri döndü." },
+    afterText: "Ocak çatladığında içindeki ısı patlamadı; dağıldı. Dehlizden çıktığında Ardıç'ın üstüne ılık bir yağmur yağıyordu. Kuzeyde Ayazkale'nin buzları çözülüyor, Taşpınar'da kayısılar yeniden çiçek açacak. Ateş sönmemişti; yalnız evinden uzaktaydı. Şimdi döndü." },
 ];
 
 /* ---------- kadim eşyalar (bölümler) ---------- */

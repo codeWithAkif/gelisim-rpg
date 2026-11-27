@@ -11,7 +11,7 @@ import { FINDS, SEARCH_MINUTES } from "../content/explore";
 import { MARKETS } from "../content/world";
 import { partnerAt, partnerLock, stake } from "./finance";
 import { lodgingAt } from "./rest";
-import { scavSite } from "./scavenge";
+import { sitesAt, TIER_NAMES } from "./scavenge";
 import { olcerOpen, nextLevel, solvedLevels, OLCER_PLACE, OLCER_LEVELS, canStartOlcer } from "./olcer";
 import { PET_TYPES, canAdopt } from "./pet";
 import { homeBed, candidatesAt, canHire, canBuyHouse, HOUSES, HOME_PLACES, ROLE_NAMES } from "./estate";
@@ -39,8 +39,9 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
   if (HOME_PLACES.includes(placeId) && !(s.estate?.house)) { const c = canBuyHouse(cfg, s, placeId); out.push({ act: "house", id: placeId, label: `Ev kur: ${HOUSES[0].name}`, sub: `${HOUSES[0].cost.money} bakır + ${Object.entries(HOUSES[0].cost.items).map(([k, n]) => `${n} ${k}`).join(", ")} · ${HOUSES[0].desc}`, disabled: placeId === s.location ? (c.ok ? undefined : c.reason) : "Oraya git" }); }
   if (placeId === OLCER_PLACE && olcerOpen(s)) { const l = nextLevel(s); const n = solvedLevels(s).length; const c = canStartOlcer(s);
     out.push({ act: "olcer", id: l.id, label: `Ölçer işi: ${l.title}`, sub: n >= OLCER_LEVELS.length ? "Hepsini çözdün · alıştırma" : `Isıyı ölç ve taşı · ${n}/${OLCER_LEVELS.length}`, disabled: c.ok ? undefined : c.reason }); }
-  const sv = scavSite(placeId);
-  if (sv && !sv.unlock(s)) out.push({ act: "scav", id: placeId, label: `Harabeyi ara: ${sv.name}`, sub: `${sv.floors} kat · baskınlar gelir · çıkışta kazanç`, disabled: placeId === s.location ? undefined : "Oraya git" });
+  const ruins = sitesAt(placeId).filter(x => !x.unlock(s));
+  if (ruins.length) out.push({ act: "scav", id: placeId, label: ruins.length > 1 ? `Harabeler (${ruins.length})` : `Harabeyi ara: ${ruins[0].name}`,
+    sub: ruins.map(x => `${x.name} · ${TIER_NAMES[x.tier]}`).join(" / "), disabled: placeId === s.location ? undefined : "Oraya git" });
   if (placeId === s.location) {
     const l = lodgingAt(placeId); const hb = homeBed(s); const ok = !!hb || (!!l && !l.unlock(s));
     out.push({ act: "sleep", id: "", label: ok ? `Konakla: ${hb?.name ?? l!.name}` : "Dinlen ya da kamp kur", sub: ok ? "Güvenli uyku, dinlenme" : "Açıkta uyumak tehlikeli" });

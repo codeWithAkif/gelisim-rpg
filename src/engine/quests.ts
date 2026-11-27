@@ -1,7 +1,7 @@
 // Görevler ve mantıklı ödüller: ödülü verenin imkânı ve görevin onun için önemi belirler.
 import type { Config } from "./config";
 import { type Bonus, bonusMoney } from "./encounter";
-import { type GameState, addRep, log, repOf, DAY_MINUTES } from "./state";
+import { type GameState, addRep, log, repOf, DAY_MINUTES, NIGHT_START } from "./state";
 import { NPCS, QUESTS, GAME_ITEMS, type QuestDef } from "../content/world";
 import { addItem } from "./inventory";
 import { REGION_NAMES } from "../content/map";
@@ -65,6 +65,12 @@ export function completeQuest(cfg: Config, s: GameState, id: string, bonus?: Bon
 export function walkQuest(cfg: Config, s: GameState, id: string): RewardReport | { error: string } {
   const def = QUESTS.find(q => q.id === id)!;
   if (s.journey) return { error: "Yoldasın" };
+  // gece işi: gündüz başlanırsa akşam beklenir (gece yarısına doğru başlar)
+  if (def.night) {
+    const startAt = Math.max(s.minute, NIGHT_START + 180);
+    if (DAY_MINUTES - startAt < def.minutes) return { error: "Bu gece için çok geç; yarın akşam gel" };
+    s.satiety = Math.max(0, s.satiety - (startAt - s.minute) / 60 * 3); s.minute = startAt;
+  }
   if (DAY_MINUTES - s.minute < def.minutes) return { error: "Bugün buna vakit yok" };
   s.minute += def.minutes; s.energy = Math.max(0, s.energy - 3); s.satiety = Math.max(0, s.satiety - 3);
   return completeQuest(cfg, s, id);
@@ -74,5 +80,5 @@ export function itemName(cfg: Config, id: string) { return GAME_ITEMS[id]?.name 
 
 /** Görevin türü: neyi takip edeceğin anlaşılsın. */
 export type QuestKind = "ana" | "hikaye" | "yan";
-export const questKind = (def: { importance: string; repeatable?: boolean }): QuestKind => def.importance === "hayati" ? "ana" : def.repeatable || def.importance === "basit" ? "yan" : "hikaye";
+export const questKind = (def: { importance: string; repeatable?: boolean; story?: boolean }): QuestKind => def.importance === "hayati" || def.story ? "ana" : def.repeatable || def.importance === "basit" ? "yan" : "hikaye";
 export const KIND_ORDER: Record<QuestKind, number> = { ana: 0, hikaye: 1, yan: 2 };

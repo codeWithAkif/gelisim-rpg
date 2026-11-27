@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { config as cfg } from "../src/engine/config";
-import { newGame, repOf } from "../src/engine/state";
+import { newGame, repOf, NIGHT_START, DAY_MINUTES } from "../src/engine/state";
 import { doActivity, sleep, canDoActivity, applyGain } from "../src/engine/progression";
 import { derived } from "../src/engine/derived";
 import { createBattle, player, enemies, playerAttack, enemyTurn, reachable, observe, finishBattle, previewAttack, dist } from "../src/engine/combat";
@@ -108,7 +108,17 @@ describe("görevler", () => {
     walkQuest(cfg, s, "mesaj");
     expect(repOf(s, "taspinar", "taninirlik")).toBe(1);
     expect(s.inventory.peynir).toBe(1);
+    expect(questList(s).find(q => q.def.id === "agil_nobet")!.status).toBe("yeni");   // önce gece ağılda nöbet
+    expect(questList(s).find(q => q.def.id === "kurt")!.status).toBe("kilitli");
+  });
+
+  it("ağılda nöbet gece tutulur: gündüz başlanırsa akşam beklenir; sonra kurt avı açılır", () => {
+    const s = newGame(cfg, 1); s.quests.mesaj = { status: "bitti", count: 1 }; s.location = "yayla";
+    acceptQuest(s, "agil_nobet"); const r = walkQuest(cfg, s, "agil_nobet");
+    expect("error" in r).toBe(false); expect(s.minute).toBeGreaterThanOrEqual(NIGHT_START + 180);
     expect(questList(s).find(q => q.def.id === "kurt")!.status).toBe("yeni");
+    const late = newGame(cfg, 2); late.quests.mesaj = { status: "bitti", count: 1 }; late.minute = DAY_MINUTES - 30; acceptQuest(late, "agil_nobet");
+    expect("error" in walkQuest(cfg, late, "agil_nobet")).toBe(true);
   });
 });
 

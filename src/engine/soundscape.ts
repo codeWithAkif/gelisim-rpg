@@ -14,12 +14,13 @@ export function scapeOf(place: Pick<Place, "id" | "icon" | "region"> | undefined
 }
 
 /* ---------- ortam katmanları (kayıtlar: src/assets/ses/ortam_<ad>.ogg) ---------- */
-export type AmbId = "ruzgar" | "kar" | "dere" | "koyun" | "meydan" | "carsi" | "demirhane" | "koru" | "gece";
+export type AmbId = "ruzgar" | "kar" | "dere" | "koyun" | "meydan" | "carsi" | "demirhane" | "koru" | "gece" | "muzik_orman";
 export interface AmbLayer { id: AmbId; vol: number }
-export interface AmbPlan { layers: AmbLayer[]; owls: boolean }
+export interface AmbPlan { layers: AmbLayer[]; owls: boolean; wolves: boolean }
 /**
  * Bu yerde ve vakitte hangi kayıtlar döngüyle çalar (ses düzeyi 0–1). Gece kuşlar ve kalabalık susar,
- * açıkta cırcır başlar; koruda ve yaylada ara ara baykuş öter. Ayazkale'de rüzgârın yerini kar fırtınası alır.
+ * açıkta cırcır başlar; koruda ve yaylada ara ara baykuş öter; koruda ve dere kenarında gece ürkütücü
+ * bir orman müziği, uzaktan kurt sesleri. Ayazkale'de rüzgârın yerini kar fırtınası alır.
  */
 export function ambientPlan(sc: Scape, night: boolean): AmbPlan {
   const L = (id: AmbId, vol: number): AmbLayer => ({ id, vol });
@@ -27,9 +28,9 @@ export function ambientPlan(sc: Scape, night: boolean): AmbPlan {
   let layers: AmbLayer[];
   switch (sc.kind) {
     case "yayla": layers = night ? [wind(0.4), L("gece", 0.7)] : [wind(0.6), L("koyun", 0.8)]; break;
-    case "dere": layers = night ? [L("dere", 0.8), L("gece", 0.5)] : [L("dere", 0.9), wind(0.2)]; break;
+    case "dere": layers = night ? [L("dere", 0.8), L("gece", 0.5), L("muzik_orman", 0.35)] : [L("dere", 0.9), wind(0.2)]; break;
     case "meydan": layers = night ? [L("gece", 0.5), wind(0.2)] : [L("meydan", 1)]; break;
-    case "koru": layers = night ? [L("gece", 0.8), wind(0.15)] : [L("koru", 1), wind(0.15)]; break;
+    case "koru": layers = night ? [L("gece", 0.8), wind(0.15), L("muzik_orman", 0.35)] : [L("koru", 1), wind(0.15)]; break;
     case "ocak": layers = night ? [wind(0.15)] : [L("demirhane", 1)]; break;
     case "ev": layers = [wind(0.1)]; break;   // içeride: dışarıdan hafif rüzgâr
     case "sehir": layers = night ? [wind(0.3), L("gece", 0.3)] : [L("carsi", 1)]; break;
@@ -37,7 +38,9 @@ export function ambientPlan(sc: Scape, night: boolean): AmbPlan {
     case "kar": layers = [L("kar", 1)]; break;
     case "yol": layers = night ? [wind(0.4), L("gece", 0.5)] : [wind(0.6)]; break;
   }
-  return { layers, owls: night && (sc.kind === "koru" || sc.kind === "yayla") };
+  // uzaktan kurt sesleri: koruda her zaman, yaylada ve derede gece (kurtlar ormanda; "kurt böyle avlanmaz")
+  const wolves = !sc.cold && (sc.kind === "koru" || (night && (sc.kind === "yayla" || sc.kind === "dere")));
+  return { layers, owls: night && (sc.kind === "koru" || sc.kind === "yayla"), wolves };
 }
 /** Elde kaydı olmayan katmanlar çıkarılır. */
 export const playableLayers = (p: AmbPlan, available: Set<string>) => p.layers.filter(l => available.has(l.id));

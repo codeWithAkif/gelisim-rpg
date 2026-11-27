@@ -1,7 +1,8 @@
-// Harabe araması: çok katlı yıkık bir yapıda odaları gezip saklı şeyleri ararsın.
-// Yan kesit görünüm: soldan sağa yürürsün, merdivenle kat değiştirirsin; arama noktasına dokununca ilerleme dolana kadar beklersin.
-// Sayaç bitince baskın gelir (kurtlar, haydutlar); yayın ve okun varsa uzaktan, yoksa elindeki silahla vurursun.
-// Bulduklarını çantana (sınırlı göz) koyarsın; "Çıkış"a ulaşırsan hepsi senin olur, ölürsen çanta gider.
+// Harabe araması: yıkık bir yapıda odaları gezip saklı şeyleri ararsın. Bir yerde kolaydan zora birden çok
+// harabe olabilir (oda, kat, bekçi ve baskın sayısı artar). Yan kesit: yürürsün, merdivenle kat değiştirirsin.
+// İçeride bekçiler uyur; biri seni fark ederse ötekileri çağırır ve baskın sayacı başlar (baskın sayısı sınırlı).
+// Bulduklarını çantana koyarsın; "Çıkış"a ulaşırsan hepsi senin. Ölürsen çanta düştüğün yerde kalır.
+// Boşaltılan sandık boş kalır, açılan kapı açık kalır, öldürülen bekçi dönmez (kayıtta: s.harabe).
 // Saf simülasyon (DOM yok): stepScav(dt) zamanı ilerletir.
 import type { Config } from "./config";
 import type { GameState } from "./state";
@@ -26,36 +27,84 @@ export const SPELL_KIND: Record<string, { kind: SpellKind; mul: number; r: numbe
   sarmasik: { kind: "sarmasik", mul: 0.6, r: 18, cd: 14 }, karga_surusu: { kind: "karga", mul: 0.5, r: 26, cd: 20 }, yer_kiliclari: { kind: "kilic", mul: 4, r: 5, cd: 16 },
 };
 
-export const SW = 700;                 // yapının genişliği (birim): yedi daire, her biri 100
-export const ROOM_W = 100;
+export const ROOM_W = 100;              // bir oda 100 birim genişlikte
 export const EXIT_X = 8;               // çıkış, zemin katın solunda
-export const LADDER_XS = [550, 150];  // 0→1 ve 1→2 merdivenlerinin yeri
-export const ladderX = (gap: number) => LADDER_XS[gap % 2];
+/** Yapının genişliği: oda sayısı × oda genişliği. */
+export const siteW = (site: { rooms: number }) => site.rooms * ROOM_W;
+/** Katlar arası merdiven: çift aralıklarda sağda, tek aralıklarda solda. */
+export const ladderAt = (w: number, gap: number) => (gap % 2 === 0 ? w - 150 : 150);
 
 interface LootEntry { item?: string; money?: [number, number]; weapon?: boolean; w: number; n?: [number, number] }
+/**
+ * Bir harabe. Aynı yerde kolaydan zora birden çok harabe olabilir (tier 1–4). Oda ve kat çoğaldıkça
+ * bekçi, baskın ve ödül de artar. Sandıklar bir kez boşaltılınca boş kalır (kayıtta tutulur).
+ */
 export interface ScavSite {
-  place: string; name: string; desc: string; floors: number; foes: string[]; spotsPerFloor: number;
-  names: string[]; loot: LootEntry[]; unlock: (s: GameState) => string | null;
+  id: string; place: string; name: string; tier: 1 | 2 | 3 | 4; desc: string;
+  floors: number; rooms: number; vault: boolean;   // vault: her katta anahtarla açılan bir oda
+  guards: number;                                  // içeride uyuyan bekçi sayısı
+  raids: number; raidSize: number;                 // fark edilince gelecek baskın sayısı ve ilk baskının büyüklüğü
+  foes: string[]; spotsPerFloor: number; names: string[]; loot: LootEntry[];
+  unlock: (s: GameState) => string | null;
 }
+export const TIER_NAMES = ["", "Kolay", "Orta", "Zor", "Çok zor"] as const;
 const done = (s: GameState, q: string) => (s.quests[q]?.count ?? 0) > 0 || s.quests[q]?.status === "bitti";
+const KORU_NAMES = ["Sandık", "Yatak altı", "Raf", "Çuval", "Ocak yanı", "Fıçı", "Dolap"];
 export const SCAV_SITES: ScavSite[] = [
-  { place: "koru", name: "Yıkık avcı kulübesi", desc: "Korunun derinliğinde, çökmüş bir kulübe. İçinde eski avcıların bıraktıkları olabilir.", floors: 3, foes: ["kurt"], spotsPerFloor: 3,
-    names: ["Sandık", "Yatak altı", "Raf", "Çuval", "Ocak yanı"],
-    loot: [{ item: "sargi_bezi", w: 3 }, { item: "yara_merhemi", w: 1 }, { item: "deri", w: 4 }, { item: "ok", w: 4, n: [2, 4] }, { item: "ip", w: 3 }, { item: "kekik", w: 2, n: [1, 2] }, { item: "ekmek", w: 2 }, { money: [1, 3], w: 3 }, { item: "eski_sikke", w: 1 }, { weapon: true, w: 1 }],
+  { id: "koru_kulube", place: "koru", tier: 1, name: "Yıkık avcı kulübesi",
+    desc: "Korunun kıyısında, çatısı çökmüş tek katlı bir kulübe. Üç oda. İçeride iki kurt yatıyor; uyandırmazsan sessizce arayabilirsin.",
+    floors: 1, rooms: 3, vault: false, guards: 2, raids: 1, raidSize: 2, foes: ["kurt"], spotsPerFloor: 4, names: KORU_NAMES,
+    loot: [{ item: "sargi_bezi", w: 3 }, { item: "deri", w: 4 }, { item: "ok", w: 4, n: [2, 3] }, { item: "ip", w: 3 }, { item: "kekik", w: 2 }, { item: "ekmek", w: 3 }, { item: "demir_parca", w: 1 }, { money: [1, 2], w: 3 }],
     unlock: s => done(s, "kurt") ? null : "Önce Hasan'ın kurt derdine yardım et" },
-  { place: "karacam_sarnic", name: "Sarnıç mahzeni", desc: "Nemli taş katlar, aşağıya inen merdivenler. Eski depolar boş değil.", floors: 4, foes: ["haydut", "kurt"], spotsPerFloor: 3,
+  { id: "koru_agil", place: "koru", tier: 2, name: "Terk edilmiş ağıl",
+    desc: "Eski bir çobanın iki katlı ağılı ve samanlığı. Dört oda. Kurtlar burayı yuva yapmış; uyanırlarsa sürünün geri kalanı da gelir.",
+    floors: 2, rooms: 4, vault: false, guards: 4, raids: 2, raidSize: 2, foes: ["kurt"], spotsPerFloor: 4, names: KORU_NAMES,
+    loot: [{ item: "sargi_bezi", w: 3 }, { item: "yara_merhemi", w: 1 }, { item: "deri", w: 4, n: [1, 2] }, { item: "ok", w: 3, n: [2, 4] }, { item: "ip", w: 3 }, { item: "demir_parca", w: 3 }, { item: "peynir", w: 2 }, { money: [1, 4], w: 3 }, { weapon: true, w: 1 }],
+    unlock: s => done(s, "kurt") ? null : "Önce Hasan'ın kurt derdine yardım et" },
+  { id: "koru_kule", place: "koru", tier: 3, name: "Eski korucu kulesi",
+    desc: "Ağaçların arasında yükselen üç katlı taş bir kule. Her katta kilitli bir oda var; anahtarlar başka katlarda. Kurtlar kalabalık.",
+    floors: 3, rooms: 5, vault: true, guards: 6, raids: 3, raidSize: 3, foes: ["kurt"], spotsPerFloor: 4, names: KORU_NAMES,
+    loot: [{ item: "sargi_bezi", w: 3 }, { item: "yara_merhemi", w: 2 }, { item: "deri", w: 3, n: [1, 2] }, { item: "ok", w: 3, n: [3, 5] }, { item: "ip", w: 2, n: [1, 2] }, { item: "demir_parca", w: 4, n: [1, 2] }, { money: [2, 6], w: 4 }, { item: "eski_sikke", w: 2 }, { weapon: true, w: 2 }],
+    unlock: s => done(s, "kurt_izi") ? null : "Önce kurtların nereden geldiğini bul (Hasan'ın işi)" },
+  { id: "koru_kosk", place: "koru", tier: 4, name: "Yanık beyler köşkü",
+    desc: "Korunun derinliğinde dört katlı, yarısı yanmış bir köşk. Yedi oda, kilitli odalar, bir sürü kurt. Kurtların başı buradan geliyordu.",
+    floors: 4, rooms: 7, vault: true, guards: 9, raids: 4, raidSize: 3, foes: ["kurt"], spotsPerFloor: 4, names: ["Kömürleşmiş sandık", "Dolap", "Yatak", "Kasa", "Soba dibi", "Raf"],
+    loot: [{ item: "yara_merhemi", w: 3 }, { item: "sargi_bezi", w: 2 }, { item: "deri", w: 2, n: [2, 3] }, { item: "ok", w: 3, n: [4, 6] }, { item: "demir_parca", w: 4, n: [1, 3] }, { money: [4, 9], w: 5 }, { item: "eski_sikke", w: 3 }, { item: "kartal_tuyu", w: 1 }, { weapon: true, w: 2 }],
+    unlock: s => done(s, "akyele") ? null : "Önce sürünün başını yen" },
+  { id: "karacam_sarnic", place: "karacam_sarnic", tier: 3, name: "Sarnıç mahzeni",
+    desc: "Nemli taş katlar, aşağıya inen merdivenler. Eski depolar boş değil; haydutlar da bunu biliyor.",
+    floors: 4, rooms: 7, vault: true, guards: 6, raids: 3, raidSize: 3, foes: ["haydut", "kurt"], spotsPerFloor: 4,
     names: ["Fıçı", "Dolap", "Sandık", "Kasa", "Taş niş"],
     loot: [{ item: "sargi_bezi", w: 3 }, { item: "yara_merhemi", w: 2 }, { item: "demir_parca", w: 4, n: [1, 2] }, { item: "ok", w: 3, n: [2, 5] }, { item: "ip", w: 3 }, { item: "peynir", w: 2 }, { item: "deri", w: 2 }, { money: [2, 6], w: 4 }, { item: "eski_sikke", w: 2 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "sarnic") ? null : "Önce Selim'in sarnıç işini bitir" },
-  { place: "ardic_kul", name: "Yanık evler", desc: "Kül Yangını'ndan kalan beş katlı yıkık bir yapı. Isı hâlâ burada gibi.", floors: 5, foes: ["muhafiz", "haydut"], spotsPerFloor: 3,
+  { id: "ardic_kul", place: "ardic_kul", tier: 4, name: "Yanık evler",
+    desc: "Kül Yangını'ndan kalan beş katlı yıkık bir yapı. Isı hâlâ burada gibi. Muhafızlar da buraya göz kulak oluyor.",
+    floors: 5, rooms: 7, vault: true, guards: 9, raids: 4, raidSize: 4, foes: ["muhafiz", "haydut"], spotsPerFloor: 4,
     names: ["Kömürleşmiş sandık", "Dolap", "Yatak", "Kasa", "Soba dibi"],
     loot: [{ item: "sargi_bezi", w: 3 }, { item: "yara_merhemi", w: 2 }, { item: "demir_parca", w: 3, n: [1, 3] }, { item: "ok", w: 3, n: [3, 6] }, { item: "peynir", w: 2 }, { item: "ekmek", w: 2 }, { item: "deri", w: 2 }, { money: [4, 10], w: 5 }, { item: "eski_sikke", w: 2 }, { item: "kartal_tuyu", w: 1 }, { weapon: true, w: 1 }],
     unlock: s => done(s, "kul_ana") ? null : "Önce Kül Ana'yı dinle" },
 ];
-export const scavSite = (place: string) => SCAV_SITES.find(x => x.place === place);
+export const scavSite = (id: string) => SCAV_SITES.find(x => x.id === id);
+/** Bir yerdeki harabeler, kolaydan zora. */
+export const sitesAt = (place: string) => SCAV_SITES.filter(x => x.place === place).sort((a, b) => a.tier - b.tier);
+
+/* ---------- kalıcı durum: boşaltılan sandık boş kalır ---------- */
+export interface HarabeSave { stages: Record<number, number>; opened: number[]; keys: number[]; killed: number[]; ground: { item: string; x: number; floor: number }[] }
+export function harabeSave(s: GameState, siteId: string): HarabeSave {
+  const all = (s.harabe ??= {}); return (all[siteId] ??= { stages: {}, opened: [], keys: [], killed: [], ground: [] });
+}
+/** Yerleşim her kayıtta aynıdır: aynı harabeye girince aynı odalar, aynı sandıklar. */
+export const layoutSeed = (s: GameState, siteId: string) => { let h = s.seed | 0; for (const c of siteId) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+/** Aranacak kutu sayısı ve kaçının boşaltıldığı (açılmış odalar dahil). */
+export function siteProgress(s: GameState, site: ScavSite): { done: number; total: number } {
+  const total = site.floors * (site.spotsPerFloor + (site.vault ? 3 : 0));
+  const st = s.harabe?.[site.id]?.stages ?? {};
+  return { done: Object.values(st).filter(v => v >= SPOT_STAGES).length, total };
+}
 export const SCAV_ENERGY = 8;
-export function canStartScav(s: GameState, place: string): { ok: boolean; reason?: string } {
-  const site = scavSite(place); if (!site) return { ok: false, reason: "Burada aranacak harabe yok" };
+export function canStartScav(s: GameState, siteId: string): { ok: boolean; reason?: string } {
+  const site = scavSite(siteId); if (!site) return { ok: false, reason: "Burada aranacak harabe yok" };
+  if (s.location !== site.place) return { ok: false, reason: "Oraya git" };
   const lock = site.unlock(s); if (lock) return { ok: false, reason: lock };
   if (s.journey) return { ok: false, reason: "Yoldasın" };
   if (s.energy < SCAV_ENERGY + 6) return { ok: false, reason: "Çok yorgunsun" };
@@ -149,7 +198,7 @@ export interface Spot { vault?: boolean; id: number; x: number; floor: number; n
 export interface SFoe { idle?: boolean; id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
 export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
-  | { k: "hurt"; dmg: number } | { k: "raid"; n: number } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
+  | { k: "hurt"; dmg: number } | { k: "raid"; n: number; last: boolean } | { k: "alarm"; human: boolean } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
   | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "dodge"; x: number; floor: number } | { k: "key"; x: number; floor: number } | { k: "unlock"; x: number; floor: number } | { k: "locked"; x: number; floor: number } | { k: "cast"; kind: SpellKind; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
 export interface Lock { floor: number; x: number; side: "R" | "L"; key: number; open: boolean }
 export interface GItem { id: number; item: string; x: number; floor: number }
@@ -158,6 +207,7 @@ export interface TrapSlot { id: string; state: "hand" | "placed" | "cool"; x: nu
 export interface Dog { x: number; floor: number; state: "yanda" | "av" | "don"; t: number; cd: number; moving: boolean; face: 1 | -1; lag: number }
 export interface Scav {
   site: ScavSite; seed: number; rng: Rng; time: number; phase: "play" | "over"; result?: "exit" | "dead"; load: Loadout;
+  w: number; alerted: boolean; guardCount: number; killed: number[];   // genişlik; bekçiler fark etti mi; ilk bekçi kimlikleri; öldürülen bekçiler
   px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
   spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number; raidHold: number; spellQ: { t: number; dir: 1 | -1; floor: number }[];
   bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
@@ -167,8 +217,8 @@ export interface Scav {
 const bagCount = (n: Scav) => Object.values(n.bag).reduce((a, b) => a + b, 0);
 export const bagUsed = bagCount;
 /** Bir katta şu an girilebilen aralık (kilitli oda kapalıyken dışarıda kalır). */
-export function freeRange(n: { locks: Lock[] }, floor: number): [number, number] {
-  let lo = 0, hi = SW; const lk = n.locks.find(l => l.floor === floor && !l.open);
+export function freeRange(n: { locks: Lock[]; w: number }, floor: number): [number, number] {
+  let lo = 0, hi = n.w; const lk = n.locks.find(l => l.floor === floor && !l.open);
   if (lk) { if (lk.side === "R") hi = lk.x - 3; else lo = lk.x + 3; } return [lo, hi];
 }
 /** Çantadan bir tane yere at (yer açar; eşya orada durur). */
@@ -201,22 +251,25 @@ export const searchMul = (n: Scav) => n.tr.search;
 export const stageSeconds = (n: Scav, sp: Spot) => sp.stages[sp.stage] ? sp.stages[sp.stage].time * searchMul(n) : 0;
 
 export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: number, load: Loadout = defaultLoadout(cfg, s)): Scav {
-  const rng = new Rng(seed); const spots: Spot[] = []; let id = 1; const locks: Lock[] = [];
-  for (let f = 0; f < site.floors; f++) { const side = f % 2 === 0 ? "R" : "L"; locks.push({ floor: f, side, x: side === "R" ? SW - ROOM_W : ROOM_W, key: f, open: false }); }
-  const vaultSpan = (f: number): [number, number] => locks[f].side === "R" ? [locks[f].x + 18, SW - 18] : [18, locks[f].x - 18];
-  const freeSpan = (f: number): [number, number] => locks[f].side === "R" ? [24, locks[f].x - 20] : [locks[f].x + 20, SW - 24];
+  // yerleşim (odalar, sandıklar, bekçiler) kayda bağlı sabit tohumdan; savaş ve baskınlar her girişte başka
+  const rng = new Rng(layoutSeed(s, site.id)); const run = new Rng(seed); const spots: Spot[] = []; let id = 1; const locks: Lock[] = [];
+  const W = siteW(site); const ladders = Array.from({ length: Math.max(0, site.floors - 1) }, (_, g) => ladderAt(W, g));
+  if (site.vault) for (let f = 0; f < site.floors; f++) { const side = f % 2 === 0 ? "R" : "L"; locks.push({ floor: f, side, x: side === "R" ? W - ROOM_W : ROOM_W, key: f, open: false }); }
+  const lockOf = (f: number) => locks.find(l => l.floor === f);
+  const vaultSpan = (f: number): [number, number] => { const l = lockOf(f)!; return l.side === "R" ? [l.x + 18, W - 18] : [18, l.x - 18]; };
+  const freeSpan = (f: number): [number, number] => { const l = lockOf(f); return !l ? [f === 0 ? 40 : 24, W - 24] : l.side === "R" ? [f === 0 ? 40 : 24, l.x - 20] : [l.x + 20, W - 24]; };
   const place = (f: number, span: [number, number], count: number, vault: boolean) => {
     const xs: number[] = [];
     for (let k = 0; k < count; k++) {
-      let x = 0; for (let t = 0; t < 40; t++) { x = span[0] + rng.next() * (span[1] - span[0]); if (xs.every(q => Math.abs(q - x) > 34) && LADDER_XS.every(l => Math.abs(l - x) > 22)) break; }
+      let x = 0; for (let t = 0; t < 40; t++) { x = span[0] + rng.next() * (span[1] - span[0]); if (xs.every(q => Math.abs(q - x) > 30) && ladders.every(l => Math.abs(l - x) > 22)) break; }
       xs.push(x);
       const roll = () => { const a = rollStage(site, rng); if (!vault) return a; const b = rollStage(site, rng); return b.time > a.time ? b : a; };
       spots.push({ id: id++, x, floor: f, vault, name: site.names[rng.int(0, site.names.length - 1)], stages: Array.from({ length: SPOT_STAGES }, () => roll()), stage: 0, prog: 0, done: false });
     }
   };
-  for (let f = 0; f < site.floors; f++) { place(f, freeSpan(f), site.spotsPerFloor + 2, false); place(f, vaultSpan(f), 3, true); }
+  for (let f = 0; f < site.floors; f++) { place(f, freeSpan(f), site.spotsPerFloor, false); if (site.vault) place(f, vaultSpan(f), 3, true); }
   // her kilitli odanın anahtarı başka bir katta, normal bir kutunun içinde saklıdır
-  for (let f = 0; f < site.floors; f++) {
+  if (site.vault) for (let f = 0; f < site.floors; f++) {
     const kf = (f + 1) % site.floors; const cands = spots.filter(q => q.floor === kf && !q.vault); const sp = cands[rng.int(0, cands.length - 1)]; sp.stages[rng.int(0, SPOT_STAGES - 1)] = { kind: "key", key: f, time: 3.2 };
   }
   const tr = scavTraits(cfg, s); const mh = maxHp(cfg, s); const lv = (a: string) => s.attrs[a]?.level ?? 0; const fist = 2 + lv("ust_govde") / 10;
@@ -227,25 +280,27 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   if (load.kind === "trap" && load.id) { const own = trapsOwned(s).find(x => x.id === load.id); for (let i = 0; i < Math.min(3, own?.n ?? 0); i++) traps.push({ id: load.id, state: "hand", x: 0, floor: 0, t: 0 }); }
   if (load.kind === "spell" && load.id) { const o = spellOptions(cfg, { ...s, mana: 999 } as GameState).find(x => x.spell.id === load.id && x.ok); const info = SPELL_KIND[load.id];
     if (o && info) { const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0; spell = { id: load.id, kind: info.kind, name: o.spell.name, cd: 4, max: 5 * Math.max(0.8, 1 - m / 300), mul: info.mul * (1 + m / 100), r: info.r }; } }
-  // bazı odalarda düşmanlar bekler: yaklaşınca uyanıp saldırırlar (kilitli odada daha güçlüler)
+  // içeride uyuyan bekçiler: yaklaşınca uyanır (kilitli odada daha güçlüler); girişin hemen yanında olmaz
   const guards: SFoe[] = []; let gid2 = 1;
-  for (let f = 0; f < site.floors; f++) {
-    const lk = locks[f]; const spans: [number, number, boolean][] = [[freeSpan(f)[0], freeSpan(f)[1], false], [vaultSpan(f)[0], vaultSpan(f)[1], true]];
-    for (const [lo, hi, vault] of spans) {
-      const cnt = vault ? 1 + (f >= 2 ? 1 : 0) : (f === 0 ? 1 : 1 + (rng.chance(40) ? 1 : 0));
-      for (let k = 0; k < cnt; k++) {
-        let x = lo + rng.next() * (hi - lo); if (f === 0 && !vault && x < 130) x = Math.min(hi, 130 + rng.next() * 60);   // girişin hemen yanında bekçi olmaz
-        const def = site.foes[rng.int(0, site.foes.length - 1)]; const d = ENEMIES[def]; const sc = 1 + f * 0.12 + (vault ? 0.2 : 0);
-        guards.push({ idle: true, id: gid2++, def, x, floor: f, hp: d.hp * sc * 1.35, max: d.hp * sc * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * sc * 0.7, cd: 1.2, human: d.species === "insan", climbT: 0, toFloor: f, hitT: 0, root: 0, slow: 0, burn: 0 });
-      }
-    }
-    void lk;
+  for (let k = 0; k < site.guards; k++) {
+    const f = site.floors === 1 ? 0 : (k < site.floors ? k : rng.int(0, site.floors - 1));
+    const vault = site.vault && k >= site.floors && rng.chance(35);
+    const [lo, hi] = vault ? vaultSpan(f) : freeSpan(f);
+    let x = lo + rng.next() * (hi - lo); if (f === 0 && !vault && x < 130) x = Math.min(hi, 130 + rng.next() * Math.max(10, hi - 130));
+    const def = site.foes[rng.int(0, site.foes.length - 1)]; const d = ENEMIES[def]; const sc = 1 + f * 0.12 + (vault ? 0.2 : 0) + (site.tier - 1) * 0.08;
+    guards.push({ idle: true, id: gid2++, def, x, floor: f, hp: d.hp * sc * 1.35, max: d.hp * sc * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * sc * 0.7, cd: 1.2, human: d.species === "insan", climbT: 0, toFloor: f, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
+  // kayıtlı durum: boşaltılan sandık boş, açılan kapı açık, öldürülen bekçi yok, yerde bırakılanlar yerde
+  const sv = harabeSave(s, site.id);
+  for (const sp of spots) { const st = sv.stages[sp.id] ?? 0; sp.stage = Math.min(SPOT_STAGES, st); sp.done = st >= SPOT_STAGES; }
+  for (const l of locks) if (sv.opened.includes(l.floor)) l.open = true;
+  const alive = guards.filter(g => !sv.killed.includes(g.id));
+  const ground: GItem[] = sv.ground.map((g, i) => ({ id: i + 1, ...g }));
   return {
-    site, seed, rng, time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4 * tr.hp)), maxHp: Math.round(mh * 1.4 * tr.hp),
-    spots, searchId: 0, searchWait: 0, foes: guards, nextId: gid2, wave: 0, raidT: tr.firstRaid, raidHold: 0, spellQ: [], bag: {}, bagCap: tr.bagCap, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
+    site, seed, rng: run, w: W, alerted: false, guardCount: site.guards, killed: [...sv.killed], time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4 * tr.hp)), maxHp: Math.round(mh * 1.4 * tr.hp),
+    spots, searchId: 0, searchWait: 0, foes: alive, nextId: gid2, wave: 0, raidT: tr.firstRaid, raidHold: 0, spellQ: [], bag: {}, bagCap: tr.bagCap, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
     atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), tr, searched: 0, shots: 0, kills: 0, found: 0, fx: [],
-    ground: [], gid: 1, proj: [], locks, keys: [], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
+    ground, gid: ground.length + 1, proj: [], locks, keys: [...sv.keys], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
 }
 
@@ -271,7 +326,7 @@ export function aimTarget(n: Scav, aim?: { dx: number; dy: number }): { floor: n
   let floor = n.floor;
   if (aim && Math.abs(aim.dy) > 0.5) {
     const up = aim.dy < 0; const gap = up ? (n.climbing ? lowF : n.floor) : (n.climbing ? lowF : n.floor - 1);
-    if (gap >= 0 && gap < n.site.floors - 1 && (n.climbing || Math.abs(n.px - ladderX(gap)) <= 9)) floor = up ? (n.climbing ? highF : n.floor + 1) : (n.climbing ? lowF : n.floor - 1);
+    if (gap >= 0 && gap < n.site.floors - 1 && (n.climbing || Math.abs(n.px - ladderAt(n.w, gap)) <= 9)) floor = up ? (n.climbing ? highF : n.floor + 1) : (n.climbing ? lowF : n.floor - 1);
   } else if (n.climbing) floor = Math.round(n.py);
   let dir: 1 | -1 = n.face;
   if (aim && Math.abs(aim.dx) > 0.25) dir = aim.dx > 0 ? 1 : -1;
@@ -335,25 +390,34 @@ function applyStage(n: Scav, sp: Spot, st: Stage) {
   if (got) { n.found += got; n.fx.push({ k: "loot", text: `+${got} ${id}`, ...at }); }
 }
 export const danger = (n: Scav) => 5 + n.wave * 2;
+/** Kalan baskın sayısı. */
+export const raidsLeft = (n: Scav) => Math.max(0, n.site.raids - n.wave);
+/** Bekçiler fark etti: kurtlar ulur (insanlar ıslık çalar), baskın sayacı başlar. */
+function alarm(n: Scav, f?: SFoe) {
+  if (n.alerted) return; n.alerted = true; n.raidT = n.site.raids > 0 ? n.tr.firstRaid : Infinity;
+  n.fx.push({ k: "alarm", human: f ? f.human : n.site.foes.every(d => ENEMIES[d]?.species === "insan") });
+}
 function spawnRaid(n: Scav) {
-  n.wave++; const count = Math.min(6, 1 + Math.floor(n.wave * 0.5)); const scale = 1 + n.wave * 0.14;
+  if (raidsLeft(n) <= 0) { n.raidT = Infinity; return; }
+  n.wave++; const count = Math.min(7, n.site.raidSize + n.wave - 1); const scale = 1 + n.wave * 0.1 + (n.site.tier - 1) * 0.08;
   for (let i = 0; i < count; i++) {
     const def = n.site.foes[n.rng.int(0, n.site.foes.length - 1)]; const d = ENEMIES[def];
     const floor = n.rng.chance(60) ? n.floor : n.rng.int(0, n.site.floors - 1); const [lo, hi] = freeRange(n, floor); const x = n.rng.chance(50) ? hi - 6 - n.rng.next() * 30 : lo + 10 + n.rng.next() * 30;
     n.foes.push({ id: n.nextId++, def, x, floor, hp: d.hp * scale * 1.35, max: d.hp * scale * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + n.rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * scale * 0.7, cd: 1 + n.rng.next(), human: d.species === "insan", climbT: 0, toFloor: floor, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
-  n.raidHold = 10; n.raidT = Math.max(12, 15 - Math.floor(n.wave / 2)); n.fx.push({ k: "raid", n: count });
+  const last = raidsLeft(n) <= 0; n.raidHold = 10; n.raidT = last ? Infinity : Math.max(14, 20 - n.wave * 2); n.fx.push({ k: "raid", n: count, last });
 }
 function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean, quiet = false) {
-  f.idle = false; f.hp -= dmg; f.hitT = 0.2; if (!quiet) n.fx.push({ k: "hit", x: f.x, floor: f.floor, dmg: Math.round(dmg), crit });
-  if (f.hp <= 0 && n.foes.includes(f)) { n.foes = n.foes.filter(q => q !== f); n.kills++; n.fx.push({ k: "die", x: f.x, floor: f.floor }); }
+  if (f.idle) { f.idle = false; alarm(n, f); }
+  f.hp -= dmg; f.hitT = 0.2; if (!quiet) n.fx.push({ k: "hit", x: f.x, floor: f.floor, dmg: Math.round(dmg), crit });
+  if (f.hp <= 0 && n.foes.includes(f)) { n.foes = n.foes.filter(q => q !== f); n.kills++; if (f.id <= n.guardCount && !n.killed.includes(f.id)) n.killed.push(f.id); n.fx.push({ k: "die", x: f.x, floor: f.floor }); }
 }
 
 /** Zamanı ilerlet. */
 export function stepScav(n: Scav, dt: number) {
   if (n.phase !== "play") return; dt = Math.min(dt, 0.05); n.time += dt; n.atkFx = Math.max(0, n.atkFx - dt); n.castT = Math.max(0, n.castT - dt); n.foundT = Math.max(0, n.foundT - dt);
-  if (n.raidHold > 0) n.raidHold = Math.max(0, n.raidHold - dt);       // baskından sonra 10 sn sayaç işlemez
-  else { n.raidT -= dt; if (n.raidT <= 0) spawnRaid(n); }
+  // baskın sayacı yalnız bekçiler fark edince işler; baskından sonra 10 sn durur
+  if (n.alerted) { if (n.raidHold > 0) n.raidHold = Math.max(0, n.raidHold - dt); else { n.raidT -= dt; if (n.raidT <= 0) spawnRaid(n); } }
   for (const q of [...n.spellQ]) { q.t -= dt; if (q.t <= 0) { n.spellQ = n.spellQ.filter(x => x !== q); launchSpell(n, q); } }
   if (n.spell) n.spell.cd = Math.max(0, n.spell.cd - dt);
   // yönlendirme
@@ -362,7 +426,7 @@ export function stepScav(n: Scav, dt: number) {
   const onLadder = Math.abs(n.py - Math.round(n.py)) > 0.02;
   if (!n.searchId) {
     if (onLadder) {
-      const gap = Math.floor(n.py); n.px = ladderX(gap);
+      const gap = Math.floor(n.py); n.px = ladderAt(n.w, gap);
       if (Math.abs(dy) > 0.25) n.py = Math.max(gap, Math.min(gap + 1, n.py - Math.sign(dy) * CLIMB_SPEED * dt * n.tr.climb));
       if (Math.abs(n.py - Math.round(n.py)) <= 0.02) n.py = Math.round(n.py);
     } else {
@@ -374,7 +438,7 @@ export function stepScav(n: Scav, dt: number) {
       }
       if (Math.abs(dy) > 0.25) {
         const up = dy < 0; const gap = up ? n.floor : n.floor - 1;
-        if (gap >= 0 && gap < n.site.floors - 1 && Math.abs(n.px - ladderX(gap)) <= 6) { n.px = ladderX(gap); n.py = n.floor + (up ? 0.04 : -0.04); }
+        if (gap >= 0 && gap < n.site.floors - 1 && Math.abs(n.px - ladderAt(n.w, gap)) <= 6) { n.px = ladderAt(n.w, gap); n.py = n.floor + (up ? 0.04 : -0.04); }
       }
     }
   }
@@ -397,7 +461,7 @@ export function stepScav(n: Scav, dt: number) {
   for (const pj of [...n.proj]) {
     const st = 95 * dt; pj.x += pj.dir * st; pj.left -= st;
     const hit = n.foes.some(f => f.floor === pj.floor && f.climbT <= 0 && Math.abs(f.x - pj.x) <= 5);
-    if (hit || pj.left <= 0 || pj.x < 0 || pj.x > SW) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); }
+    if (hit || pj.left <= 0 || pj.x < 0 || pj.x > n.w) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); }
   }
   // tuzaklar
   for (const tr of n.traps) {
@@ -416,12 +480,12 @@ export function stepScav(n: Scav, dt: number) {
   for (const f of [...n.foes]) {
     f.hitT = Math.max(0, f.hitT - dt); f.cd -= dt; f.root = Math.max(0, f.root - dt); f.slow = Math.max(0, f.slow - dt);
     if (f.burn > 0) { f.burn -= dt; hurtFoe(n, f, n.dmg * 0.12 * dt, false, true); if (!n.foes.includes(f)) continue; }
-    if (f.idle) { if (f.floor === n.floor && Math.abs(f.x - n.px) <= 48 && !n.climbing) f.idle = false; else continue; }   // bekçi: yaklaşınca uyanır
+    if (f.idle) { if (f.floor === n.floor && Math.abs(f.x - n.px) <= 48 && !n.climbing) { f.idle = false; alarm(n, f); } else continue; }   // bekçi: yaklaşınca uyanır, ötekileri çağırır
     if (f.climbT > 0) { f.climbT -= dt; if (f.climbT <= 0) f.floor = f.toFloor; continue; }
     if (f.root > 0) continue;
     const sp = f.speed * (f.slow > 0 ? 0.45 : 1);
     if (f.floor !== pf) {
-      const gap = pf > f.floor ? f.floor : f.floor - 1; const lx = ladderX(gap); const d = lx - f.x;
+      const gap = pf > f.floor ? f.floor : f.floor - 1; const lx = ladderAt(n.w, gap); const d = lx - f.x;
       if (Math.abs(d) > 1) f.x += Math.sign(d) * Math.min(Math.abs(d), sp * dt);
       else { f.x = lx; f.toFloor = pf > f.floor ? f.floor + 1 : f.floor - 1; f.climbT = 1.6; }
       continue;
@@ -466,9 +530,19 @@ export function stepScav(n: Scav, dt: number) {
 }
 
 /* ---------- bitiş ---------- */
-export interface ScavResult { result: "exit" | "dead"; items: Record<string, number>; lostItems: Record<string, number>; money: number; dropped: Record<string, number>; minutes: number; gains: GainReport; kills: number; waves: number; searched: number; weaponParts: string[] }
+export interface ScavResult { result: "exit" | "dead"; items: Record<string, number>; lostItems: Record<string, number>; money: number; dropped: Record<string, number>; minutes: number; gains: GainReport; kills: number; waves: number; searched: number; weaponParts: string[]; progress: { done: number; total: number } }
+/** Harabedeki ilerlemeyi kayda yazar: sandıklar, kapılar, anahtarlar, öldürülen bekçiler, yerde kalanlar. */
+function saveRun(s: GameState, n: Scav, dead: boolean) {
+  const sv = harabeSave(s, n.site.id);
+  for (const sp of n.spots) if (sp.stage > 0) sv.stages[sp.id] = Math.max(sv.stages[sp.id] ?? 0, sp.stage);
+  sv.opened = n.locks.filter(l => l.open).map(l => l.floor); sv.keys = [...n.keys]; sv.killed = [...n.killed];
+  const ground = n.ground.map(g => ({ item: g.item, x: g.x, floor: g.floor }));
+  // ölünce çanta düştüğün yerde kalır; geri gelip alabilirsin
+  if (dead) for (const [item, k] of Object.entries(n.bag)) for (let i = 0; i < k; i++) ground.push({ item, x: n.px + (i % 5) * 3 - 6, floor: n.floor });
+  sv.ground = ground.slice(-40);
+}
 export function finishScav(cfg: Config, s: GameState, n: Scav): ScavResult {
-  const dead = n.result === "dead"; const gains: GainReport = {};
+  const dead = n.result === "dead"; const gains: GainReport = {}; saveRun(s, n, dead);
   const items = dead ? {} : { ...n.bag }; const lostItems = dead ? { ...n.bag } : {}; const money = dead ? Math.floor(n.money / 2) : n.money;
   s.money += money; const dropped: Record<string, number> = {};
   for (const [k, v] of Object.entries(items)) { const d = addItem(cfg, s, k, v); if (d) dropped[k] = d; }
@@ -482,7 +556,7 @@ export function finishScav(cfg: Config, s: GameState, n: Scav): ScavResult {
   const k = 1.4 * n.tr.hp; s.hp = dead ? Math.max(1, Math.round(n.maxHp / k * 0.2)) : Math.max(1, Math.min(maxHp(cfg, s), Math.round(n.hp / k)));   // harabede can 1,4 kat (dayanmayla daha çok) ölçeklidir
   const minutes = Math.min(120, 20 + Math.round(n.time / 3)); s.minute = Math.min(DAY_MINUTES, s.minute + minutes);
   s.energy = Math.max(0, s.energy - SCAV_ENERGY - Math.min(12, n.wave * 2)); s.satiety = Math.max(0, s.satiety - 5);
-  return { result: n.result ?? "exit", items, lostItems, money, dropped, minutes, gains, kills: n.kills, waves: n.wave, searched: n.searched, weaponParts };
+  return { result: n.result ?? "exit", items, lostItems, money, dropped, minutes, gains, kills: n.kills, waves: n.wave, searched: n.searched, weaponParts, progress: siteProgress(s, n.site) };
 }
 
 /** Harabede yara sar: önce çantadan, yoksa cebinden; can 1,4 kat ölçeklidir. */
