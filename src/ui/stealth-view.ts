@@ -19,7 +19,7 @@ const img = (key: string) => { if (!imgCache.has(key)) { const u = artUrl(key); 
 
 const GOAL_TEXT: Record<StealthGoal, { exit: string; hint: string }> = {
   sizma: { exit: "Giriş", hint: "Muhafızlara görünmeden yukarıdaki girişe var." },
-  pusu: { exit: "Pusu yeri", hint: "Fark edilmeden yukarıdaki pusu yerine var; ilk vuruş senin olur." },
+  pusu: { exit: "Pusu yeri", hint: "Fark edilmeden yukarıdaki pusu yerine var: savaş bir kurdun dibinde başlar, ilk vuruşun iki kat." },
   kacis: { exit: "Yol", hint: "Görünmeden yukarıdaki yola çık; sıyrılıp gidersin." },
 };
 
@@ -144,9 +144,11 @@ export function openStealth(cfg: Config, s: GameState, title: string, foes: stri
     }
     // oyuncu
     const hid = inBush(st);
-    const pm = !!st.target && holding; const pq = pm ? quad("anim_kahraman_yuru", walkFrame(now, 0, st.run ? 13 : 8)) : null;
+    // sinsice: çömelmiş yürür (anim_kahraman_ara'nın eğilmiş kareleri 0 ve 2); koşarken dik yürür
+    const pm = !!st.target && holding;
+    const pq = pm && st.run ? quad("anim_kahraman_yuru", walkFrame(now, 0, 13)) : quad("anim_kahraman_ara", pm ? (walkFrame(now, 0, 3) % 2) * 2 : 0);
     if (st.target && st.target.x !== st.px) faceRight = st.target.x > st.px;
-    if (pq) drawQuad(g, pq, X(st.px), Y(st.py), 12 * scale, faceRight, "none", hid ? 0.55 : 1);
+    if (pq) drawQuad(g, pq, X(st.px), Y(st.py) + (pm ? gait(now, 0, true).dy * scale * 1.5 : 0), (st.run && pm ? 12 : 10.5) * scale, faceRight, "none", hid ? 0.55 : 1);
     else if (!figure("poz_kahraman_durus", st.px, st.py + gait(now, 0, pm).dy * 2.5, 12, false, "none", hid ? 0.55 : 1)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(st.px), Y(st.py), 2.6 * scale, 0, 7); g.fill(); }
     if (st.target && holding) { g.setLineDash([3, 5]); g.strokeStyle = C("--ink-soft"); g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(st.px), Y(st.py)); g.lineTo(X(st.target.x), Y(st.target.y)); g.stroke(); g.setLineDash([]); }
     if (stoneMode) { g.strokeStyle = C("--blue"); g.setLineDash([4, 4]); g.beginPath(); g.arc(X(st.px), Y(st.py), 45 * scale, 0, 7); g.stroke(); g.setLineDash([]); }

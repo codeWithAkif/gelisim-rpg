@@ -52,26 +52,33 @@ export function attackWindow(s: GameState): number {
   const w = s.equipped.weapon; const fam = w ? (s.familiarity[w] ?? 0) : 0;
   return 0.1 * (skillEase(s, "refleks") * 0.5 + skillEase(s, "kilic") * 0.5) * (1 + fam / 200);
 }
-/** Saldırıya zamanlama etkisi: isabet ve kritik puanı. q yoksa (komut kapalı) etkisiz. */
-export function attackTimingMods(q?: number): { hit: number; crit: number } {
-  if (q === undefined) return { hit: 0, crit: 0 };
-  if (q > 1) return { hit: 14, crit: 45 };   // hassas noktadan geçen kesik / kafaya ok: zor ama yıkıcı
-  if (q >= 1) return { hit: 8, crit: 15 };
-  if (q >= 0.6) return { hit: 3, crit: Math.round(8 * q) };
-  if (q > 0) return { hit: 0, crit: 0 };
-  return { hit: -5, crit: 0 };
+/**
+ * Saldırı oyununun etkisi. q: 0 ıska (hiçbir şey değişmez), 0–1 açığa ne kadar iyi denk geldiği,
+ * 1.25 nişan alınan zayıf noktadan geçti. Başarı hasarı artırır; başarısızlık cezalandırılmaz.
+ * dmg: hasar çarpanı (1 = değişmez).
+ */
+export function attackTimingMods(q?: number): { hit: number; crit: number; dmg: number } {
+  if (q === undefined || q <= 0) return { hit: 0, crit: 0, dmg: 1 };
+  if (q > 1) return { hit: 14, crit: 45, dmg: 1.5 };   // hassas noktadan geçen kesik / kafaya ok: zor ama yıkıcı
+  if (q >= 0.95) return { hit: 6, crit: 12, dmg: 1.3 };
+  if (q >= 0.6) return { hit: 3, crit: Math.round(6 * q), dmg: 1.15 };
+  return { hit: 3, crit: 0, dmg: 1.1 };
 }
 /** Savunma zamanlaması: kurt atıldığında doğru anda kaçmak. */
 export function dodgeWindow(s: GameState): number {
   return 0.11 * (skillEase(s, "refleks") * 0.7 + skillEase(s, "esneklik") * 0.3);
 }
-/** Düşmanın isabetinden düşülecek puan. */
-export function dodgeMod(q?: number): number {
-  if (q === undefined) return 0;
-  if (q >= 1) return 18;
-  if (q >= 0.6) return Math.round(12 * q);
-  return 0;
+/**
+ * Kaçınma oyununun etkisi: düşmanın isabetinden düşülen puan ve yine de isabet ederse hasar çarpanı.
+ * Başaramazsan (q = 0) her şey normaldeki gibi.
+ */
+export function dodgeMods(q?: number): { hit: number; dmg: number } {
+  if (q === undefined || q <= 0) return { hit: 0, dmg: 1 };
+  if (q >= 0.95) return { hit: 12, dmg: 0.75 };
+  if (q >= 0.6) return { hit: Math.round(8 * q), dmg: 0.85 };
+  return { hit: 4, dmg: 0.9 };
 }
+export const dodgeMod = (q?: number) => dodgeMods(q).hit;
 
 /* ---------- ritim ---------- */
 /** Vuruş anları (ms) ve dokunuşlar (ms): her vuruşa en yakın dokunuş eşlenir; boş dokunuş ceza. */

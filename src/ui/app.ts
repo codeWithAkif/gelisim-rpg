@@ -541,7 +541,7 @@ export function startApp(root: HTMLElement) {
                 <h3>Gizlenirken gelişen</h3>${gainList(cfg, gains, 6)}<h3>Ödül</h3>${rewardHtml(r)}`, [{ label: "Devam", cls: "primary", fn: () => storyTick() }]);
               return;
             }
-            modal(won ? `<h2>Pusudasın</h2><p class="lede">${esc(cap(W.pl))} seni fark etmedi. İlk vuruş senin.</p>${gainList(cfg, gains, 4)}`
+            modal(won ? `<h2>Pusudasın</h2><p class="lede">${esc(cap(W.pl))} seni fark etmedi. Sürünerek birinin dibine kadar geldin: ilk vuruşun iki kat.</p>${gainList(cfg, gains, 4)}`
               : `<h2>Görüldün!</h2><p class="lede">Bir dal çatırdadı; bakışlar sana döndü. Kaçacak yer yok.</p>${gainList(cfg, gains, 4)}`,
               [{ label: "Savaş", cls: "primary", fn: () => openBattle(cfg, s, sc, { ...DEFAULT_PLAN, surprise: won, ambushed: !won }, id, battleEnd, persist) }]);
           }, persist);
