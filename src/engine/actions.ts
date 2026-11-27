@@ -5,7 +5,7 @@ import { questList, npc, questKind, KIND_ORDER } from "./quests";
 import { minutesLeft } from "./state";
 import { canSearch, dailyRequests } from "./explore";
 import { activityPlace, place } from "./travel";
-import { nextMilestone } from "./story";
+import { nextMilestone, openSideStories } from "./story";
 import { NPC_PLACE } from "../content/map";
 import { FINDS, SEARCH_MINUTES } from "../content/explore";
 import { MARKETS } from "../content/world";
@@ -82,6 +82,7 @@ export function nextStep(s: GameState): NextStep | null {
   if (r && r.kind === "ana" && !r.also) {
     const side = questList(s).find(v => (v.status === "aktif" || v.status === "yeni") && questKind(v.def) === "hikaye" && v.def.title !== r.title);
     if (side) r.also = { title: side.def.title, kind: "hikaye" };
+    else { const ss = openSideStories(s)[0]; if (ss) r.also = { title: ss.title, kind: "hikaye" }; }
   }
   return r;
 }

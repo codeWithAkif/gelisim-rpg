@@ -1,5 +1,6 @@
 // Ekranlar. Bilgi sayfaları: Defter (Görevler dahil), Vücut. Karar sayfaları: Çanta, Harita (Çalış yer kartından açılır).
 // Her ekran HTML üretir; tıklamalar app.ts'deki data-act işleyicilerine gider.
+import { openSideStories } from "../engine/story";
 import type { Config } from "../engine/config";
 import { type GameState, clock, minutesLeft, minutesToDark, repOf, isNight } from "../engine/state";
 import { DEFERRED_CATEGORIES, lastNight, sinceStart, type GainReport } from "../engine/progression";
@@ -199,11 +200,13 @@ function storySection(_cfg: Config, s: GameState): string {
   const steps = ch.milestones.map(m => {
     const done = s.story.reached.includes(m.id);
     if (done) return `<div class="story-step done"><span class="mk" style="color:var(--green)">✓</span><span class="t">${esc(m.title)}</span></div>`;
+    if (m.side && m.after) return "";   // bölümler boyu süren yan hikâyeler aşağıda ayrı
     if (m.side) return `<div class="story-step"><span class="mk muted">◦</span><span><span class="t">${esc(m.title)}</span> <span class="muted tiny">yan hikâye</span><div class="h">${esc(m.hint)}</div></span></div>`;
     if (!nowShown) { nowShown = true; return `<div class="story-step now"><span class="mk red">→</span><span><span class="t">${esc(m.title)}</span> <span class="muted tiny">ana hikâye</span><div class="h">${esc(m.hint)}</div>${m.go ? `<button class="btn small primary" style="margin-top:4px" data-act="${m.go.act}" data-id="${esc(m.go.id)}">${esc(m.go.button)}</button>` : ""}</span></div>`; }
     return `<div class="story-step"><span class="mk muted">·</span><span class="t muted">…</span></div>`;
   }).join("");
-  return `<section class="sec">${past}<h2>${esc(ch.title)}</h2><div>${steps}</div></section>`;
+  const sides = openSideStories(s).map(m => `<div class="story-step"><span class="mk muted">◦</span><span><span class="t">${esc(m.title)}</span> <span class="muted tiny">yan hikâye</span><div class="h">${esc(m.hint)}</div></span></div>`).join("");
+  return `<section class="sec">${past}<h2>${esc(ch.title)}</h2><div>${steps}</div></section>${sides ? `<section class="sec"><h2>Yan hikâyeler</h2><div>${sides}</div></section>` : ""}`;
 }
 
 /* ---------------- Vücut (bilgi) ---------------- */

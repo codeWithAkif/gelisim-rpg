@@ -3,7 +3,7 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   est, rankOf, RANKS, HOUSES, HOME_PLACES, VENTURES, HEROES, ROLE_NAMES, heroDef, heroStats, heroLimit, houseOf, canBuyHouse, jobsFor, canAssign, successChance,
-  canFound, canUpVenture, ventureUpCost, heroOf, xpFor, PARTY_MAX, togglePartyCheck, jobDef, rankNo, venturesOpen,
+  canFound, canUpVenture, ventureUpCost, heroOf, xpFor, PARTY_MAX, togglePartyCheck, jobDef, rankNo, venturesOpen, heroSkill, SKILL_NAMES,
 } from "../engine/estate";
 import { homePets } from "../engine/pet";
 import { itemInfo, freeCount } from "../engine/inventory";
@@ -94,6 +94,7 @@ function adamlarTab(cfg: Config, s: GameState): string {
       <div class="entry-head"><span class="entry-title">${esc(d.name)}</span><span class="entry-meta">${ROLE_NAMES[d.role]} · sv.${h.lv}</span></div>
       <div class="tiny muted">${esc(d.bio)}</div>
       <div class="tiny">${STATUS[h.status]}${h.status === "yarali" ? ` (gün ${h.until} dolana dek)` : ""} · can ${Math.round(h.hp)}/${st.maxHp} · sadakat ${Math.round(h.loyalty)} · maaş ${d.wage}/gün</div>
+      <div class="tiny muted">Ustalık: ${(["kervan", "isletme", "savas"] as const).map(k => `${SKILL_NAMES[k]} ${heroSkill(h, k)}`).join(" · ")}</div>
       <div class="gb"><div class="gf" style="width:${(h.xp / xpFor(h.lv)) * 100}%;background:var(--blue)"></div></div>
       <div class="row" style="margin-top:6px"><button class="btn small ${inParty ? "primary" : ""}" data-act="hero-party" data-id="${h.id}" ${inParty || pc.ok ? "" : "disabled"}>${inParty ? "Eve gönder" : "Yanıma al"}</button><button class="btn small red" data-act="hero-dismiss" data-id="${h.id}">Terhis et</button></div>
       ${!inParty && !pc.ok ? `<div class="tiny red">${esc(pc.reason ?? "")}</div>` : ""}</div></div></div>`;

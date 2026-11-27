@@ -3,14 +3,15 @@
 import type { GameState } from "./state";
 import { Rng } from "./rng";
 import { dayFactor, ledger, financeOpen } from "./finance";
-import { est, heroOf, heroDef, heroStats, gainXp, type Hero } from "./estate";
+import { est, heroOf, heroDef, heroStats, gainXp, heroSkill, practice, type Hero } from "./estate";
 import { place, isOpen } from "./travel";
 import { GOODS, good, TRADE_POSTS, REGION_NAMES, route, CART_CAP, CART_COSTS, PAPERS, paper, FEAST_BONUS, FEAST_COST, type Region } from "../content/trade";
 import { lodgingAt } from "./rest";
 import { homeBed } from "./estate";
 
 export interface Caravan { id: number; from: Region; to: Region; cargo: Record<string, number>; paid: number; guards: string[]; depart: number; arrive: number }
-export interface TradeState { carts: number; caravans: Caravan[]; seq: number; history?: { day: number; text: string; profit: number }[] }
+export interface TradeState { carts: number; caravans: Caravan[]; seq: number; history?: { day: number; text: string; profit: number }[];
+  stats?: { trips: number; profitTrips: number; robbed: number; profit: number } }
 export function tradeOf(s: GameState): TradeState { s.trade ??= { carts: 0, caravans: [], seq: 1 }; return s.trade; }
 
 /** Kervan ticareti Karaçam'da öğrenilir (tüccar şehri). */
@@ -31,7 +32,12 @@ export function goodValue(s: GameState, r: Region, id: string): number {
   const g = good(id)!; return g.base * g.price[r] * dayFactor(s, TRADE_POSTS[r], "mal:" + id);
 }
 /** Alış: değerin biraz üstü. Satış: biraz altı; aynı maldan çok satınca birim fiyat düşer. */
-export const buyPrice = (s: GameState, r: Region, id: string) => Math.ceil(goodValue(s, r, id) * 1.1);
+export const buyPrice = (s: GameState, r: Region, id: string) => Math.ceil(goodValue(s, r, id) * 1.1 * (hasPaper(s, "lonca") ? 0.9 : 1));
+/** Yolun bu oyuncu için tehlikesi: kendi kervansarayın Karaçam yollarını güvenli kılar. */
+export function routeDanger(s: GameState, a: Region, b: Region): number {
+  const r = route(a, b); if (!r) return 0;
+  return Math.round(r.danger * (hasPaper(s, "kervansaray") && (a === "karacam" || b === "karacam") ? 0.75 : 1));
+}
 export function sellTotal(s: GameState, r: Region, id: string, n: number): number {
   if (n <= 0) return 0; const unit = goodValue(s, r, id) * 0.95;
   const glut = Math.max(0.7, 1 - 0.0075 * (n - 1));
@@ -58,7 +64,7 @@ const ROLE_FIGHT: Record<string, number> = { savasci: 1.2, okcu: 1.1, izci: 0.8,
 /** Korumaların gücü ve izci olup olmadığı. */
 export function guardPower(s: GameState, ids: string[]): { power: number; scout: boolean } {
   let power = 0, scout = false;
-  for (const id of ids) { const h = heroOf(s, id); if (!h) continue; const d = heroDef(h.id)!; power += heroStats(h).power * (ROLE_FIGHT[d.role] ?? 0.5); if (d.role === "izci") scout = true; }
+  for (const id of ids) { const h = heroOf(s, id); if (!h) continue; const d = heroDef(h.id)!; power += heroStats(h).power * (ROLE_FIGHT[d.role] ?? 0.5) * (1 + 0.1 * heroSkill(h, "kervan")); if (d.role === "izci") scout = true; }
   return { power, scout };
 }
 /** Pusu olasılığı (0–1): izci pusuyu önceden görüp yolu değiştirir. */
@@ -74,7 +80,8 @@ export function planCaravan(s: GameState, to: Region, cargo: Record<string, numb
   const { power, scout } = guardPower(s, guards);
   const cost = from ? Object.entries(cargo).reduce((n, [id, k]) => n + buyPrice(s, from, id) * Math.max(0, k), 0) : 0;
   const estimate = Object.entries(cargo).reduce((n, [id, k]) => n + sellTotal(s, to, id, k), 0);
-  const base: CaravanPlan = { ok: false, cost, units, carts: Math.ceil(units / CART_CAP), days: r?.days ?? 0, danger: r?.danger ?? 0, threat: r?.threat ?? "", ambush: r ? ambushChance(r.danger, scout) : 0, power, need: r ? repelNeed(r.danger) : 0, estimate };
+  const danger = from && r ? routeDanger(s, from, to) : 0;
+  const base: CaravanPlan = { ok: false, cost, units, carts: Math.ceil(units / CART_CAP), days: r?.days ?? 0, danger, threat: r?.threat ?? "", ambush: r ? ambushChance(danger, scout) : 0, power, need: r ? repelNeed(r.danger) : 0, estimate };
   if (!tradeOpen(s)) return { ...base, reason: "Ticareti Karaçam'ın tüccarlarından öğrenirsin" };
   if (!from) return { ...base, reason: "Kervan bir ticaret yerinden çıkar" };
   if (s.journey) return { ...base, reason: "Yoldasın" };
@@ -109,7 +116,7 @@ export function nightlyTrade(s: GameState): CaravanReport[] {
     const r = route(c.from, c.to)!; const guards = c.guards.map(id => heroOf(s, id)).filter((h): h is Hero => !!h);
     const { power, scout } = guardPower(s, guards.map(h => h.id));
     const cargo = { ...c.cargo }; let story = ""; let lostUnits = 0;
-    if (rng.chance(ambushChance(r.danger, scout) * 100)) {
+    if (rng.chance(ambushChance(routeDanger(s, c.from, c.to), scout) * 100)) {
       const need = repelNeed(r.danger) * (0.7 + rng.next() * 0.6);
       if (power >= need) {
         story = `${r.threat.split(",")[0]} yolu kesti; korumalar püskürttü.`;
@@ -124,7 +131,8 @@ export function nightlyTrade(s: GameState): CaravanReport[] {
     } else story = "Yol sakin geçti.";
     const sold = Object.entries(cargo).reduce((n, [id, k]) => n + sellTotal(s, c.to, id, k), 0);
     s.money += sold; const profit = sold - c.paid;
-    for (const h of guards) { if (h.status === "gorevde") h.status = "evde"; gainXp(s, h, 3 + Math.floor(r.danger / 10)); h.loyalty = Math.min(100, h.loyalty + 1); }
+    const st = (t.stats ??= { trips: 0, profitTrips: 0, robbed: 0, profit: 0 }); st.trips++; st.profit += profit; if (profit > 0) st.profitTrips++; if (lostUnits) st.robbed++;
+    for (const h of guards) { if (h.status === "gorevde") h.status = "evde"; gainXp(s, h, 3 + Math.floor(r.danger / 10)); h.loyalty = Math.min(100, h.loyalty + 1); practice(h, "kervan"); }
     const text = `${REGION_NAMES[c.from]} → ${REGION_NAMES[c.to]}: ${story} ${sold ? `Yük ${sold} bakıra satıldı` : "Satacak bir şey kalmadı"} (${profit >= 0 ? "+" : ""}${profit}).`;
     ledger(s, text, sold); (t.history ??= []).unshift({ day: s.day, text, profit }); t.history.length = Math.min(t.history.length, 12);
     out.push({ id: c.id, text, profit, lost: lostUnits, sold });

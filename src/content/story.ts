@@ -25,8 +25,9 @@ export interface Milestone {
   hint: string;                      // henüz ulaşılmadıysa oyuncuya ipucu
   reached: (s: GameState) => boolean;
   text: string;                      // ulaşınca açılan sayfa
-  effects?: { learnElement?: string; items?: Record<string, number>; flag?: string };
+  effects?: { learnElement?: string; items?: Record<string, number>; flag?: string; cart?: number };
   side?: boolean;                    // yan hikâye: bölümün bitmesini beklemez
+  after?: string;                    // yan hikâye ancak bu sayfadan sonra görünür (bölümler boyu süren yan hikâyeler)
   /** Bir göreve bağlı olmayan hedeflerde "Sıradaki adım" kartının düğmesi (ör. Ateş çalış). */
   go?: { act: "session-pick" | "sleep"; id: string; button: string };
   scene?: string;                    // varsa "Yeni sayfa" penceresi yerine bu sahne oynar (content/scenes.ts)
@@ -77,7 +78,7 @@ export const CHAPTERS: Chapter[] = [
         scene: "tebesir", accept: "kervan",
         text: "Dolu arabaların tekerleğinde tebeşirle çizilmiş bir çarpı. İşareti koyan handan çıkıp hana geri girmiş; balkonda biri avluyu seyrediyordu. Selim işaretleri silmedi: kervan çıkacak, sen işaretli arabada olacaksın." },
       { id: "k_selim", title: "Selim'in sözü", hint: "Selim'in kervanını haydutlara karşı koru.", reached: s => done(s, "kervan"),
-        scene: "k_selim", accept: "sarnic",
+        scene: "k_selim", accept: "sarnic", effects: { flag: "selimGun" },
         text: "Haydudun heybesinde bir not: \"Kuzeye, Kayhan Bey'in adamlarına.\" Selim sözünü tuttu: annen on iki yıl önce buradaydı, taşların ısıyı yerden çaldığını ilk o anladı. Şehrin altındaki sarnıçta bir Ölçer saklanıyor." },
       { id: "k_derya", title: "Su", hint: "Eski sarnıca in; suyun sesini takip et.", reached: s => done(s, "sarnic"),
         effects: { learnElement: "el_su" }, scene: "k_derya", accept: "lonca_defteri",
@@ -85,6 +86,22 @@ export const CHAPTERS: Chapter[] = [
       { id: "k_defter", title: "Annem yaşıyor", hint: "Derya'nın işi: Isı Loncası'nın deposundan kayıt defterini al.", reached: s => done(s, "lonca_defteri"),
         scene: "k_defter",
         text: "Loncanın kayıtlarını geçen aya kadar annen tutmuş. En altta başka bir el: \"Ölçer L. Soğuk Ocak'ta çalıştırılıyor.\" On iki yıl boyunca öldüğünü sandığın annen kuzeyde, Ayazkale'de. Kar geçidinin yolu açıldı (yayladan kuzeye), ama geçidin gümrüğü loncanın beratını ister (150 bakır, lonca kâtibi). Bölüm 2 burada bitiyor." },
+      /* ---- Selim'in defteri: ticaretin yan hikâyesi (bölümler boyu sürer) ---- */
+      { id: "f_ders", side: true, after: "k_selim", title: "Selim'in dersi", hint: "Karaçam çarşısına uğra; Selim seni bekliyor.",
+        reached: s => s.story.flags.selimGun !== undefined && s.day > s.story.flags.selimGun && s.location === "karacam", scene: "selim_ders", effects: { cart: 1 },
+        text: "Selim ucuz al, pahalı sat'ı öğretti ve sana eski bir araba verdi. Haritada bir ticaret yerinin kartından Kervan kur." },
+      { id: "f_ilk_yuk", side: true, after: "f_ders", title: "İlk yük", hint: "Bir kervanı kârla sat: ticaret yerinin kartından Kervan kur.",
+        reached: s => (s.trade?.stats?.profitTrips ?? 0) >= 1, scene: "selim_ilk_yuk",
+        text: "İlk kervanın kârla döndü. Selim: \"Gözü olmayan kervan kördür; bir izci bul.\"" },
+      { id: "f_kayip", side: true, after: "f_ilk_yuk", title: "Kayıp kervan", hint: "Kervanlarını yollamaya devam et; Selim'den haber gelecek.",
+        reached: s => (s.trade?.stats?.trips ?? 0) >= 3, scene: "kayip_kervan",
+        text: "Selim'in izcisiz kervanı soyuldu; arabalar tebeşirli döndü. Selim loncaya girmeni öneriyor: aidat 100 bakır." },
+      { id: "f_lonca", side: true, after: "f_kayip", title: "Lonca kapısı", hint: "Isı Loncası deposunda kâtibe üyelik aidatını öde (100 bakır).",
+        reached: s => s.story.flags.belge_lonca !== undefined, scene: "lonca_kapisi",
+        text: "Isı Loncası'na üye oldun: pazardan mal alırken %10 ucuz. Selim kendi hanını düşünmeni söyledi." },
+      { id: "f_kervansaray", side: true, after: "f_lonca", title: "Kendi kervansarayın", hint: "Karaçam'ın doğu kapısındaki eski kervansarayı satın al (Selim, 300 bakır).",
+        reached: s => s.story.flags.belge_kervansaray !== undefined, scene: "kervansaray",
+        text: "Karaçam'da kendi kervansarayın var. Karaçam'dan çıkan ve Karaçam'a giden kervanlara pusu daha az kurulur." },
     ],
   },
   {

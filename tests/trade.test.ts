@@ -85,7 +85,9 @@ test("zengin sofra o gece uykuda işlenen gelişimi %25 artırır", () => {
 test("ekonomi: Bölüm 1 sonundaki cep (100) ve bir korumayla 150 bakırlık berat 10–30 günde birikir", () => {
   const s = trader(11, 140); buyCart(s); est(s).heroes!.push({ id: "bora", lv: 1, xp: 0, loyalty: 60, hp: 30, status: "evde" } as never);
   let day = 0;
-  while (s.money < 150 + 100 && day < 60) {
+  // net servet: cep + ilk arabadan sonra arabalara yatırılan (araba satılmaz ama birikimdir)
+  const worth = () => s.money + [0, 0, 90, 250][tradeOf(s).carts];
+  while (worth() < 150 + 100 && day < 60) {
     const here = s.location === "koy_meydani" ? "taspinar" : "karacam";
     const goodId = here === "taspinar" ? "peynir_kalibi" : "kumas"; const to = here === "taspinar" ? "karacam" : "taspinar";
     if (tradeOf(s).carts < 3 && s.money > [0, 90, 160][tradeOf(s).carts] + 80) buyCart(s);
@@ -97,4 +99,33 @@ test("ekonomi: Bölüm 1 sonundaki cep (100) ve bir korumayla 150 bakırlık ber
   }
   console.log("berat için gün:", day, "para:", s.money, "araba:", tradeOf(s).carts);
   expect(day).toBeGreaterThanOrEqual(10); expect(day).toBeLessThanOrEqual(30);
+});
+
+test("Selim'in defteri: ders araba verir, kârlı sefer ve üç sefer sonraki adımları açar; lonca ucuzlatır, kervansaray güvenli kılar", async () => {
+  const { advanceStory, openSideStories } = await import("../src/engine/story");
+  const { routeDanger } = await import("../src/engine/trade");
+  const s = trader(21, 500); s.story.reached.push("k_muhur", "k_tebesir", "k_selim"); s.story.flags.selimGun = s.day;
+  advanceStory(s); expect(s.story.reached).not.toContain("f_ders");          // ertesi gün, Karaçam'da
+  s.day++; arrive(s, "karacam"); advanceStory(s);
+  expect(s.story.reached).toContain("f_ders"); expect(tradeOf(s).carts).toBe(1);
+  expect(openSideStories(s).map(m => m.id)).toEqual(["f_ilk_yuk"]);
+  tradeOf(s).stats = { trips: 1, profitTrips: 1, robbed: 0, profit: 30 }; advanceStory(s); expect(s.story.reached).toContain("f_ilk_yuk");
+  tradeOf(s).stats!.trips = 3; advanceStory(s); expect(s.story.reached).toContain("f_kayip");
+  const before = buyPrice(s, "karacam", "kumas");
+  arrive(s, "karacam_lonca"); expect(buyPaper(s, "lonca").ok).toBe(true); advanceStory(s);
+  expect(s.story.reached).toContain("f_lonca"); expect(buyPrice(s, "karacam", "kumas")).toBeLessThan(before);
+  const d0 = routeDanger(s, "karacam", "taspinar");
+  arrive(s, "karacam"); expect(buyPaper(s, "kervansaray").ok).toBe(true); advanceStory(s);
+  expect(s.story.reached).toContain("f_kervansaray"); expect(routeDanger(s, "karacam", "taspinar")).toBeLessThan(d0);
+  expect(routeDanger(s, "taspinar", "ardic")).toBe(25);
+});
+
+test("adamlar yaptıkları işte ustalaşır: kervan seferi korumayı güçlendirir", async () => {
+  const { heroSkill, practice } = await import("../src/engine/estate");
+  const { guardPower } = await import("../src/engine/trade");
+  const s = trader(); const e = est(s); e.heroes!.push({ id: "bora", lv: 1, xp: 0, loyalty: 60, hp: 30, status: "evde" } as never);
+  const h = e.heroes![0]; const p0 = guardPower(s, ["bora"]).power;
+  for (let i = 0; i < 8; i++) practice(h, "kervan");
+  expect(heroSkill(h, "kervan")).toBe(2); expect(heroSkill(h, "isletme")).toBe(0);
+  expect(guardPower(s, ["bora"]).power).toBeGreaterThan(p0 * 1.15);
 });

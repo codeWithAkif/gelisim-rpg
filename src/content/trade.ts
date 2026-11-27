@@ -46,6 +46,10 @@ export const PAPERS: Paper[] = [
     desc: "Isı Loncası'nın mühürlü kâğıdı. Kar geçidindeki gümrükçü beratsız geçeni geri çevirmez; donmaya bırakır." },
   { id: "cizelge", name: "Nöbet çizelgesi", cost: 250, place: "ardic_kul", seller: "Saray kâtibinin yeğeni", after: "d_yaren",
     desc: "Saray muhafızlarının hangi saatte değiştiği. Kül Ana'nın torunları damları bilir, saati bilmez." },
+  { id: "lonca", name: "Lonca üyeliği", cost: 100, place: "karacam_lonca", seller: "Lonca kâtibi", after: "f_kayip",
+    desc: "Isı Loncası'nın defterine adın yazılır. Pazardan mal alırken %10 ucuz alırsın; lonca kervanına kimse kolay dokunmaz." },
+  { id: "kervansaray", name: "Kervansaray", cost: 300, place: "karacam", seller: "Selim", after: "f_lonca",
+    desc: "Karaçam'ın doğu kapısındaki eski kervansaray. Karaçam'dan çıkan ve Karaçam'a giden kervanlarına pusu dörtte bir daha az kurulur." },
 ];
 export const paper = (id: string) => PAPERS.find(p => p.id === id);
 
