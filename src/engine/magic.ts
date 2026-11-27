@@ -8,6 +8,7 @@ import { type Battle, type Unit, type XY, player, enemies, dist, neighbors, unit
 import { Rng } from "./rng";
 import { ENEMIES, TERRAIN, type Terrain } from "../content/world";
 import { RELIC_SPELLS } from "../content/spells";
+import { synthSpells } from "../content/synthesis";
 import { hasRelic } from "./relics";
 
 /** Büyülerin fiziksel sonuçları (config'deki "Fiziksel etki" metninin oyun karşılığı). */
@@ -25,6 +26,8 @@ export const SPELL_FX: Record<string, { ignite?: boolean; wall?: number; slow?: 
   karga_surusu: { blind: 2 },
   yer_kiliclari: { stun: 1 },
 };
+// sentezden çıkan büyülerin etkileri
+Object.assign(SPELL_FX, synthSpells().fx);
 const IGNITE: Partial<Record<Terrain, number>> = { uzun_ot: 90, agac: 80, cayir: 45 };
 
 /** Bir kaynağın (element ya da birleşim) dayandığı temel elementler. */
@@ -44,7 +47,10 @@ export function spellOptions(cfg: Config, s: GameState): SpellOption[] {
   return cfg.data.spells.map(sp => {
     const els = sp.sources.flatMap(src => baseElements(cfg, src.id));
     const relic = RELIC_SPELLS[sp.id];
-    const known = relic ? hasRelic(s, relic) : els.length > 0 && els.every(e => s.knownElements.includes(e));
+    // sentez büyüleri ancak keşfedilince bilinir (deney ya da savaşta çizerek); fırlatma hava sayfası ister
+    const synth = sp.id.startsWith("sy_");
+    const known = relic ? hasRelic(s, relic) : els.length > 0 && els.every(e => s.knownElements.includes(e))
+      && (!synth || ((s.spellbook ?? []).includes(sp.id) && (!sp.id.endsWith("_firlat") || s.knownElements.includes("el_hava"))));
     if (!known) return { spell: sp, known, ok: false, reason: relic ? "Kadim eşyası bulunmadı" : "Defterinde gereken sayfa yok" };
     const m = mastery(cfg, s, sp), need = sp.minMastery ?? 0;
     if (m < need) return { spell: sp, known, ok: false, reason: `${cfg.attr.get(sp.mastery ?? "")?.name ?? "Ustalık"} ${m.toFixed(1)}/${need}` };
