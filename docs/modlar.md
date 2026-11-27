@@ -103,7 +103,7 @@ komşusundan ısı alır: ısı kaybolmaz, bir yere toplanır (Soğuk Ocak'ın k
 
 Sonraki adım (karar bekliyor): bu kural savaşa ve Soğuk Ocak bölümüne taşınacak mı, mevcut büyü kartlarının yerine mi geçecek?
 
-## Dondurma kuralı
+## Dondurma kuralı (kaldırıldı)
 
-Bu kararlar yürürlükteyken yeni mod, yeni kart sistemi ya da kalıcı güçlenme eklenmez. Yapılan işler:
-hikâye, denge ve var olan modları karakterin özelliklerine daha sıkı bağlamak.
+Yeni mod eklenmez kuralı iki bilinçli istisnayla kaldırıldı: kervan ticareti (finans ve adamlar) ve büyü sentezi.
+Tasarım: `docs/finans-ve-buyu.md`. Kalıcı güçlenme ya da kart sistemi yine eklenmez; güç karakterden ve bilgisinden gelir.
