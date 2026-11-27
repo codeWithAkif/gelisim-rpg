@@ -117,3 +117,13 @@ oyuncu imza büyüyü bulur. Son sayfa annenin bitiremediği deney.
    sayfasında çözülenler işaretli.
 
 Her aşamanın sonunda testler, tarayıcıda deneme ve yayın.
+
+## Sonradan: her yerde aynı kural ve yol göstericiler
+
+- **Büyü her yerde çizilir** (zamanlama oyunları açıksa): altıgen savaşta "Büyü çiz"; gece savunmasında "Büyü çiz"
+  (çizerken zaman durur, sonra hedefe dokunulur; düğmeler yalnız dolma süresini gösterir); harabede seçilen büyünün
+  dizisi girişte bir kez doğru çizilir, çizim kalitesi büyünün gücünü belirler. Keşfedilen sentez büyüleri harabede ve
+  savunmada da kullanılır (harabe karşılığı etkisinden türetilir: `scavSpellInfo`).
+- **Yol göstericiler:** savaşta Hasan'ın dersi, ardından ilk büyüde Zehra'nın dersi (aç → Alev, sonra Hilal → hedef);
+  kervan penceresinde Selim o an yapılacak tek şeyi söyler (ilk kervana kadar); barikat, gizlenme, harabe ve Ölçer
+  işinde ilk girişte sayfa sayfa öğüt (`src/content/guides.ts`, `src/ui/guide.ts`). Hepsi bir kez gösterilir.

@@ -95,3 +95,20 @@ test("annenin deney sayfaları: yeri ve zamanı gelince alınır; bilmecenin cev
   expect(experiment(cfg, s, ["el_ates"], "duvar")).toMatchObject({ kind: "yeni", spellId: "sy_el_ates_duvar" });
   expect(pageSolved(s, pg)).toBe(true);
 });
+
+test("her yerde aynı kural: keşfedilen büyü harabede de seçilir, gece savunmasında da kullanılır; girişteki çizim gücü belirler", async () => {
+  const { loadoutOptions, scavSpellInfo, createScav, scavSite } = await import("../src/engine/scavenge");
+  const { siegeSpells, createSiege, SIEGES } = await import("../src/engine/siege");
+  const s = newGame(cfg, 12); s.knownElements = ["el_ates", "el_toprak", "el_hava"]; s.attrs.toprak_buyu.level = 40; s.mana = 99;
+  expect(loadoutOptions(cfg, s).some(o => o.id === "sy_magma_firlat")).toBe(false);
+  discover(s, "sy_magma_firlat");
+  expect(scavSpellInfo(cfg, "sy_magma_firlat")).toMatchObject({ kind: "ates" });
+  expect(loadoutOptions(cfg, s).some(o => o.id === "sy_magma_firlat")).toBe(true);
+  const site = scavSite("koru_kulube")!;
+  const weak = createScav(cfg, s, site, 5, { kind: "spell", id: "sy_magma_firlat", q: 0 });
+  const strong = createScav(cfg, s, site, 5, { kind: "spell", id: "sy_magma_firlat", q: 1 });
+  expect(strong.spell!.mul).toBeGreaterThan(weak.spell!.mul * 1.4);
+  const def = Object.values(SIEGES)[0];
+  const sg = createSiege(cfg, s, def, 3);
+  expect(siegeSpells(cfg, s, sg).some(x => x.id === "sy_magma_firlat")).toBe(true);
+});

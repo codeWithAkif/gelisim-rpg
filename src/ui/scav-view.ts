@@ -1,4 +1,11 @@
 // Harabe araması ekranı: yan kesit, çok katlı yapı. Dokun: oraya yürür; mercek simgesine dokun: arar; çıkışa varınca çıkarsın.
+import { castDrawPrompt } from "./gesture-view";
+import { settings } from "./settings";
+import { skillEase } from "../engine/timing";
+import { synthesize } from "../engine/synthesis";
+import { ELEMENT_RUNES, FORM_RUNES } from "../engine/gesture";
+import type { FormId } from "../content/synthesis";
+import { withGuide } from "./guide";
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
@@ -17,11 +24,12 @@ const img = (key: string) => { if (!imgCache.has(key)) { const u = artUrl(key); 
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#2A2722";
 
 /** Başlamadan önce: bu yerdeki harabeler (kolaydan zora), sonra yanına alacağın TEK şey. */
-export function openScavHub(cfg: Config, s: GameState, place: string, persist: () => void, onEnd: (r: ScavResult) => void) {
+function openScavHubInner(cfg: Config, s: GameState, place: string, persist: () => void, onEnd: (r: ScavResult) => void) {
   const list = sitesAt(place); const bg = document.createElement("div"); bg.className = "modal-bg";
   const opts = loadoutOptions(cfg, s); let sel: Loadout = defaultLoadout(cfg, s);
   let pick: ScavSite | undefined = list.find(x => !x.unlock(s) && siteProgress(s, x).done < siteProgress(s, x).total) ?? list.find(x => !x.unlock(s));
   const isSel = (o: { kind: string; id?: string }) => sel.kind === o.kind && sel.id === o.id;
+  let note = "";   // büyü dizisi tutmadıysa
   const stars = (t: number) => Array.from({ length: 4 }, (_, i) => `<i class="${i < t ? "on" : ""}">◆</i>`).join("");
   const draw = () => {
     const can = pick ? canStartScav(s, pick.id) : { ok: false, reason: "Burada aranacak harabe yok" };
@@ -41,6 +49,7 @@ export function openScavHub(cfg: Config, s: GameState, place: string, persist: (
         <div class="trait-list">${traitLines(cfg, s, sel.kind === "spell", sel.kind === "bow").map(l => `<span><b>${esc(l.name)}</b> ${esc(l.value)} <i class="muted">· ${esc(l.from)}</i></span>`).join("")}</div></details>
       <div class="odds"><span>Enerji <b>−${SCAV_ENERGY}</b></span><span>Süre <b>~${20 + pick.rooms * pick.floors * 3} dk</b></span></div>` : ""}
       ${can.ok ? "" : `<p class="tiny red" style="margin:0">${esc(can.reason ?? "")}</p>`}
+      ${note ? `<p class="tiny red" style="margin:0">${esc(note)}</p>` : sel.kind === "spell" && settings().timing ? `<p class="tiny muted" style="margin:0">Büyüyü girişte avucunda hazırlarsın: dizisini aklından çiz. İyi çizim daha güçlü vurur.</p>` : ""}
       <div class="row"><button class="btn" data-x="close">Kapat</button><span style="flex:1"></span><button class="btn primary" data-x="go" ${can.ok ? "" : "disabled"}>Gir</button></div></div>`;
   };
   draw(); document.body.appendChild(bg);
@@ -49,7 +58,20 @@ export function openScavHub(cfg: Config, s: GameState, place: string, persist: (
     const st = t.closest<HTMLButtonElement>("[data-site]"); if (st && !st.disabled) { pick = list.find(x => x.id === st.dataset.site); sfx("tap"); draw(); return; }
     const o = t.closest<HTMLButtonElement>("[data-i]");
     if (o) { const i = +o.dataset.i!; sel = i < 0 ? { kind: "yumruk" } : { kind: opts[i].kind, id: opts[i].id }; sfx("tap"); draw(); return; }
-    const b = t.closest<HTMLButtonElement>("button[data-x]"); if (!b || b.disabled) return; bg.remove();
+    const b = t.closest<HTMLButtonElement>("button[data-x]"); if (!b || b.disabled) return;
+    // büyü seçildiyse girişte avucunda hazırlarsın: dizisini aklından bir kez doğru çiz
+    if (b.dataset.x === "go" && pick && sel.kind === "spell" && sel.id && settings().timing) {
+      const want = sel.id; const name = cfg.spell.get(want)?.name ?? "";
+      void castDrawPrompt(bg, { allowed: [...ELEMENT_RUNES.filter(r => s.knownElements.includes(r)), ...FORM_RUNES], ease: skillEase(s, "odak"), limitMs: 12000, tip: `${name}: dizisini aklından çiz.` }).then(res => {
+        const f = res?.runes[res.runes.length - 1]?.startsWith("f_") ? res.runes[res.runes.length - 1].slice(2) as FormId : undefined;
+        const r = res && f ? synthesize(s, res.runes.filter(x => !x.startsWith("f_")), f) : null;
+        if (!res) return;
+        if (!r?.ok || r.spellId !== want) { note = `${name} olmadı: ${r?.ok ? `çizdiğin ${cfg.spell.get(r.spellId!)?.name ?? "başka bir büyü"}` : r?.reason ?? "biçimi çizmedin"}. Dizi Defter → Büyüler'de.`; sfx("bad"); draw(); return; }
+        bg.remove(); openScav(cfg, s, pick!.id, persist, onEnd, { ...sel, q: res.q });
+      });
+      return;
+    }
+    bg.remove();
     if (b.dataset.x === "go" && pick) openScav(cfg, s, pick.id, persist, onEnd, sel);
   });
 }
@@ -339,3 +361,6 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
   layout(); harabeAudio(true, site.foes.includes("kurt")); tip.hidden = false; tip.textContent = `${site.name}. Bekçiler uyuyor; yaklaşırsan uyanırlar. Kutunun yanında dur: kendiliğinden arar.`; setTimeout(() => { tip.hidden = true; }, 4500);
   raf = requestAnimationFrame(loop); void itemPic; void walkT;
 }
+
+/** İlk girişte öğüt, sonra ekran. */
+export function openScavHub(...a: Parameters<typeof openScavHubInner>) { withGuide("harabe", a[1], () => openScavHubInner(...a)); }

@@ -1,6 +1,7 @@
 // Gizlenme ekranı: parmağını basılı tut, oraya doğru sinsice yürürsün; bırakınca durursun.
 // "Koş" hızlı ama sesli. "Taş at": dokunduğun yere taş düşer, yakın bekçiler oraya bakar.
 // Bekçilerin görüş konisi çizilir; kurtların koku alanı rüzgârla uzar. Kuşku dolarsa yakalanırsın.
+import { withGuide } from "./guide";
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
@@ -23,7 +24,7 @@ const GOAL_TEXT: Record<StealthGoal, { exit: string; hint: string }> = {
   kacis: { exit: "Yol", hint: "Görünmeden yukarıdaki yola çık; sıyrılıp gidersin." },
 };
 
-export function openStealth(cfg: Config, s: GameState, title: string, foes: string[], goal: StealthGoal, seed: number, night: boolean,
+function openStealthInner(cfg: Config, s: GameState, title: string, foes: string[], goal: StealthGoal, seed: number, night: boolean,
   onEnd: (won: boolean, gains: GainReport) => void, persist: () => void) {
   const st: Stealth = createStealth(s, foes, goal, seed, night);
   const el = document.createElement("div"); el.className = "siege stealth"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Gizlenme");
@@ -184,3 +185,6 @@ export function openStealth(cfg: Config, s: GameState, title: string, foes: stri
   const ro = new ResizeObserver(layout); ro.observe(stage);
   layout(); renderPanel(); raf = requestAnimationFrame(loop);
 }
+
+/** İlk girişte öğüt, sonra ekran. */
+export function openStealth(...a: Parameters<typeof openStealthInner>) { withGuide("gizlenme", a[1], () => openStealthInner(...a)); }

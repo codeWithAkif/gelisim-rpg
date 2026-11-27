@@ -29,3 +29,37 @@ export function coachNext(step: CoachStep, ev: CoachEvent, timing: boolean): Coa
 }
 /** Ders bitti sayılır mı: saldırıyı ve kaçmayı gördüyse savaş erken bitse de bir daha gösterilmez. */
 export const coachLearned = (step: CoachStep) => step === "son" || step === "bitti";
+
+/* ---------- Zehra'nın dersi: ilk kez büyü çizerken ---------- */
+export type SpellStep = "ac" | "ciz" | "hedef" | "son" | "bitti";
+export type SpellEvent = "acildi" | "cizildi" | "sondu" | "yapti" | "tamam" | "vazgecti";
+export function spellCoachLine(step: SpellStep): CoachLine | null {
+  switch (step) {
+    case "ac": return { text: "Büyüyü listeden seçmezsin; aklından çizersin. \"Büyü çiz\"e bas." };
+    case "ciz": return { text: "Önce maddenin işareti, en sonda biçimi. Ateş topu: Alev, sonra Hilal." };
+    case "hedef": return { text: "Avucunda tutuyorsun. Kırmızı kesikli altıgenlerin içindeki bir hedefe dokun, sonra \"Büyüyü yap\". Uzaksa Vazgeç, yaklaş, yeniden çiz." };
+    case "son": return { text: "Dizileri Defter → Büyüler'de bulursun. Savaşta kimse hatırlatmaz; aklında tut. Yeni bir dizi denersen yeni bir büyü bulabilirsin.", button: "Anladım" };
+    case "bitti": return null;
+  }
+}
+export function spellCoachNext(step: SpellStep, ev: SpellEvent): SpellStep {
+  if (step === "ac" && ev === "acildi") return "ciz";
+  if (step === "ciz" && (ev === "sondu" || ev === "vazgecti")) return "ac";
+  if (step === "ciz" && ev === "cizildi") return "hedef";
+  if (step === "hedef" && ev === "yapti") return "son";
+  if (step === "hedef" && ev === "vazgecti") return "ac";
+  if (step === "son" && ev === "tamam") return "bitti";
+  return step;
+}
+
+/* ---------- Selim'in öğüdü: kervan penceresinde sıradaki adım ---------- */
+/** İlk kervanda pencerenin üstünde tek cümle: o an yapılması gereken. */
+export function caravanTip(o: { carts: number; freeCarts: number; dests: number; to?: string; units: number; heroes: number; guards: number }): string {
+  if (!o.carts) return "Önce bir araba al. Her araba sekiz yük taşır.";
+  if (!o.freeCarts) return "Bütün arabaların yolda. Dönmelerini bekle ya da bir araba daha al.";
+  if (!o.dests) return "Mal götürebileceğin başka bir pazar görmedin. Önce oralara bir kez git.";
+  if (!o.to) return "Nereye gideceğini seç.";
+  if (!o.units) return "Yük ekle: + ile. Yeşil sayı birim başına kârdır; kırmızıysa orada zarar edersin.";
+  if (o.heroes && !o.guards) return "Korumalardan birini seç. İzci pusuyu önceden görür; savaşçı püskürtür. Korumasız kervan soyulur.";
+  return "Hazır. Yola çıkar; sonucu bu gece uyuyunca öğrenirsin.";
+}

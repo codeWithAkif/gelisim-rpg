@@ -6,6 +6,8 @@ import {
 import { GOODS, REGION_NAMES, route, CART_CAP, type Region } from "../content/trade";
 import { est, heroDef, heroStats, ROLE_NAMES } from "../engine/estate";
 import { esc } from "./sketch";
+import { artUrl } from "./art";
+import { caravanTip } from "../engine/coach";
 import { sfx, buzz } from "./feel";
 
 export function openCaravan(s: GameState, done: { persist: () => void; render: () => void; toast: (t: string) => void }) {
@@ -33,7 +35,11 @@ export function openCaravan(s: GameState, done: { persist: () => void; render: (
     const gp = guardPower(s, [...guards]);
     const verdict = !p || !units ? "" : p.power >= p.need * 1.3 ? `<span class="green">Pusu olursa büyük ihtimalle püskürtürler.</span>`
       : p.power >= p.need * 0.7 ? `<span>Pusu olursa ucu ucuna; yük gidebilir.</span>` : `<span class="red">Pusu olursa yükün çoğu gider.</span>`;
-    box.innerHTML = `<p class="hand muted" style="margin:0">Kervan · ${esc(REGION_NAMES[here])}</p><h2>Ucuz al, uzağa götür</h2>
+    // ilk kervanda Selim o an yapılacak tek şeyi söyler
+    const tipText = s.story.flags.ogretici_kervan === undefined ? caravanTip({ carts: t.carts, freeCarts: cartsFree(s), dests: dests.length, to, units, heroes: heroes.length, guards: guards.size }) : "";
+    const sel = artUrl("portre_selim");
+    const tip = tipText ? `<div class="cv-tip">${sel ? `<img src="${sel}" alt="">` : ""}<div><div class="hand">Selim</div><div class="tiny">${esc(tipText)}</div></div></div>` : "";
+    box.innerHTML = `<p class="hand muted" style="margin:0">Kervan · ${esc(REGION_NAMES[here])}</p><h2>Ucuz al, uzağa götür</h2>${tip}
       <div class="odds"><span>Araba <b>${t.carts}</b> (boşta ${cartsFree(s)})</span><span>Yük yeri <b>${units}/${cap}</b></span><span>Cebin <b>${s.money}</b></span></div>
       ${cc !== null ? `<div class="row"><button class="btn small" data-c="cart" ${s.money >= cc ? "" : "disabled"}>${t.carts ? "Bir araba daha" : "Araba al"} (${cc} bakır, ${CART_CAP} yük)</button></div>` : ""}
       ${dests.length ? `<h3>Nereye?</h3><div class="chips">${dests.map(r => { const rt = route(here, r)!; return `<button class="chip ${to === r ? "on" : ""}" data-c="to" data-id="${r}">${esc(REGION_NAMES[r])} · ${rt.days} gün · tehlike ${rt.danger}</button>`; }).join("")}</div>`
@@ -56,7 +62,7 @@ export function openCaravan(s: GameState, done: { persist: () => void; render: (
     if (c === "g") { if (guards.has(id)) guards.delete(id); else guards.add(id); }
     if (c === "send" && to) {
       const r = sendCaravan(s, to, cargo, [...guards]);
-      if (r.ok) { sfx("coin"); buzz("medium"); done.toast(`Kervan yola çıktı: ${r.days} gün sonra ${REGION_NAMES[to]}'ta. Sonucu uyuyunca öğrenirsin.`); done.persist(); done.render(); bg.remove(); return; }
+      if (r.ok) { s.story.flags.ogretici_kervan ??= s.day; sfx("coin"); buzz("medium"); done.toast(`Kervan yola çıktı: ${r.days} gün sonra ${REGION_NAMES[to]}'ta. Sonucu uyuyunca öğrenirsin.`); done.persist(); done.render(); bg.remove(); return; }
       done.toast(r.reason ?? ""); sfx("bad");
     }
     sfx("tap"); draw();

@@ -20,7 +20,7 @@ import { TERRAIN, ENEMIES, MAPS } from "../content/world";
 import { esc, wolfSketch, humanSketch } from "./sketch";
 import { spellOptions, previewSpell, castSpell, hexRange, areaHexes, SPELL_FX, failedCast } from "../engine/magic";
 import { MapRenderer } from "./battle-render";
-import { type CoachStep, type CoachEvent, coachLine, coachNext, coachLearned } from "../engine/coach";
+import { type CoachStep, type CoachEvent, coachLine, coachNext, coachLearned, type SpellStep, type SpellEvent, spellCoachLine, spellCoachNext } from "../engine/coach";
 import { artUrl } from "./art";
 
 type Mode = { k: "normal" } | { k: "spell"; id: string; target?: XY; q?: number } | { k: "torch" };
@@ -52,15 +52,25 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
   const bubble = document.createElement("div"); bubble.className = "coach";
   panel.before(bubble);   // haritayla panelin arasında: kurtları kapatmasın
   const timingOn = () => !!settings().timing;
+  // Zehra'nın dersi: ilk kez büyü çizerken (Hasan'ın dersi bitince)
+  let spellCoach: SpellStep | null = timingOn() && s.knownElements.length > 0 && s.story.flags.ogretici_buyu === undefined ? "ac" : null;
+  function spellEv(ev: SpellEvent) {
+    if (!spellCoach) return; const was = spellCoach; spellCoach = spellCoachNext(spellCoach, ev);
+    if (spellCoach === was) return;
+    if (spellCoach === "bitti") { s.story.flags.ogretici_buyu = s.day; persist(); spellCoach = null; }
+    sfx("page"); renderCoach();
+  }
   let shown = "";
   function renderCoach() {
-    const line = coach ? coachLine(coach, timingOn()) : null;
+    const hasan = coach ? coachLine(coach, timingOn()) : null;
+    const line = hasan ?? (spellCoach ? spellCoachLine(spellCoach) : null);
     bubble.classList.toggle("on", !!line);
     if (!line) { bubble.innerHTML = ""; shown = ""; return; }
     if (shown === line.text) return;   // aynı öğüt: balon yeniden çizilmesin (canlandırma baştan başlamasın)
     shown = line.text;
-    const pic = artUrl("portre_hasan");
-    bubble.innerHTML = `${pic ? `<img src="${pic}" alt="">` : ""}<div class="coach-body"><div class="coach-who hand">Hasan</div><p>${esc(line.text)}</p>
+    const who = hasan ? "Hasan" : "Zehra"; const pic = artUrl(hasan ? "portre_hasan" : "portre_zehra");
+    bubble.dataset.who = hasan ? "hasan" : "zehra";
+    bubble.innerHTML = `${pic ? `<img src="${pic}" alt="">` : ""}<div class="coach-body"><div class="coach-who hand">${who}</div><p>${esc(line.text)}</p>
       <div class="coach-row">${line.button ? `<button class="btn small primary" data-c="ok">${esc(line.button)}</button>` : ""}<button class="coach-skip" data-c="skip">Dersi geç</button></div></div>`;
   }
   function coachEv(ev: CoachEvent) {
@@ -75,8 +85,9 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
   bubble.addEventListener("click", e => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("[data-c]"); if (!t) return;
     e.stopPropagation();
-    if (t.dataset.c === "ok") coachEv("tamam");
-    if (t.dataset.c === "skip") { coach = null; s.story.flags.ogretici_savas ??= s.day; persist(); renderCoach(); }
+    const zehra = bubble.dataset.who === "zehra";
+    if (t.dataset.c === "ok") { if (zehra) spellEv("tamam"); else coachEv("tamam"); }
+    if (t.dataset.c === "skip") { if (zehra) { spellCoach = null; s.story.flags.ogretici_buyu ??= s.day; } else { coach = null; s.story.flags.ogretici_savas ??= s.day; } persist(); renderCoach(); }
   });
   /** İki altıgen arası ekran açısı (derece): a'dan b'ye. */
   const screenAngle = (a: XY, b2: XY) => { const p = R.center(...a), q = R.center(...b2); return Math.atan2(q.cy - p.cy, q.cx - p.cx) * 180 / Math.PI; };
@@ -310,21 +321,22 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
       })(); break;
       case "observe": if (tgt) { observe(cfg, s, b, tgt); after(); } break;
       case "draw": void (async () => {
-        busy = true; renderPanel();
+        spellEv("acildi"); busy = true; renderPanel();
         const allowed = [...ELEMENT_RUNES.filter(r => s.knownElements.includes(r)), ...FORM_RUNES];
         const lv = Math.max(...s.knownElements.map(e => s.attrs[{ el_ates: "ates" }[e] ?? e.replace("el_", "") + "_buyu"]?.level ?? 0), 0);
-        const res = await castDrawPrompt(stage(), { allowed, ease: skillEase(s, "odak"), limitMs: 9000 + Math.min(6000, lv * 150) });
+        const res = await castDrawPrompt(stage(), { allowed, ease: skillEase(s, "odak"), limitMs: 9000 + Math.min(6000, lv * 150), tip: spellCoach === "ciz" ? "Zehra: Alev, sonra Hilal." : undefined });
         busy = false;
-        if (!res) { renderPanel(); return; }
+        if (!res) { spellEv("vazgecti"); renderPanel(); return; }
         const form = res.runes[res.runes.length - 1]?.startsWith("f_") ? res.runes[res.runes.length - 1].slice(2) as FormId : undefined;
         const els = res.runes.filter(r => !r.startsWith("f_"));
-        if (!form) { failedCast(s, b, res.timeout ? "Zaman doldu; biçimi çizemedin." : "Biçimsiz büyü dağıldı."); sfx("bad"); after(); return; }
+        if (!form) { failedCast(s, b, res.timeout ? "Zaman doldu; biçimi çizemedin." : "Biçimsiz büyü dağıldı."); spellEv("sondu"); sfx("bad"); after(); return; }
         const r = synthesize(s, els, form);
-        if (!r.ok) { failedCast(s, b, r.reason ?? ""); sfx("bad"); after(); return; }
+        if (!r.ok) { failedCast(s, b, r.reason ?? ""); spellEv("sondu"); sfx("bad"); after(); return; }
         const sp = cfg.spell.get(r.spellId!)!;
         if (r.spellId!.startsWith("sy_") && discover(s, r.spellId!)) { sfx("perfect"); buzz("heavy"); b.log.unshift(`Yeni büyü: ${sp.name}! Deftere yazdın.`); persist(); }
         const opt = spellOptions(cfg, s).find(o => o.spell.id === r.spellId);
-        if (!opt?.ok) { failedCast(s, b, `${sp.name}: ${opt?.reason ?? "yapamadın"}.`); sfx("bad"); after(); return; }
+        if (!opt?.ok) { failedCast(s, b, `${sp.name}: ${opt?.reason ?? "yapamadın"}.`); spellEv("sondu"); sfx("bad"); after(); return; }
+        spellEv("cizildi");
         const p = player(b); const tg = selected ? unitById(b, selected) : undefined;
         mode = { k: "spell", id: sp.id, q: res.q, target: tg && tg.hp > 0 && !tg.fled && dist(p.x, p.y, tg.x, tg.y) <= hexRange(sp) ? [tg.x, tg.y] : undefined };
         renderPanel();
@@ -339,9 +351,9 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
           q = await runePrompt(stage(), { runes, spellName: sp.name, ease: skillEase(s, sp.mastery ?? "odak") * 0.6 + skillEase(s, "odak") * 0.4, guide: Math.max(0.15, Math.min(0.8, 0.8 - (lv - 5) / 40)) });
           busy = false;
         }
-        castSpell(cfg, s, b, m.id, m.target[0], m.target[1], q); mode = { k: "normal" }; after();
+        castSpell(cfg, s, b, m.id, m.target[0], m.target[1], q); mode = { k: "normal" }; spellEv("yapti"); after();
       })(); break;
-      case "cancel": mode = { k: "normal" }; renderPanel(); break;
+      case "cancel": mode = { k: "normal" }; spellEv("vazgecti"); renderPanel(); break;
       case "end": endTurn(); break;
       case "flee": if (tryFlee(b)) finish(); break;
     }
