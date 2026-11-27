@@ -2,49 +2,60 @@
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
-  type Scav, type Spot, type Loadout, SW, EXIT_X, LADDER_XS, SPOT_STAGES, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
-  traitLines, bagUsed, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, danger, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
+  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
+  traitLines, bagUsed, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
 import { ENEMIES } from "../content/world";
 import { artUrl, itemPic } from "./art";
 import { esc } from "./sketch";
-import { sfx, buzz } from "./feel";
+import { sfx, buzz, howl, harabeAudio, harabeSteps } from "./feel";
 import { quad, drawQuad, walkFrame, gait } from "./anim";
 
 const imgCache = new Map<string, HTMLImageElement | null>();
 const img = (key: string) => { if (!imgCache.has(key)) { const u = artUrl(key); imgCache.set(key, u ? Object.assign(new Image(), { src: u }) : null); } const i = imgCache.get(key)!; return i && i.complete && i.naturalWidth ? i : null; };
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#2A2722";
 
-/** Başlamadan önce: yapı bilgisi ve TEK bir şey seçmek (silah, yay, köpek, tuzak ya da büyü). */
+/** Başlamadan önce: bu yerdeki harabeler (kolaydan zora), sonra yanına alacağın TEK şey. */
 export function openScavHub(cfg: Config, s: GameState, place: string, persist: () => void, onEnd: (r: ScavResult) => void) {
-  const site = scavSite(place)!; const bg = document.createElement("div"); bg.className = "modal-bg";
-  const can = canStartScav(s, place); const opts = loadoutOptions(cfg, s); let sel: Loadout = defaultLoadout(cfg, s);
+  const list = sitesAt(place); const bg = document.createElement("div"); bg.className = "modal-bg";
+  const opts = loadoutOptions(cfg, s); let sel: Loadout = defaultLoadout(cfg, s);
+  let pick: ScavSite | undefined = list.find(x => !x.unlock(s) && siteProgress(s, x).done < siteProgress(s, x).total) ?? list.find(x => !x.unlock(s));
   const isSel = (o: { kind: string; id?: string }) => sel.kind === o.kind && sel.id === o.id;
+  const stars = (t: number) => Array.from({ length: 4 }, (_, i) => `<i class="${i < t ? "on" : ""}">◆</i>`).join("");
   const draw = () => {
-    bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">Harabe araması</p><h2>${esc(site.name)}</h2>
-      <p style="margin:0">${esc(site.desc)}</p>
-      <p class="tiny" style="margin:0">Kutunun yanında durunca <b>kendiliğinden aranır</b>, hareket edersen durur; aranırken ateş etmezsin. Her kutu 3 ayrı kez aranır; değerli şey çıkacaksa yavaş aranır. Sayaç dolunca <b>baskın</b> gelir. <b>Çıkışa varırsan</b> bulduklarının hepsi senin, <b>ölürsen</b> çanta gider.</p>
+    const can = pick ? canStartScav(s, pick.id) : { ok: false, reason: "Burada aranacak harabe yok" };
+    const sites = list.map(x => { const lock = x.unlock(s); const pr = siteProgress(s, x); const left = s.harabe?.[x.id]?.ground.length ?? 0;
+      return `<button class="site-opt ${pick?.id === x.id ? "on" : ""}" data-site="${x.id}" ${lock ? "disabled" : ""}>
+        <span class="site-head"><b>${esc(x.name)}</b><span class="site-tier t${x.tier}">${stars(x.tier)} ${TIER_NAMES[x.tier]}</span></span>
+        <span class="site-meta">${x.floors} kat · ${x.rooms} oda · ${x.guards} bekçi · ${x.raids} baskın${lock ? "" : ` · aranan ${pr.done}/${pr.total}`}${left ? ` · yerde ${left} eşya` : ""}</span>
+        ${lock ? `<span class="tiny red">${esc(lock)}</span>` : pr.done >= pr.total ? `<span class="tiny muted">Burada aranacak bir şey kalmadı.</span>` : ""}</button>`; }).join("");
+    bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">Harabeler</p>
+      <div class="site-list">${sites}</div>
+      ${pick ? `<p style="margin:0">${esc(pick.desc)}</p>
+      <p class="tiny" style="margin:0">Bekçiler uyuyor. Biri seni fark ederse ötekileri çağırır ve <b>baskın sayacı</b> başlar. Boşalttığın sandık boş kalır; <b>ölürsen</b> çantan düştüğün yerde kalır.</p>
       <h3 style="margin:4px 0 0">Yanına ne alırsın? <span class="tiny muted">(yalnız bir tane)</span></h3>
       <div class="load-list">${opts.map((o, i) => `<button class="load-opt ${isSel(o) ? "on" : ""}" data-i="${i}"><b>${esc(o.label)}</b><span>${esc(o.note)}</span></button>`).join("")}
         <button class="load-opt ${sel.kind === "yumruk" ? "on" : ""}" data-i="-1"><b>Yumruk</b><span>hiçbir şey almazsın</span></button></div>
       <details class="tiny"><summary>Vücudun burada ne yapar?</summary><p class="muted" style="margin:2px 0">Harabede ayrıca güçlenmezsin; ne kadar hızlı, dayanıklı ve becerikliysen o kadarsın.</p>
         <div class="trait-list">${traitLines(cfg, s, sel.kind === "spell", sel.kind === "bow").map(l => `<span><b>${esc(l.name)}</b> ${esc(l.value)} <i class="muted">· ${esc(l.from)}</i></span>`).join("")}</div></details>
-      <div class="odds"><span>Kat <b>${site.floors}</b></span><span>Enerji <b>−${SCAV_ENERGY}</b></span><span>Süre <b>~30 dk</b></span></div>
+      <div class="odds"><span>Enerji <b>−${SCAV_ENERGY}</b></span><span>Süre <b>~${20 + pick.rooms * pick.floors * 3} dk</b></span></div>` : ""}
       ${can.ok ? "" : `<p class="tiny red" style="margin:0">${esc(can.reason ?? "")}</p>`}
       <div class="row"><button class="btn" data-x="close">Kapat</button><span style="flex:1"></span><button class="btn primary" data-x="go" ${can.ok ? "" : "disabled"}>Gir</button></div></div>`;
   };
   draw(); document.body.appendChild(bg);
   bg.addEventListener("click", e => {
-    const o = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-i]");
+    const t = e.target as HTMLElement;
+    const st = t.closest<HTMLButtonElement>("[data-site]"); if (st && !st.disabled) { pick = list.find(x => x.id === st.dataset.site); sfx("tap"); draw(); return; }
+    const o = t.closest<HTMLButtonElement>("[data-i]");
     if (o) { const i = +o.dataset.i!; sel = i < 0 ? { kind: "yumruk" } : { kind: opts[i].kind, id: opts[i].id }; sfx("tap"); draw(); return; }
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b || b.disabled) return; bg.remove();
-    if (b.dataset.x === "go") openScav(cfg, s, place, persist, onEnd, sel);
+    const b = t.closest<HTMLButtonElement>("button[data-x]"); if (!b || b.disabled) return; bg.remove();
+    if (b.dataset.x === "go" && pick) openScav(cfg, s, pick.id, persist, onEnd, sel);
   });
 }
 
-export function openScav(cfg: Config, s: GameState, place: string, persist: () => void, onEnd: (r: ScavResult) => void, load: Loadout = defaultLoadout(cfg, s)) {
-  const site = scavSite(place)!; const n: Scav = createScav(cfg, s, site, (s.seed * 29 + s.day * 811 + Math.floor(s.minute)) | 0, load);
+export function openScav(cfg: Config, s: GameState, siteId: string, persist: () => void, onEnd: (r: ScavResult) => void, load: Loadout = defaultLoadout(cfg, s)) {
+  const site = scavSite(siteId)!; const n: Scav = createScav(cfg, s, site, (s.seed * 29 + s.day * 811 + Math.floor(s.minute)) | 0, load);
   const el = document.createElement("div"); el.className = "siege nobet scav"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Harabe araması");
   el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="sc-hud"><span id="scMoney"></span><span class="raid-pill" id="scRaid"></span><span id="scDanger"></span></div></div>
     <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="scTip"></div>
@@ -59,7 +70,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   const rings: { x: number; floor: number; t: number; r: number; color: string }[] = []; const pops: { x: number; floor: number; t: number; text: string; color: string }[] = []; const shots: { a: number; b: number; floor: number; t: number }[] = [];
   const F = site.floors; const VIEW = 110;
   const layout = () => { const r = stage.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + "px"; cv.style.height = H + "px"; g.setTransform(dpr, 0, 0, dpr, 0, 0); };
-  const sc = () => W / VIEW; const camX = () => Math.max(VIEW / 2, Math.min(SW - VIEW / 2, n.px));
+  const sc = () => W / VIEW; const camX = () => Math.max(VIEW / 2, Math.min(n.w - VIEW / 2, n.px));
   const X = (x: number) => (x - camX()) * sc() + W / 2;
   const fh = () => Math.min(H / F, 200);
   const top = () => (H - fh() * F) / 2;
@@ -77,7 +88,7 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
     const rimg = img("harabe_oda_" + site.place);
     if (rimg) {
       // oda panelleri yan yana dizilir (her oda 100 birim); çift odalar aynalanır, böylece kenarlar birbirine uyar
-      for (let k = 0; k < SW / 100; k++) { const x0 = X(k * 100), x1 = X((k + 1) * 100); if (x1 < -2 || x0 > W + 2) continue;
+      for (let k = 0; k < n.w / 100; k++) { const x0 = X(k * 100), x1 = X((k + 1) * 100); if (x1 < -2 || x0 > W + 2) continue;
         g.save(); g.beginPath(); g.rect(x0, y0, x1 - x0, fh()); g.clip(); if (k % 2) { g.translate(x0 + x1, 0); g.scale(-1, 1); } g.drawImage(rimg, k % 2 ? x0 : x0, y0, x1 - x0, fh()); g.restore(); }
       g.strokeStyle = "rgba(20,16,10,.7)"; g.lineWidth = 2; g.beginPath(); g.moveTo(0, y1 - 10); g.lineTo(W, y1 - 10); g.stroke();
       const lk0 = n.locks.find(l => l.floor === f);
@@ -105,9 +116,9 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   }
   function ladders() {
     const lim = img("harabe_merdiven");
-    if (lim) { for (let gap = 0; gap < F - 1; gap++) { const x = X(LADDER_XS[gap % 2]); const yLow = floorBottom(gap) - 6, yHigh = floorBottom(gap + 1) - 10; const h = yLow - yHigh + 6, w = h * lim.naturalWidth / lim.naturalHeight; g.drawImage(lim, x - Math.max(w, 22) / 2, yHigh - 6, Math.max(w, 22), h); } return; }
+    if (lim) { for (let gap = 0; gap < F - 1; gap++) { const x = X(ladderAt(n.w, gap)); const yLow = floorBottom(gap) - 6, yHigh = floorBottom(gap + 1) - 10; const h = yLow - yHigh + 6, w = h * lim.naturalWidth / lim.naturalHeight; g.drawImage(lim, x - Math.max(w, 22) / 2, yHigh - 6, Math.max(w, 22), h); } return; }
     for (let gap = 0; gap < F - 1; gap++) {
-      const x = X(LADDER_XS[gap % 2]); const yLow = floorBottom(gap) - 10, yHigh = floorBottom(gap + 1) - 10;
+      const x = X(ladderAt(n.w, gap)); const yLow = floorBottom(gap) - 10, yHigh = floorBottom(gap + 1) - 10;
       g.strokeStyle = "#3A2A1A"; g.lineWidth = 3; g.beginPath(); g.moveTo(x - 9, yLow); g.lineTo(x - 9, yHigh); g.moveTo(x + 9, yLow); g.lineTo(x + 9, yHigh); g.stroke();
       g.lineWidth = 2; for (let y = yLow - 8; y > yHigh + 4; y -= 11) { g.beginPath(); g.moveTo(x - 9, y); g.lineTo(x + 9, y); g.stroke(); }
     }
@@ -209,8 +220,12 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
   /* ---------- HUD ---------- */
   const q = (id: string) => el.querySelector<HTMLElement>(id)!;
   function hud() {
-    q("#scMoney").textContent = `◉ ${n.money}`; const rs = Math.max(0, Math.ceil(n.raidT)); const rp = q("#scRaid"); if (n.raidHold > 0) { rp.textContent = `Baskın bitti · ${Math.ceil(n.raidHold)}`; rp.className = "raid-pill calm"; } else { rp.textContent = `BASKIN ${rs}`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`; }
-    q("#scDanger").textContent = `Tehlike ${danger(n)}`;
+    q("#scMoney").textContent = `◉ ${n.money}`; const rs = Math.max(0, Math.ceil(n.raidT)); const rp = q("#scRaid");
+    if (!n.alerted) { rp.textContent = "Sessiz"; rp.className = "raid-pill calm"; }
+    else if (raidsLeft(n) <= 0 && !isFinite(n.raidT)) { rp.textContent = n.raidHold > 0 ? `Son baskın · ${Math.ceil(n.raidHold)}` : "Baskın kalmadı"; rp.className = "raid-pill calm"; }
+    else if (n.raidHold > 0) { rp.textContent = `Baskın bitti · ${Math.ceil(n.raidHold)}`; rp.className = "raid-pill calm"; }
+    else { rp.textContent = `BASKIN ${rs}`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`; }
+    q("#scDanger").textContent = n.alerted ? `${raidsLeft(n)} baskın kaldı` : `${n.site.raids} baskın`;
     { const wa = n.weaponId && artUrl("harabe_silah_" + n.weaponId); q("#scAmmo").innerHTML = `${wa ? `<img class="sc-wicon" src="${wa}" alt="">` : ""}${esc(n.weaponName)}${n.bow ? ` · ok ${n.ammo}` : ""}`; } { const ka = artUrl("harabe_anahtar"); q("#scBag").innerHTML = `${n.keys.length ? (ka ? `<img class="sc-wicon" src="${ka}" alt="">×${n.keys.length} ` : `🔑${n.keys.length} `) : ""}Çanta ${bagUsed(n)}/${n.bagCap}`; }
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
     (q("#scSearch") as HTMLElement).hidden = true;
@@ -229,7 +244,8 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
       if (f.k === "full") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Çanta dolu: yere düştü", color: "#E36A55" }); sfx("bad"); }
       if (f.k === "hit") pops.push({ x: f.x, floor: f.floor, t: now, text: `${f.crit ? "Kritik " : ""}${f.dmg}`, color: f.crit ? "#E36A55" : "#F2E7C9" });
       if (f.k === "hurt") { shake = Math.max(shake, 5); sfx("hurt"); buzz("light"); }
-      if (f.k === "raid") { tip.hidden = false; tip.textContent = `Baskın! ${f.n} düşman geliyor`; setTimeout(() => { tip.hidden = true; }, 2200); sfx("beat"); buzz("medium"); }
+      if (f.k === "alarm") { tip.hidden = false; tip.textContent = f.human ? "Seni fark ettiler! Islık çalıp ötekileri çağırdılar." : "Kurtlar seni fark etti! Uluyarak arkadaşlarını çağırdılar."; setTimeout(() => { tip.hidden = true; }, 3200); if (!f.human) howl(); sfx("beat"); buzz("heavy"); shake = 6; }
+      if (f.k === "raid") { tip.hidden = false; tip.textContent = f.last ? `Son baskın! ${f.n} düşman geliyor` : `Baskın! ${f.n} düşman geliyor`; setTimeout(() => { tip.hidden = true; }, 2200); sfx("beat"); buzz("medium"); }
       if (f.k === "shot") { shots.push({ a: f.from, b: f.to, floor: f.floor, t: now }); sfx("whoosh"); }
       if (f.k === "trap") { rings.push({ x: f.x, floor: f.floor, t: now, r: 14, color: "rgba(241,193,74," }); sfx("thunk"); pops.push({ x: f.x, floor: f.floor, t: now, text: "Tuzak!", color: "#F1C14A" }); }
       if (f.k === "spell") { rings.push({ x: f.x, floor: f.floor, t: now, r: f.r, color: f.kind === "buz" ? "rgba(159,211,232," : f.kind === "ates" ? "rgba(230,110,50," : "rgba(160,140,255," }); sfx("crit"); buzz("heavy"); shake = 8; }
@@ -309,16 +325,17 @@ export function openScav(cfg: Config, s: GameState, place: string, persist: () =
 
   /* ---------- döngü ---------- */
   function end() {
-    if (ended) return; ended = true; cancelAnimationFrame(raf); window.removeEventListener("resize", layout); ro.disconnect();
+    if (ended) return; ended = true; cancelAnimationFrame(raf); window.removeEventListener("resize", layout); ro.disconnect(); harabeAudio(false);
     const r = finishScav(cfg, s, n); persist(); sfx(r.result === "exit" ? "win" : "lose"); setTimeout(() => { el.remove(); onEnd(r); }, 350);
   }
   const loop = (now: number) => {
     const real = Math.min(0.1, (now - last) / 1000); last = now;
     if (!paused && n.phase === "play") stepScav(n, real);
+    harabeSteps(!paused && n.moving && !n.climbing);
     popFx(); shake = Math.max(0, shake - 0.5);
     if (n.phase === "over") { end(); return; }
     draw(now); hud(); raf = requestAnimationFrame(loop);
   };
-  layout(); tip.hidden = false; tip.textContent = `Kutunun yanında dur: kendiliğinden arar. Hareket edersen durur.`; setTimeout(() => { tip.hidden = true; }, 4000);
-  raf = requestAnimationFrame(loop); void itemPic; void LADDER_XS; void walkT;
+  layout(); harabeAudio(true); tip.hidden = false; tip.textContent = `${site.name}. Bekçiler uyuyor; yaklaşırsan uyanırlar. Kutunun yanında dur: kendiliğinden arar.`; setTimeout(() => { tip.hidden = true; }, 4500);
+  raf = requestAnimationFrame(loop); void itemPic; void walkT;
 }

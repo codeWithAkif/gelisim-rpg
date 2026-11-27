@@ -32,6 +32,23 @@ Her mod için üç soru:
 | Finans (ortaklık) | Ertelendi | Ortaklıklar Karaçam'a varınca açılır. Pazarda satış her zaman açık. |
 | Evcil hayvan | Tut, küçük | Köpek ve şahin yetenekleri kuşatmada işler. |
 
+## Harabeler: kolaydan zora, tükenen sandıklar
+
+Bir yerde birden çok harabe olabilir (`src/engine/scavenge.ts` içindeki `SCAV_SITES`). Korudaki dört harabe:
+
+| Harabe | Zorluk | Kat · oda | Bekçi | Baskın | Açılış |
+|---|---|---|---|---|---|
+| Yıkık avcı kulübesi | Kolay | 1 · 3 | 2 | 1 | Kurt derdi |
+| Terk edilmiş ağıl | Orta | 2 · 4 | 4 | 2 | Kurt derdi |
+| Eski korucu kulesi | Zor | 3 · 5 (kilitli odalar) | 6 | 3 | Kurtların izi |
+| Yanık beyler köşkü | Çok zor | 4 · 7 (kilitli odalar) | 9 | 4 | Sürünün başı |
+
+- **Bekçiler uyur.** Biri seni fark ederse (yaklaşınca ya da vurulunca) ötekileri çağırır: kurtlar ulur, insanlar ıslık çalar. Baskın sayacı ancak o an başlar; fark edilmezsen baskın gelmez.
+- **Baskın sayısı sınırlı** ve harabeye göre büyür; sonuncusu "Son baskın" diye duyurulur.
+- **Tükenen sandık.** Yerleşim her kayıtta sabittir; boşaltılan sandık boş, açılan kapı açık kalır, öldürülen bekçi dönmez (`s.harabe`). Aynı harabeden sürekli ödül alınamaz.
+- **Ölünce** çanta düştüğün yerde kalır; geri dönüp alabilirsin.
+- Ödül harabenin zorluğuyla artar (daha çok sandık, kilitli odalar, daha değerli eşya).
+
 ## Tekrar eden savunmalar (eski nöbet)
 
 `src/engine/siege.ts` içindeki `escalate(def, kez)`: aynı gece görevini kaçıncı kez kazandığına göre

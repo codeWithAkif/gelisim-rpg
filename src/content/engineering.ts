@@ -43,4 +43,6 @@ GAME_ITEMS.odun = { id: "odun", name: "Odun", slot: "Malzeme", stack: 10, price:
 GAME_ITEMS.demir_parca = { id: "demir_parca", name: "Demir parçası", slot: "Malzeme", stack: 10, price: 6, desc: "Kemal'in atığından kalan çivi ve demir parçaları. Mekanizma ve uç yapımı için." };
 MARKETS.koy_meydani.items.push("odun");
 MARKETS.karacam.items.push("odun", "demir_parca");
+// Taşpınar'da demir Kemal'in tezgâhından alınır (tuzak, kazık, ev için gereken demir parçası)
+MARKETS.demirhane = { name: "Kemal'in tezgâhı", items: ["demir_parca", "odun"] };
 MARKETS.ardic_kul.items.push("demir_parca");

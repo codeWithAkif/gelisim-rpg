@@ -366,10 +366,10 @@ export function startApp(root: HTMLElement) {
       const items = Object.entries(r.items).map(([k, v]) => `${itemInfo(cfg, k).name}${v > 1 ? " ×" + v : ""}`);
       const lost = Object.entries(r.lostItems).map(([k, v]) => `${itemInfo(cfg, k).name}${v > 1 ? " ×" + v : ""}`);
       modal(`<p class="hand ${r.result === "exit" ? "muted" : "red"}" style="margin:0">Harabe araması</p><h2>${r.result === "exit" ? "Sağ salim çıktın" : "Yaralı kaçtın"}</h2>
-        <p style="margin:0">${r.result === "exit" ? "Bulduklarını çıkışa kadar getirdin." : "Baskın seni yere serdi; çantandakiler harabede kaldı."}</p>
-        <div class="odds"><span>Aranan yer <b>${r.searched}</b></span><span>Baskın <b>${r.waves}</b></span><span>Süre <b>${r.minutes} dk</b></span></div>
+        <p style="margin:0">${r.result === "exit" ? "Bulduklarını çıkışa kadar getirdin." : "Baskın seni yere serdi. Çantan düştüğün yerde kaldı; geri dönüp alabilirsin."}</p>
+        <div class="odds"><span>Bu sefer aranan <b>${r.searched}</b></span><span>Harabede boşaltılan <b>${r.progress.done}/${r.progress.total}</b></span><span>Baskın <b>${r.waves}</b></span><span>Süre <b>${r.minutes} dk</b></span></div>
         ${items.length || r.money ? `<p class="hand blue" style="margin:0">Getirdiklerin: ${esc([...(r.money ? [`${r.money} bakır`] : []), ...items].join(", "))}</p>` : `<p class="tiny muted" style="margin:0">Eli boş döndün.</p>`}
-        ${lost.length ? `<p class="tiny red" style="margin:0">Kaybolan: ${esc(lost.join(", "))}</p>` : ""}
+        ${lost.length ? `<p class="tiny red" style="margin:0">Harabede kalan: ${esc(lost.join(", "))}</p>` : ""}
         ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
         <h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
     });

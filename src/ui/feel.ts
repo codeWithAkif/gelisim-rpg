@@ -175,6 +175,31 @@ export function bellCue(pan: number) {
   });
 }
 
+/* ---------- harabe: ürkütücü müzik, ayak sesi, uluma (src/assets/ses/harabe_*.ogg) ---------- */
+const HARABE_FILES = import.meta.glob("../assets/ses/harabe_*.ogg", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
+for (const [path, url] of Object.entries(HARABE_FILES)) ORTAM[path.split("/").pop()!.replace(/\.ogg$/, "")] = url;
+type HarabeAudio = { music?: AudioBufferSourceNode; steps?: AudioBufferSourceNode; stepGain: GainNode; out: GainNode };
+let harabe: HarabeAudio | null = null;
+const harabeNow = (): HarabeAudio | null => harabe;
+/** Harabeye girince müzik ve (yürürken açılan) ayak sesi kurulur; çıkınca söner. */
+export function harabeAudio(on: boolean) {
+  const c = ac(); if (!c || !master) return;
+  if (!on) { if (harabe) { const h = harabe; harabe = null; h.out.gain.setTargetAtTime(0, c.currentTime, 0.4); setTimeout(() => { try { h.music?.stop(); h.steps?.stop(); } catch { /* */ } h.out.disconnect(); }, 1800); } return; }
+  if (harabe || !settings().sound) return;
+  const out = c.createGain(); out.gain.value = 0; out.connect(master); out.gain.setTargetAtTime(1, c.currentTime, 1);
+  const stepGain = c.createGain(); stepGain.gain.value = 0; stepGain.connect(out);
+  const me: HarabeAudio = { stepGain, out }; harabe = me;
+  if (settings().music) void ambBuf(c, "harabe_muzik").then(buf => { if (!buf || harabeNow() !== me) return; const src = c.createBufferSource(); src.buffer = buf; src.loop = true; const g = c.createGain(); g.gain.value = 0.45; src.connect(g).connect(out); src.start(0, Math.random() * buf.duration); me.music = src; });
+  void ambBuf(c, "harabe_ayak").then(buf => { if (!buf || harabeNow() !== me) return; const src = c.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(stepGain); src.start(0, Math.random() * buf.duration); me.steps = src; });
+}
+/** Yürürken ayak sesi duyulur, durunca kesilir. */
+export function harabeSteps(moving: boolean) { const c = ctx; if (!harabe || !c) return; harabe.stepGain.gain.setTargetAtTime(moving ? 0.8 : 0, c.currentTime, moving ? 0.05 : 0.08); }
+/** Kurt uluması: bekçiler fark edince. */
+export function howl() {
+  if (!settings().sound) return; const c = ac(); if (!c || !master) return;
+  void ambBuf(c, "harabe_uluma").then(buf => { if (!buf) return; const src = c.createBufferSource(); src.buffer = buf; const p = c.createStereoPanner(); p.pan.value = Math.random() * 0.8 - 0.4; const g = c.createGain(); g.gain.value = 0.9; src.connect(g).connect(p).connect(master!); src.start(); });
+}
+
 /** Ortak ses bağlamı ve ana çıkış (müzik çalar da kullanır). */
 export function audioOut(): { c: AudioContext; out: GainNode } | null { const c = ac(); return c && master ? { c, out: master } : null; }
 
