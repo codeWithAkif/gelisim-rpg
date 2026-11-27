@@ -17,6 +17,8 @@ import { TERRAIN, ENEMIES, MAPS } from "../content/world";
 import { esc, wolfSketch, humanSketch } from "./sketch";
 import { spellOptions, previewSpell, castSpell, hexRange, areaHexes, SPELL_FX } from "../engine/magic";
 import { MapRenderer } from "./battle-render";
+import { type CoachStep, type CoachEvent, coachLine, coachNext, coachLearned } from "../engine/coach";
+import { artUrl } from "./art";
 
 type Mode = { k: "normal" } | { k: "spell"; id: string; target?: XY } | { k: "torch" };
 
@@ -41,6 +43,38 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
   const R = new MapRenderer(canvas);
 
   const stage = () => el.querySelector<HTMLElement>(".battle-canvas")!;
+
+  /* ---------- Hasan'ın dersi: ilk savaşta adım adım ---------- */
+  let coach: CoachStep | null = s.story.flags.ogretici_savas === undefined ? "giris" : null;
+  const bubble = document.createElement("div"); bubble.className = "coach";
+  panel.before(bubble);   // haritayla panelin arasında: kurtları kapatmasın
+  const timingOn = () => !!settings().timing;
+  let shown = "";
+  function renderCoach() {
+    const line = coach ? coachLine(coach, timingOn()) : null;
+    bubble.classList.toggle("on", !!line);
+    if (!line) { bubble.innerHTML = ""; shown = ""; return; }
+    if (shown === line.text) return;   // aynı öğüt: balon yeniden çizilmesin (canlandırma baştan başlamasın)
+    shown = line.text;
+    const pic = artUrl("portre_hasan");
+    bubble.innerHTML = `${pic ? `<img src="${pic}" alt="">` : ""}<div class="coach-body"><div class="coach-who hand">Hasan</div><p>${esc(line.text)}</p>
+      <div class="coach-row">${line.button ? `<button class="btn small primary" data-c="ok">${esc(line.button)}</button>` : ""}<button class="coach-skip" data-c="skip">Dersi geç</button></div></div>`;
+  }
+  function coachEv(ev: CoachEvent) {
+    if (!coach) return;
+    const was = coach; coach = coachNext(coach, ev, timingOn());
+    if (coach === was) return;
+    if (coachLearned(coach) && s.story.flags.ogretici_savas === undefined) { s.story.flags.ogretici_savas = s.day; persist(); }
+    if (coach === "bitti") coach = null;
+    sfx("page"); renderCoach();
+  }
+  const nearFoe = () => { const p = player(b); return enemies(b).some(e => dist(p.x, p.y, e.x, e.y) === 1 && visible(cfg, s, b, e)); };
+  bubble.addEventListener("click", e => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>("[data-c]"); if (!t) return;
+    e.stopPropagation();
+    if (t.dataset.c === "ok") coachEv("tamam");
+    if (t.dataset.c === "skip") { coach = null; s.story.flags.ogretici_savas ??= s.day; persist(); renderCoach(); }
+  });
   /** İki altıgen arası ekran açısı (derece): a'dan b'ye. */
   const screenAngle = (a: XY, b2: XY) => { const p = R.center(...a), q = R.center(...b2); return Math.atan2(q.cy - p.cy, q.cx - p.cx) * 180 / Math.PI; };
   function refreshView() {
@@ -126,7 +160,7 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
   }
 
   function renderPanel() {
-    info(); refreshView();
+    info(); refreshView(); renderCoach();
     const p = player(b);
     const tgt = b.units.find(u => u.uid === selected && u.hp > 0 && !u.fled && visible(cfg, s, b, u));
     const terr = TERRAIN[b.tiles[p.y][p.x]];
@@ -192,8 +226,8 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     busy = true; renderPanel();
     await R.wait(200);
     const inc = settings().timing ? incomingAttack(cfg, s, b) : null;
-    if (inc) b.dodgeQ = await dodgePrompt(stage(), { foe: inc.def, from: screenAngle(inc.to, inc.from), ease: skillEase(s, "refleks") * 0.7 + skillEase(s, "esneklik") * 0.3 });
-    enemyTurn(cfg, s, b); busy = false;
+    if (inc) { b.dodgeQ = await dodgePrompt(stage(), { foe: inc.def, from: screenAngle(inc.to, inc.from), ease: skillEase(s, "refleks") * 0.7 + skillEase(s, "esneklik") * 0.3, tip: coach === "kac" ? "Hasan: çalımına kanma. Havadayken parmağını yana kaydır." : undefined }); coachEv("kacis"); }
+    enemyTurn(cfg, s, b); busy = false; coachEv("tur_bitti");
     await play();
     if (!b.units.some(u => u.uid === selected && u.hp > 0 && !u.fled)) selected = enemies(b)[0]?.uid ?? null;
     persist(); renderPanel();
@@ -221,8 +255,13 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
     }
     if (mode.k === "torch") { if (canThrowTorch(b, hex[0], hex[1])) { throwTorch(b, hex[0], hex[1]); mode = { k: "normal" }; after(); } return; }
     const u = b.units.find(v => v.hp > 0 && !v.fled && v.x === hex[0] && v.y === hex[1]);
-    if (u && u.side === "enemy" && visible(cfg, s, b, u)) { if (selected !== u.uid) aim = undefined; selected = u.uid; renderPanel(); return; }
-    if (movePlayer(cfg, s, b, hex[0], hex[1])) after();
+    if (u && u.side === "enemy" && visible(cfg, s, b, u)) { if (selected !== u.uid) aim = undefined; selected = u.uid; coachEv("sec"); if (nearFoe()) coachEv("yanında"); renderPanel(); return; }
+    if (movePlayer(cfg, s, b, hex[0], hex[1])) {
+      // yanına vardığın kurt seçili değilse onu seç: "Saldır" hemen açılsın
+      const p = player(b); const cur = selected ? unitById(b, selected) : undefined;
+      if (!cur || cur.hp <= 0 || cur.fled || dist(p.x, p.y, cur.x, cur.y) !== 1) { const adj = enemies(b).find(e => dist(p.x, p.y, e.x, e.y) === 1 && visible(cfg, s, b, e)); if (adj) { selected = adj.uid; aim = undefined; } }
+      if (nearFoe()) coachEv("yanında"); after();
+    }
   });
   panel.addEventListener("click", e => {
     const t = (e.target as HTMLElement).closest("button"); if (!t || busy || t.disabled) return;
@@ -239,10 +278,11 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
         let q: number | undefined;
         if (settings().timing) {
           busy = true; const wp = aim ? ENEMIES[tgt.def!].weakPoints.find(w => w.id === aim) : undefined;
-          q = await slashPrompt(stage(), { foe: tgt.def!, aimName: wp?.name, aimAt: wp?.at, aimArtAt: wp?.artAt, detail: s.attrs.analiz?.level ?? 10, ease: skillEase(s, "refleks") * 0.5 + skillEase(s, "kilic") * 0.5 });
+          q = await slashPrompt(stage(), { foe: tgt.def!, aimName: wp?.name, aimAt: wp?.at, aimArtAt: wp?.artAt, detail: s.attrs.analiz?.level ?? 10, ease: skillEase(s, "refleks") * 0.5 + skillEase(s, "kilic") * 0.5,
+            tip: coach === "vur" ? "Hasan: sarı açık parlayınca, parmağını içinden hızla geçir." : undefined });
           busy = false;
         }
-        playerAttack(cfg, s, b, tgt, aim, stance, q); stance = "normal"; after();
+        playerAttack(cfg, s, b, tgt, aim, stance, q); stance = "normal"; coachEv("saldir"); after();
       })(); break;
       case "stance": stance = stance === "guclu" ? "normal" : "guclu"; renderPanel(); break;
       case "push": if (tgt) void (async () => {
@@ -288,14 +328,18 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
       <p><b>Saldır</b>: kurdun üstünde açık parlayınca içinden kes; iyi kesik hasarı artırır. <b>Kaç</b>: kurt atıldığında, havadayken yana kaydır; çalımına kanma. İyi kaçış isabeti ve hasarı düşürür. Başaramamak bir şey değiştirmez. Uzun ot ve ağaç seni saklar, rüzgâr kokunu taşır, yağmur kokunu bastırır.</p>
       <p><b>İt</b>: düşmanı bir altıgen geri iter. Arkası ateşse yanar, dereyse sersemler, çamursa saplanır.</p>
       <p><b>Savun</b>: turu harcarsın ama düşmanın isabeti düşer.</p>
-      <div class="row"><button class="btn primary">Tamam</button></div></div>`;
-    document.body.appendChild(h); h.querySelector("button")!.addEventListener("click", () => h.remove());
+      <div class="row"><button class="btn" data-h="ders">Hasan'ın dersi</button><button class="btn primary" data-h="ok">Tamam</button></div></div>`;
+    document.body.appendChild(h);
+    h.querySelector("[data-h=ok]")!.addEventListener("click", () => h.remove());
+    h.querySelector("[data-h=ders]")!.addEventListener("click", () => { h.remove(); coach = "giris"; renderCoach(); });
   });
 
   const onResize = () => R.layout();
   window.addEventListener("resize", onResize);
   const ro = new ResizeObserver(() => R.layout());
   ro.observe(canvas.parentElement!);
+  // yalnız geliştirme sürümünde: tarayıcı denemeleri haritadaki birimlere dokunabilsin
+  if (import.meta.env.DEV) (window as unknown as { __savas?: unknown }).__savas = { b, center: (x: number, y: number) => { const c = R.center(x, y), r = canvas.getBoundingClientRect(); return { x: r.left + c.cx, y: r.top + c.cy }; } };
   refreshView(); R.layout(); renderPanel(); R.start();
   if (b.events.length) after();
   return b;

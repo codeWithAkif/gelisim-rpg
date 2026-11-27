@@ -104,13 +104,13 @@ export function statusBar(cfg: Config, s: GameState): string {
 }
 
 /* ---------------- Sıradaki adım ---------------- */
-const STEP_KIND: Record<string, string> = { ana: "Ana görev", hikaye: "Hikâye", yan: "Yan görev", uyku: "Dinlen" };
+const STEP_KIND: Record<string, string> = { ana: "Ana hikâye", hikaye: "Yan hikâye", yan: "Yan görev", uyku: "Dinlen" };
 /** Defter'in en üstünde: şimdi ne yapmalı, tek düğmeyle. */
 export function nextCard(s: GameState): string {
   const n = nextStep(s); if (!n) return "";
   const btn = n.act ? `<button class="btn small ${n.act === "fight" ? "red" : n.act === "show-place" ? "blue" : "primary"}" data-act="${n.act}" data-id="${esc(n.id ?? "")}">${esc(n.button ?? "Git")}</button>` : "";
   return `<section class="next-card" aria-label="Sıradaki adım"><div class="nc-text"><span class="nc-kind">Sıradaki adım${n.kind ? ` · ${STEP_KIND[n.kind]}` : ""}</span>
-    <b>${esc(n.title)}</b><span class="nc-sub">${esc(n.text)}</span></div>${btn}</section>`;
+    <b>${esc(n.title)}</b><span class="nc-sub">${esc(n.text)}</span>${n.also ? `<span class="nc-also">Ayrıca · ${STEP_KIND[n.also.kind]}: ${esc(n.also.title)} <i>(isteğe bağlı, Görevler'de)</i></span>` : ""}</div>${btn}</section>`;
 }
 
 /* ---------------- Defter (bilgi) ---------------- */
@@ -200,7 +200,7 @@ function storySection(_cfg: Config, s: GameState): string {
     const done = s.story.reached.includes(m.id);
     if (done) return `<div class="story-step done"><span class="mk" style="color:var(--green)">✓</span><span class="t">${esc(m.title)}</span></div>`;
     if (m.side) return `<div class="story-step"><span class="mk muted">◦</span><span><span class="t">${esc(m.title)}</span> <span class="muted tiny">yan hikâye</span><div class="h">${esc(m.hint)}</div></span></div>`;
-    if (!nowShown) { nowShown = true; return `<div class="story-step now"><span class="mk red">→</span><span><span class="t">${esc(m.title)}</span><div class="h">${esc(m.hint)}</div></span></div>`; }
+    if (!nowShown) { nowShown = true; return `<div class="story-step now"><span class="mk red">→</span><span><span class="t">${esc(m.title)}</span> <span class="muted tiny">ana hikâye</span><div class="h">${esc(m.hint)}</div>${m.go ? `<button class="btn small primary" style="margin-top:4px" data-act="${m.go.act}" data-id="${esc(m.go.id)}">${esc(m.go.button)}</button>` : ""}</span></div>`; }
     return `<div class="story-step"><span class="mk muted">·</span><span class="t muted">…</span></div>`;
   }).join("");
   return `<section class="sec">${past}<h2>${esc(ch.title)}</h2><div>${steps}</div></section>`;
@@ -402,7 +402,7 @@ function dailyCards(cfg: Config, s: GameState): string {
 /** Görevin türü: neyi takip edeceğin anlaşılsın. */
 export { questKind, type QuestKind } from "../engine/quests";
 import { questKind, type QuestKind } from "../engine/quests";
-export const KIND_NAMES: Record<QuestKind, string> = { ana: "Ana görev", hikaye: "Hikâye görevi", yan: "Yan görev" };
+export const KIND_NAMES: Record<QuestKind, string> = { ana: "Ana hikâye", hikaye: "Yan hikâye", yan: "Yan görev" };
 const kindChip = (k: QuestKind) => `<span class="kind-chip k-${k}">${KIND_NAMES[k]}</span>`;
 
 /** Defter'in Görevler sayfası: açık, biten ve sıradaki işler; günlük istekler. */

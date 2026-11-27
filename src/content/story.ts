@@ -27,6 +27,8 @@ export interface Milestone {
   text: string;                      // ulaşınca açılan sayfa
   effects?: { learnElement?: string; items?: Record<string, number>; flag?: string };
   side?: boolean;                    // yan hikâye: bölümün bitmesini beklemez
+  /** Bir göreve bağlı olmayan hedeflerde "Sıradaki adım" kartının düğmesi (ör. Ateş çalış). */
+  go?: { act: "session-pick" | "sleep"; id: string; button: string };
   scene?: string;                    // varsa "Yeni sayfa" penceresi yerine bu sahne oynar (content/scenes.ts)
   accept?: string;                   // sahne bitince bu iş kendiliğinden üstlenilir (sahnede söz verildiyse)
 }
@@ -49,15 +51,16 @@ export const CHAPTERS: Chapter[] = [
         text: "Köyde adın anılmaya başladı. Muhtar Ayşe seni çağırttı: \"On iki yıl önce buraya bir kadın geldi. Bir defteri vardı; seninkine benziyordu. Şifacı Zehra'ya bir şey bıraktı.\"" },
       { id: "iz", title: "Annenin izi", hint: "Muhtardan işi al; Zehra'nın evi yaylaya çıkan patikada.", reached: s => done(s, "annenin_izi"), scene: "zehra",
         effects: { learnElement: "el_ates" },
-        text: "Zehra eski bir sandığı açtı. İçinde annenin elinden çıkmış tek bir yaprak: ATEŞ. \"Isı, maddenin titreşimidir. Titreşimi tek noktada topla; nefesin yakıtındır.\" Defterine yeni bir sayfa eklendi. Artık Ateş çalışabilirsin (Çalış)." },
-      { id: "kivilcim", title: "İlk kıvılcım", hint: "Ateş çalışmasıyla Ateş büyüsünü 5'e çıkar.", reached: s => (s.attrs.ates?.level ?? 0) >= 5, scene: "kivilcim",
+        text: "Zehra eski bir sandığı açtı. İçinde annenin elinden çıkmış tek bir yaprak: ATEŞ. \"Isı, maddenin titreşimidir. Titreşimi tek noktada topla; nefesin yakıtındır.\" Defterine yeni bir sayfa eklendi. Artık Ateş çalışabilirsin: Sıradaki adım kartındaki \"Ateş çalış\" ya da haritada bir yere dokunup Çalış." },
+      { id: "kivilcim", title: "İlk kıvılcım", hint: "Ateş çalış: Ateş büyün 5 olunca avucunda ilk alev yanar. Her yerde çalışabilirsin.", reached: s => (s.attrs.ates?.level ?? 0) >= 5, scene: "kivilcim",
+        go: { act: "session-pick", id: "calisma_ates", button: "Ateş çalış" },
         text: "Avucunda bir an için gerçek bir alev durdu. Nefesin titredi, alev de titredi. Ateş topu artık savaşta kullanılabilir." },
       { id: "ates_kurt", title: "Ateş ve kurt", hint: "Bir savaşı büyü kullanarak kazan (Defter → Görevler: Meraya devriye).", reached: s => (s.story.flags.buyuluZafer ?? 0) > 0, scene: "ates_kurt",
         effects: { flag: "zaferGun" },
         text: "Kurtlar ateşi görünce dağıldı. Hasan uzaktan bakıp bir dua mırıldandı. Köyde biri yasak bir şey gördüğünü fısıldıyor." },
       { id: "suru_basi", side: true, title: "Sürünün başı", hint: "Kurtların neden çoğaldığını bul: Hasan'ın 'Kurtlar nereden geliyor?' işi.", reached: s => done(s, "akyele"), scene: "suru_basi",
         text: "Akyele düştü, sürü dağıldı. Ama donmuş karacayı unutamıyorsun: kuzeyde bir şey ısıyı çekiyor, ve annenin defterindeki kor taşı şimdi senin cebinde." },
-      { id: "mektup", title: "Annenin mektubu", hint: "Bir gece dinlen; Zehra seni bekliyor.", reached: s => has(s, "ates_kurt") && s.day > (s.story.flags.zaferGun ?? 1e9), scene: "mektup",
+      { id: "mektup", title: "Annenin mektubu", hint: "Bir gece uyu; sabah Zehra seni bekliyor.", go: { act: "sleep", id: "", button: "Uyu" }, reached: s => has(s, "ates_kurt") && s.day > (s.story.flags.zaferGun ?? 1e9), scene: "mektup",
         text: "Zehra annenin bıraktığı mühürlü mektubu sana verdi: \"Isıyı çeken biri var. Kuzeyde değil, aramızda. Karaçam'daki tüccar Selim'e git; kimin için çalıştığını o bilir.\" Bölüm 1 burada bitiyor." },
     ],
   },

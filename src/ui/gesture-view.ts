@@ -20,6 +20,11 @@ function layer(host: HTMLElement, cls: string, title: string, W: number, H: numb
   return { el, box: el.querySelector(".gx-stage")!, cv, g, W, H, ink: v("--ink"), red: v("--red"), blue: v("--blue"), green: v("--green"),
     close: (ms = 560) => new Promise(r => setTimeout(() => { el.remove(); r(); }, ms)) };
 }
+/** Hasan'ın dersi sırasında oyunun altında kısa bir öğüt. */
+function addTip(L: Layer, tip?: string) {
+  if (!tip) return; const t = document.createElement("div"); t.className = "gx-tip"; t.textContent = tip;
+  L.el.querySelector(".qt-label")!.after(t);
+}
 function result(L: Layer, q: number, text: string) {
   const r = L.el.querySelector<HTMLElement>(".qt-result")!; r.textContent = text; r.dataset.q = q >= 0.95 ? "1" : q >= 0.55 ? "g" : "0";
   if (q >= 0.95) { sfx("perfect"); buzz("medium"); } else if (q >= 0.55) sfx("good"); else sfx("bad");
@@ -75,13 +80,14 @@ function foePicHtml(W: number, H: number, detail: number, art: FoeArt, aimAt?: [
  * Açık parlarken içinden geçersen tam vuruş (hasar ×1,5; nişanlıysan zayıf nokta), gövdeye denk gelirsen
  * sıyırır (×1,1), ıskalarsan hiçbir şey değişmez. Açığın süresi ve boyu karakterin refleks ve kılıç becerisiyle büyür.
  */
-export function slashPrompt(host: HTMLElement, o: { foe?: string; aimName?: string; aimAt?: [number, number]; aimArtAt?: [number, number]; detail: number; ease: number }): Promise<number> {
+export function slashPrompt(host: HTMLElement, o: { foe?: string; aimName?: string; aimAt?: [number, number]; aimArtAt?: [number, number]; detail: number; ease: number; tip?: string }): Promise<number> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 0.65);
     const art = foeArt(o.foe); const R = fitRect(W, H, art.aspect);
     const toStage = (p: [number, number]): [number, number] => [(R.x + p[0] * R.w) / W, (R.y + p[1] * R.h) / H];
     const aim: [number, number] | undefined = art.url && o.aimArtAt ? toStage(o.aimArtAt) : o.aimAt;
     const L = layer(host, "slash", aim ? `${esc(o.aimName ?? "")} açılınca kes!` : `${esc(art.name)}: açık parlayınca kes!`, W, H, foePicHtml(W, H, o.detail, art, aim));
+    addTip(L, o.tip);
     const bodyPts: [number, number][] = art.human ? [[0.5, 0.25], [0.5, 0.45], [0.5, 0.65], [0.5, 0.85]] : [[0.22, 0.45], [0.42, 0.5], [0.62, 0.5], [0.82, 0.48]];
     const body0 = bodyPts.map(p => { const [x, y] = art.human && art.url ? toStage(p) : p; return { x: x * W, y: y * H, r: (art.human ? R.w * 0.3 : W * 0.11) }; });
     const wolfEl = L.box.querySelector<HTMLElement>(".gx-wolf"); let ox = 0, oy = 0;
@@ -154,11 +160,12 @@ export function slashPrompt(host: HTMLElement, o: { foe?: string; aimName?: stri
  * Çalıma kanarsan ya da erken kaçarsan bir şey değişmez; doğru anda yana kaçarsan isabeti düşer, yine de
  * ısırırsa hasarı azalır. Pencere refleks ve esneklikle genişler.
  */
-export function dodgePrompt(host: HTMLElement, o: { foe?: string; from: number; ease: number }): Promise<number> {
+export function dodgePrompt(host: HTMLElement, o: { foe?: string; from: number; ease: number; tip?: string }): Promise<number> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 0.8);
     const art = foeArt(o.foe);
     const L = layer(host, "dodge", `${esc(art.name)} ${art.human ? "saldıracak" : "atılacak"}! Atılınca yana kaç`, W, H);
+    addTip(L, o.tip);
     const cx = W / 2, cy = H / 2; const a = o.from * Math.PI / 180;
     const sx = cx + Math.cos(a) * W * 0.46, sy = cy + Math.sin(a) * H * 0.46;
     const ease = Math.max(0.8, Math.min(2.5, o.ease));
