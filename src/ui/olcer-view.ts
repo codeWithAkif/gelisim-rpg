@@ -6,7 +6,7 @@ import type { GameState } from "../engine/state";
 import { type HState, type HNode, createPuzzle, transfer, measure, totalHeat, linked, nodeOk, finishOlcer, olcerLevel } from "../engine/olcer";
 import type { GainReport } from "../engine/progression";
 import { esc, roughPath, roughEllipse } from "./sketch";
-import { sfx, buzz, theme } from "./feel";
+import { sfx, buzz } from "./feel";
 
 export interface OlcerEnd { won: boolean; title: string; gains: GainReport; first: boolean }
 
@@ -73,7 +73,7 @@ export function openOlcer(cfg: Config, s: GameState, levelId: string, persist: (
     if (!linked(level, sel, id)) { sel = id; sfx("tap"); draw(); return; }
     const r = transfer(st, sel, id);
     if (r === "ok") { sfx("whoosh"); buzz("light"); flash = { id, t: Date.now() }; } else if (r === "bos") { sfx("bad"); buzz("medium"); }
-    if (st.done === "won") { if (!theme("tam")) sfx("win"); buzz("medium"); } else if (st.done === "lost") sfx("bad");
+    if (st.done === "won") { sfx("win"); buzz("medium"); } else if (st.done === "lost") sfx("bad");
     sel = null;   // her hamle iki dokunuş: önce kaynak, sonra hedef (yanlışlıkla aktarım olmasın)
     draw();
   });
