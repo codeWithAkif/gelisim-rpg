@@ -28,6 +28,7 @@ import { openSiege } from "./siege-view";
 import { openStealth } from "./stealth-view";
 import { diyarScreen } from "./diyar-screen";
 import { openScavHub } from "./scav-view";
+import { openNobetHub, lootText } from "./nobet-view";
 import { openOlcer } from "./olcer-view";
 import { canStartOlcer } from "../engine/olcer";
 import { rollFoes, bonusOf, modeOptions, stealthGoal, siegeFromFoes, groundOf, type Mode, type Context } from "../engine/encounter";
@@ -368,6 +369,7 @@ export function startApp(root: HTMLElement) {
         persist(); render(false); break; }
       case "feast": { const r = feast(s); sfx(r.ok ? "good" : "bad"); toast(r.ok ? "Doyasıya yedin. Bu gece kasların daha çok gelişecek." : r.reason ?? ""); persist(); render(); break; }
       case "scav": doScav(id); break;
+      case "nobet": doNobet(id); break;
       case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;
       case "study": tab = "calis"; sfx("page"); render(false); break;
       case "olcer": {
@@ -389,6 +391,18 @@ export function startApp(root: HTMLElement) {
     }
   });
 
+  /** Sonsuz nöbet; bitince ne kadar dayandığın, rekor, kese ve gelişim. */
+  function doNobet(id: string) {
+    openNobetHub(cfg, s, id, persist, r => {
+      persist(); render();
+      modal(`<p class="hand muted" style="margin:0">Nöbet bitti</p><h2>${r.wave}. dalgaya kadar dayandın${r.best ? " · yeni rekor!" : ""}</h2>
+        <p class="lede">${r.best ? (r.prev ? `Önceki rekorun ${r.prev}. dalgaydı.` : "İlk nöbetin.") : `Rekorun ${r.prev}. dalga.`} Kule düştü; o gecenin kartları ve yükseltmeleri de onunla gitti. Kalan, vücudunda.</p>
+        <div class="odds"><span>Geçen süre <b>${r.minutes} dk</b></span></div>
+        ${r.loot.money || Object.keys(r.loot.items).length ? `<p class="hand blue" style="margin:0">Kese: ${esc(lootText(r.loot))}</p>` : `<p class="tiny muted" style="margin:0">Kese beşinci dalgadan sonra gelir.</p>`}
+        ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
+        <h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
+    });
+  }
   /** Harabe araması; bitince sonuç. */
   function doScav(id: string) {
     openScavHub(cfg, s, id, persist, r => {

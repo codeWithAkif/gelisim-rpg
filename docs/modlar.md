@@ -23,7 +23,7 @@ Her mod için üç soru:
 | Plan + altıgen savaş | Tut, çekirdek | Değişmedi. Zayıf noktalar, rüzgâr, ışık ve anatomi burada. |
 | Gizlenme | Tut | Değişmedi. Algısal özellikleri (koku, işitme) anlamlı kılan yer. |
 | Barikat (kuşatma) | Tut | Ağıl gecesi, Hanın gecesi, Mutfak kapısı. Tekrarlandıkça zorlaşır (aşağıda). |
-| Nöbet | Kuşatmaya katıldı | Kaldırıldı. Sonsuz dalga, "nöbet izi" ve kalıcı güçlenmeler yok. |
+| Nöbet | Geri geldi, değişti | Sonsuz dalga ve nöbet içi güçlenmeler (kırıntı, yükseltme, kart) geri geldi; hepsi yalnız o nöbet için. "Nöbet izi" ve kalıcı güçlenmeler yok. Kalan: rekor, beşer dalgada kese, karakterin gerçek kullanımla gelişimi. |
 | Harabe | Dönüştürüldü | Arama içi kartlar kaldırıldı; her etki bir özellikten gelir (aşağıda). |
 | Savaş içi jestler | Tut | Değişmedi. |
 | Odak mini oyunları | Tut, isteğe bağlı | En iyi oyunla verim ×1,5 (önceden ×2); oynamamak cezalandırılmaz. |
@@ -59,7 +59,15 @@ Bir yerde birden çok harabe olabilir (`src/engine/scavenge.ts` içindeki `SCAV_
 - 4 tekrarda tavan yapar.
 
 Oyuncunun gücü yalnızca karakterden gelir; tekrar yalnızca düşmanı artırır.
-Eski nöbet kulesi görselleri (`kule_*.webp`) ileride kuşatma arka planı olarak kullanılmak üzere saklandı.
+Nöbet kulesi görselleri (`kule_*.webp`) sonsuz nöbetin giriş penceresinde.
+
+## Sonsuz nöbet (geri geldi)
+
+"Ne kadar dayanacaksın" oyunu: dört kule (yayla, han, Ayazkale suru, Kül mahallesi damı), sonsuz ve gittikçe zorlaşan
+dalgalar, her beşinci dalgada bir lider ve bir kese. Kırıntıyla hasar, atış hızı, can, yenilenme ve menzil yükseltilir;
+defter sayfası dolunca üç karttan biri seçilir. **Bunların hepsi o nöbetle biter.** İlk çıkarılış sebebi (ayrı para birimi
+ve kalıcı güçlenme ağacının gelişim sistemiyle yarışması) böylece ortadan kalktı. Büyü burada da çizilir; çizerken ve
+hedefe dokunana kadar zaman durur.
 
 ## Harabe: hangi özellik neyi değiştirir
 

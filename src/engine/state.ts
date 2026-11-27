@@ -68,7 +68,8 @@ export interface GameState {
   ledger?: { day: number; text: string; amount: number }[];         // hesap defteri
   trade?: import("./trade").TradeState;           // kervan ticareti: arabalar, yoldaki kervanlar (engine/trade.ts)
   feast?: number;
-  spellbook?: string[];                           // keşfedilen büyüler (sentez; engine/synthesis.ts)                                 // zengin sofranın kurulduğu gün: o gece uykuda gelişim fazla
+  spellbook?: string[];
+  nobet?: { best: Record<string, number>; runs: number };   // sonsuz nöbet: yalnız rekorlar (geçici güçlenmeler nöbette kalır)                           // keşfedilen büyüler (sentez; engine/synthesis.ts)                                 // zengin sofranın kurulduğu gün: o gece uykuda gelişim fazla
   log: LogEntry[];
 }
 

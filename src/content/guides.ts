@@ -1,7 +1,14 @@
 // İlk girişte kısa öğütler: barikat, gizlenme, harabe ve Ölçer işi. Sayfa sayfa gösterilir, bir kez.
 // Kim söylüyor, hangi portreyle. Savaştaki adım adım dersler (Hasan, Zehra) engine/coach.ts içinde.
 export interface Guide { who: string; portrait?: string; title: string; steps: string[] }
-export const GUIDES: Record<"barikat" | "gizlenme" | "harabe" | "olcer", Guide> = {
+export const GUIDES: Record<"barikat" | "gizlenme" | "harabe" | "olcer" | "nobet", Guide> = {
+  nobet: { who: "Hasan", portrait: "portre_hasan", title: "Sonsuz nöbet", steps: [
+    "Kulenin tepesindesin. Menzile gireni yayla kendiliğinden vurursun; yayın yoksa yalnız yanına geleni.",
+    "Düşenlerden kırıntı toplanır. Alttan hasarı, hızı, canı, menzili yükselt. Hepsi yalnız bu nöbet için.",
+    "Defter sayfası dolunca üç karttan birini seç: çift ok, ateşli ok, Karabaş… Gece biter, kartlar sende kalmaz.",
+    "Her beşinci dalgada bir lider ve bir kese gelir. Kalan, ne kadar dayandığın: rekorun. Okun ve refleksin de gelişir.",
+    "Büyü için \"Büyü çiz\": çizerken ve hedefe dokunana kadar zaman durur.",
+  ] },
   barikat: { who: "Hasan", portrait: "portre_hasan", title: "Barikat gecesi", steps: [
     "Dalga dalga gelecekler. Önce barikat: parmağını haritada sürükle, kısa bir çit kurarsın. Kazığın sınırlı.",
     "Çiti yolun ağzına kur. Kurt etrafından dolanmaya çalışır; dolandıkça sana vakit kalır.",
