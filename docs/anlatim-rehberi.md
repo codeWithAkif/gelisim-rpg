@@ -38,18 +38,24 @@ Sahneler `src/content/scenes.ts` içinde saf veridir. Her sahne bir dizi "vuruş
 | `{ t: "gorsel", art: "yer_yayla", gece: true }` | Görseli gece gibi karartır (aynı yerin gece hâli için yeni çizim gerekmez). |
 | `{ t: "tek", id: "harabe_uluma", vol: 0.8 }` | Tek seferlik ses: uluma, uzaktan kurtlar. Dosya `src/assets/ses/` içinde. |
 | `{ t: "incele", prompt: "…", spots: [{ x, y, label, text }] }` | Oyuncu görselin üstünde parlayan yerlere dokunarak inceler; hepsi bulununca sahne sürer. Gizemi oyuncunun kendisi bulsun. |
+| `{ t: "baslik", text: "Bölüm 1", sub: "Kıvılcım" }` | Bölüm kartı: büyük el yazısı, görsel kararır. Bölümün ilk ve son sahnesinde. |
 
 Bir hikâye sayfasını (`src/content/story.ts` içindeki kilometre taşı) sahneye bağlamak için ona
 `scene: "<sahne kimliği>"` ekle. O sayfa açıldığında "Yeni sayfa" penceresi yerine sahne oynar.
 Sahnede bir işe söz veriliyorsa (`"Yarın gece orada bekleyelim"`) `accept: "<iş>"` ile o iş kendiliğinden üstlenilir.
 Ana hikâyenin işlerine (`src/content/world.ts`) `story: true` ver: "Ana görev" diye görünür, ödül penceresi araya girmez.
 Gece geçen işlere `night: true` ver: gündüz başlanırsa akşam beklenir.
+Bir iş bitince ödül penceresi yerine sahne oynasın istiyorsan işe `scene: "<sahne kimliği>"` ver (örnek: Kurtların izi → `karaca`).
 
 ## Bölüm 1 örneği
 
 Açılış → sis → Hasan → **Muhtara haber** (Ayşe sahnesi) → **Ağılda nöbet** (gece, inceleme: donmuş kuzu) →
 Hasan pusuyu öğretir → **Kurt avı** (savaş) → kaçan kurt, kuzeyden uluma, "Kovalanıyorlar" → Ayşe: annenin izi.
 Her adım bir soru bırakır; rütbe ve ev ancak annenin izi bulununca gelir.
+
+Sonrası: Zehra (annenin ATEŞ yaprağı) → ilk kıvılcım → ateş ve kurt (Hasan gördü) → yan hikâye: donmuş karaca,
+Akyele → annenin mektubu ("Kuzeyde değil, aramızda.") → "Bölüm 1 sona erdi" kartı. Bölüm 1'in bütün sayfaları sahnedir;
+`tests/scenes.test.ts` bunu denetler. Diğer bölümler de aynı kuralla yazılmalı.
 
 ## Kontrol listesi
 
