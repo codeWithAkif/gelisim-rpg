@@ -87,3 +87,37 @@ test("en zor gece (lider dahil) baştan sona oynanır, hata vermez", () => {
   const sg = createSiege(cfg, s, escalate(SIEGES.agil, MAX_ESCALATION), 7); play(s, sg, { bow: true });
   expect(["won", "lost"]).toContain(sg.phase);
 });
+
+test("savunmada büyü: ateş duvarı çizilen şerit boyunca yanar, buz duvarı engel kurar, ateş topu ileri atılır", async () => {
+  const { createSiege, castWall, castThrow, spellAim, SIEGES, ARENA } = await import("../src/engine/siege");
+  const { discover } = await import("../src/engine/synthesis");
+  const s = newGame(cfg, 5); s.knownElements = ["el_ates", "el_su", "el_ayaz"]; s.attrs.ates.level = 30; s.attrs.ayaz_buyu.level = 40; s.mana = 99;
+  discover(s, "sy_el_ates_duvar");
+  expect(spellAim("sy_el_ates_duvar")).toBe("wall"); expect(spellAim("buz_duvari")).toBe("wall"); expect(spellAim("ates_topu")).toBe("throw");
+  const sg = createSiege(cfg, s, Object.values(SIEGES)[0], 3); sg.phase = "fight"; sg.mana = 99;
+  const cx = ARENA.w / 2, cy = ARENA.h / 2;
+  const z0 = sg.zones.length; expect(castWall(cfg, s, sg, "sy_el_ates_duvar", cx - 10, cy - 20, cx + 10, cy - 20).ok).toBe(true);
+  expect(sg.zones.length - z0).toBeGreaterThan(4); expect(sg.zones.every(z => z.kind === "ates")).toBe(true);
+  const b0 = sg.barricades.length; expect(castWall(cfg, s, sg, "buz_duvari", cx - 10, cy + 20, cx + 10, cy + 20).ok).toBe(true);
+  expect(sg.barricades.length).toBe(b0 + 1); expect(sg.barricades[b0].kind).toBe("buz");
+  expect(castWall(cfg, s, sg, "buz_duvari", cx - 10, cy + 25, cx + 10, cy + 25).ok).toBe(false);   // dolmadı
+  expect(castThrow(cfg, s, sg, "ates_topu", cx, cy - 200)).toBe(true);
+  const f = sg.fx.filter(e => e.k === "cast").pop() as { y: number; from?: [number, number] };
+  expect(f.from).toEqual([cx, cy]); expect(cy - f.y).toBeLessThanOrEqual(62.01);   // menzil kadar
+});
+
+test("ateşe giren kurt tutuşur ve birkaç saniye belirli hasar alır (şansa bağlı değil)", async () => {
+  const { createSiege, castWall, step, SIEGES, ARENA } = await import("../src/engine/siege");
+  const { discover } = await import("../src/engine/synthesis");
+  const s = newGame(cfg, 6); s.knownElements = ["el_ates"]; s.attrs.ates.level = 30; s.mana = 99; discover(s, "sy_el_ates_duvar");
+  const sg = createSiege(cfg, s, Object.values(SIEGES)[0], 4); sg.phase = "fight"; sg.mana = 99; sg.queue = [];
+  const cx = ARENA.w / 2, cy = ARENA.h / 2;
+  expect(castWall(cfg, s, sg, "sy_el_ates_duvar", cx - 10, cy - 30, cx + 10, cy - 30).ok).toBe(true);
+  // şeridin üstünden geçen bir kurt (duvar kurulduktan sonra gelir)
+  sg.foes.push({ id: 99, def: "kurt", x: cx, y: cy - 30, hp: 40, max: 40, speed: 0, dmg: [1, 2], atkCd: 9, slowT: 0, stunT: 0, burnT: 0, side: 1, r: 3.2, human: false });
+  const f = sg.foes[sg.foes.length - 1];
+  step(cfg, s, sg, 0.05); expect(f.burnT).toBeGreaterThan(3); expect(f.burnDps).toBeGreaterThanOrEqual(3);
+  f.x = cx + 40;                                      // ateşten çıktı; yine de yanmaya devam eder
+  for (let i = 0; i < 30; i++) step(cfg, s, sg, 0.1);
+  expect(40 - f.hp).toBeGreaterThanOrEqual(8);        // ~3 saniye × ≥3/sn
+});

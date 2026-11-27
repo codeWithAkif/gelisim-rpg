@@ -753,3 +753,11 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .modal.guide .guide-dots i.on { opacity: 1; background: var(--ink); }
 .caravan .cv-tip { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border: 1.5px dashed var(--ink-soft); border-radius: 10px; background: rgba(255,255,255,.3); }
 .caravan .cv-tip img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; object-position: 50% 20%; flex: none; }
+/* büyü çizimi: bütün ekran çizim alanı; düğmeler mürekkebin üstünde */
+.qt.cast.full { position: fixed; inset: 0; z-index: 85; }
+.qt.cast .cast-full { position: absolute; inset: 0; z-index: 3; touch-action: none; }
+.qt.cast .cast-row { position: relative; z-index: 5; }
+.qt.cast .cast-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 8px; margin-top: 4px; max-width: 320px; }
+.qt.cast .cast-legend span { display: inline-flex; flex-direction: column; align-items: center; }
+.qt.cast .cast-legend small { font-size: 10px; color: var(--ink-soft); line-height: 1; }
+.qt.cast .qt-result { position: static; margin: 2px 0 0; min-height: 26px; }
