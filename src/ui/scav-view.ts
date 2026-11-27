@@ -10,7 +10,7 @@ import { withGuide } from "./guide";
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
-  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
+  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, doorNear, beginFortify, canFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
   traitLines, bagUsed, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
@@ -83,7 +83,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
   el.innerHTML = `<div class="nb-top"><button class="btn small" data-c="pause">Ⅱ</button><div class="sc-hud"><span id="scMoney"></span><span class="raid-pill" id="scRaid"></span><span id="scDanger"></span></div></div>
     <div class="siege-stage"><canvas></canvas><div class="nb-tip" id="scTip"></div>
       <div class="sc-heal" id="scHeal"></div><div class="sc-stick" id="scStick"><i id="scKnob"></i></div>
-      <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="pick" id="scPick" hidden></button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act aim" data-a="shoot" id="scShoot" hidden></button><button class="sc-act aim" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
+      <div class="sc-acts"><button class="sc-act" data-a="search" id="scSearch" hidden>Ara</button><button class="sc-act" data-a="door" id="scDoor" hidden></button><button class="sc-act" data-a="pick" id="scPick" hidden></button><button class="sc-act" data-a="trap" id="scTrap" hidden></button><button class="sc-act aim" data-a="shoot" id="scShoot" hidden></button><button class="sc-act aim" data-a="spell" id="scSpell" hidden></button><button class="sc-act go" data-c="exit" id="scExit" hidden>Çık</button></div></div>
     <div class="sc-bar"><span id="scAmmo"></span><button class="btn small" id="scBag" data-c="bag"></button></div>
     <div class="nb-card" id="scPause" hidden></div>`;
   document.body.appendChild(el);
@@ -190,6 +190,21 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       g.fillStyle = "#EFE6CC"; g.font = `700 ${Math.max(13, sc() * 1.9)}px Caveat, cursive`; g.textAlign = "left"; g.strokeStyle = "rgba(0,0,0,.7)"; g.lineWidth = 3; g.strokeText("Çıkış", X(EXIT_X) + ww * 0.7, gy(0) - 12); g.fillText("Çıkış", X(EXIT_X) + ww * 0.7, gy(0) - 12); } else
     { const ex = X(EXIT_X), gyy = gy(0); g.fillStyle = "#2E4C7A"; g.beginPath(); g.moveTo(ex + 18, gyy - 26); g.lineTo(ex - 4, gyy - 14); g.lineTo(ex + 18, gyy - 2); g.closePath(); g.fill();
       g.fillStyle = "#EFE6CC"; g.font = `700 ${Math.max(13, sc() * 1.9)}px Caveat, cursive`; g.textAlign = "left"; g.fillText("Çıkış", ex + 22, gyy - 10); }
+    // odalar arası kapılar: açıkken yalnız çerçeve, geçince kapanır; seviye arttıkça demir bantlı ve kalın
+    for (const d of n.doors) {
+      const x = X(d.x); if (x < -40 || x > W + 40) continue; const yb = gy(d.floor) + 4, hh = fh() * 0.7, ww = Math.max(9, 5 * sc()); const yt = yb - hh;
+      if (d.state === "open") { g.fillStyle = "#3A2C1C"; g.fillRect(x - ww * 0.9, yt, ww * 0.35, hh); g.fillRect(x + ww * 0.55, yt, ww * 0.35, hh); g.fillRect(x - ww * 0.9, yt - 3, ww * 1.8, 6); continue; }
+      if (d.state === "broken") { g.strokeStyle = "#1E160E"; g.lineWidth = 1.5; g.fillStyle = "#5A4128";
+        g.beginPath(); g.moveTo(x - ww * 0.9, yb); g.lineTo(x - ww * 0.5, yb - hh * 0.28); g.lineTo(x - ww * 0.1, yb - hh * 0.14); g.lineTo(x + ww * 0.3, yb - hh * 0.3); g.lineTo(x + ww * 0.9, yb); g.closePath(); g.fill(); g.stroke(); continue; }
+      const fr = d.hp / doorMax(d); const lv = d.level;
+      g.fillStyle = `rgb(${Math.round(118 - lv * 4)},${Math.round(84 - lv * 3)},${Math.round(50 - lv * 2)})`; g.strokeStyle = "#1E160E"; g.lineWidth = 2; g.fillRect(x - ww / 2, yt, ww, hh); g.strokeRect(x - ww / 2, yt, ww, hh);
+      g.strokeStyle = "rgba(20,14,8,.55)"; g.lineWidth = 1; for (let k = 1; k < 3; k++) { g.beginPath(); g.moveTo(x - ww / 2 + (ww / 3) * k, yt); g.lineTo(x - ww / 2 + (ww / 3) * k, yb); g.stroke(); }
+      g.fillStyle = lv >= 6 ? "#9AA4AD" : "#6B5A3C"; const bands = 2 + Math.floor(lv / 3); for (let k = 0; k < bands; k++) g.fillRect(x - ww / 2 - 1, yt + (hh / (bands + 1)) * (k + 1) - 2, ww + 2, 4);
+      if (fr < 0.999) { g.strokeStyle = "rgba(10,6,2,.7)"; g.lineWidth = 1.5; const cr = Math.round((1 - fr) * 4); for (let k = 0; k < cr; k++) { const cy = yt + hh * (0.2 + 0.2 * k); g.beginPath(); g.moveTo(x - ww / 2, cy); g.lineTo(x, cy + 6); g.lineTo(x + ww / 2, cy - 2); g.stroke(); } }
+      const bw = Math.max(26, ww * 3), by = yt - 9; g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(x - bw / 2, by, bw, 5); g.fillStyle = fr > 0.5 ? "#9BD36B" : fr > 0.25 ? "#F4D35E" : "#E0583A"; g.fillRect(x - bw / 2, by, bw * Math.max(0, fr), 5);
+    }
+    for (const d of n.doors) if (n.fort?.d === d) { const x = X(d.x), yt = gy(d.floor) + 4 - fh() * 0.7; g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(x - 20, yt - 22, 40, 5); g.fillStyle = "#F1C14A"; g.fillRect(x - 20, yt - 22, 40 * n.fort.prog, 5);
+      g.fillStyle = "#F1C14A"; g.font = `700 ${Math.max(14, sc() * 2)}px Caveat, cursive`; g.textAlign = "center"; g.fillText("güçlendiriyor…", x, yt - 28); }
     const ns = nearSpot(n);
     for (const sp of n.spots) lens(sp, ns?.id === sp.id, now);
     // yerdeki eşyalar
@@ -255,6 +270,10 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
     { const wa = n.weaponId && artUrl("harabe_silah_" + n.weaponId); q("#scAmmo").innerHTML = `${wa ? `<img class="sc-wicon" src="${wa}" alt="">` : ""}${esc(n.weaponName)}${n.bow ? ` · ok ${n.ammo}` : ""}`; } { const ka = artUrl("harabe_anahtar"); q("#scBag").innerHTML = `${n.keys.length ? (ka ? `<img class="sc-wicon" src="${ka}" alt="">×${n.keys.length} ` : `🔑${n.keys.length} `) : ""}Çanta ${bagUsed(n)}/${n.bagCap}`; }
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
     (q("#scSearch") as HTMLElement).hidden = true;
+    { const dn = doorNear(n); const db = q("#scDoor") as HTMLButtonElement; db.hidden = !dn || n.phase !== "play";
+      if (dn) { const mx = doorMax(dn);
+        db.textContent = n.fort?.d === dn ? `Güçlendiriliyor… %${Math.round(n.fort.prog * 100)}` : dn.state === "broken" ? "Kapıyı onar" : canFortify(dn) ? `Kapıyı güçlendir ${Math.round(dn.hp)}/${mx} → ${mx + DOOR_BASE}` : `Kapı en güçlü (${mx})`;
+        db.disabled = !canFortify(dn); db.classList.toggle("busy", n.fort?.d === dn); } }
     const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", bagUsed(n) >= n.bagCap); }
     const tb = q("#scTrap") as HTMLButtonElement; tb.hidden = !n.traps.length; if (n.traps.length) { const hand = trapsInHand(n); const cool = n.traps.filter(x => x.state === "cool").map(x => Math.ceil(x.t)); tb.textContent = hand ? `Tuzak ${hand}` : cool.length ? `Tuzak ${Math.min(...cool)} sn` : "Tuzak 0"; tb.disabled = !hand || n.climbing; }
     const hl = healItemsAvailable(s, n); const hk = hl.map(x => x.id + x.n).join() + (n.hp < n.maxHp); const he = q("#scHeal");
@@ -288,6 +307,10 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       if (f.k === "key") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Anahtar buldun!", color: "#F4D35E" }); sfx("perfect"); buzz("medium"); }
       if (f.k === "unlock") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı açıldı", color: "#9BD36B" }); sfx("win"); buzz("medium"); }
       if (f.k === "locked") { if (now - lastLockedMsg > 1500) { lastLockedMsg = now; tip.hidden = false; tip.textContent = "Kilitli: başka bir odada anahtar var"; setTimeout(() => { tip.hidden = true; }, 1400); sfx("bad"); } }
+      if (f.k === "door") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı kapandı", color: "#EFE6CC" }); sfx("thunk"); }
+      if (f.k === "doorhit") { sfx("hit"); }
+      if (f.k === "doorbreak") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı kırıldı!", color: "#E0583A" }); sfx("bad"); buzz("heavy"); shake = 6; }
+      if (f.k === "fortify") { pops.push({ x: f.x, floor: f.floor, t: now, text: `Kapı güçlendi · ${f.level * DOOR_BASE}`, color: "#9BD36B" }); sfx("good"); buzz("medium"); }
       if (f.k === "die") sfx("hit");
       if (f.k === "spot") sfx("good");
     }
@@ -324,6 +347,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b || b.disabled || n.phase !== "play" || paused) return;
     if (b.dataset.c === "exit") { if (leave(n)) sfx("win"); return; }
     if (b.dataset.a === "pick") { const r = pickGround(n); if (r === "ok") sfx("coin"); else { sfx("bad"); if (r === "full") { tip.hidden = false; tip.textContent = "Çanta dolu: önce bir şey at"; setTimeout(() => { tip.hidden = true; }, 1500); } } }
+    if (b.dataset.a === "door") { const r = beginFortify(n); sfx(r === "ok" ? "tap" : "bad"); }
     if (b.dataset.a === "search") { if (beginSearch(n)) { sfx("tap"); stickReset(); } else sfx("bad"); }
     if (b.dataset.a === "trap") { if (placeTrap(n)) sfx("thunk"); else sfx("bad"); }
   });

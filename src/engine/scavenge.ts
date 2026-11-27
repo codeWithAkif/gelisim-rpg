@@ -101,7 +101,7 @@ export const scavSite = (id: string) => SCAV_SITES.find(x => x.id === id);
 export const sitesAt = (place: string) => SCAV_SITES.filter(x => x.place === place).sort((a, b) => a.tier - b.tier);
 
 /* ---------- kalıcı durum: boşaltılan sandık boş kalır ---------- */
-export interface HarabeSave { stages: Record<number, number>; opened: number[]; keys: number[]; killed: number[]; ground: { item: string; x: number; floor: number }[] }
+export interface HarabeSave { stages: Record<number, number>; opened: number[]; keys: number[]; killed: number[]; ground: { item: string; x: number; floor: number }[]; doors?: Record<string, number> }
 export function harabeSave(s: GameState, siteId: string): HarabeSave {
   const all = (s.harabe ??= {}); return (all[siteId] ??= { stages: {}, opened: [], keys: [], killed: [], ground: [] });
 }
@@ -211,7 +211,13 @@ export interface SFoe { idle?: boolean; id: number; def: string; x: number; floo
 export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
   | { k: "hurt"; dmg: number } | { k: "raid"; n: number; last: boolean } | { k: "alarm"; human: boolean } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
-  | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "dodge"; x: number; floor: number } | { k: "key"; x: number; floor: number } | { k: "unlock"; x: number; floor: number } | { k: "locked"; x: number; floor: number } | { k: "cast"; kind: SpellKind; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number; bolt?: BoltStyle | null } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
+  | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "dodge"; x: number; floor: number } | { k: "key"; x: number; floor: number } | { k: "unlock"; x: number; floor: number } | { k: "locked"; x: number; floor: number } | { k: "door"; x: number; floor: number } | { k: "doorhit"; x: number; floor: number; dmg: number } | { k: "doorbreak"; x: number; floor: number } | { k: "fortify"; x: number; floor: number; level: number } | { k: "cast"; kind: SpellKind; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number; bolt?: BoltStyle | null } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
+/** Odalar arası kapı: sen geçince kapanır, gelenler kırmaya çalışır. Seviye 1–10: dayanıklılık 200–2000. */
+export interface Door { floor: number; x: number; level: number; hp: number; state: "open" | "closed" | "broken" }
+export const DOOR_BASE = 200, DOOR_MAX_LEVEL = 10;
+export const doorMax = (d: Door) => d.level * DOOR_BASE;
+/** Güçlendirmek: kapının önünde durup beklenir; seviye yükseldikçe uzar. */
+export const fortifySeconds = (d: Door) => d.state === "broken" ? 2.5 : 2 + d.level * 0.35;
 export interface Lock { floor: number; x: number; side: "R" | "L"; key: number; open: boolean }
 export interface GItem { id: number; item: string; x: number; floor: number }
 export interface Proj { id: number; kind: SpellKind; x: number; floor: number; dir: 1 | -1; left: number; base: number; r: number; bolt?: BoltStyle | null }   // bolt: şimşek büyüsü zincir mi yıldırım mı (engine/spellfx.ts)
@@ -224,7 +230,7 @@ export interface Scav {
   spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number; raidHold: number; spellQ: { t: number; dir: 1 | -1; floor: number }[];
   bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
   foundWeapons: string[]; weaponId: string; castT: number; foundT: number; armor: number; tr: ScavTraits; searched: number; shots: number; kills: number; found: number; fx: SFx[];
-  ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number; bolt?: BoltStyle | null };
+  ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; doors: Door[]; fort: { d: Door; prog: number } | null; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number; bolt?: BoltStyle | null };
 }
 const bagCount = (n: Scav) => Object.values(n.bag).reduce((a, b) => a + b, 0);
 export const bagUsed = bagCount;
@@ -306,13 +312,18 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   const sv = harabeSave(s, site.id);
   for (const sp of spots) { const st = sv.stages[sp.id] ?? 0; sp.stage = Math.min(SPOT_STAGES, st); sp.done = st >= SPOT_STAGES; }
   for (const l of locks) if (sv.opened.includes(l.floor)) l.open = true;
+  const doors: Door[] = [];
+  for (let f = 0; f < site.floors; f++) for (let k = 1; k < site.rooms; k++) {
+    const x = k * ROOM_W; if (locks.some(l => l.floor === f && l.x === x)) continue;   // kilitli oda kapısı zaten kapı
+    const level = Math.max(1, Math.min(DOOR_MAX_LEVEL, sv.doors?.[`${f}:${x}`] ?? 1)); doors.push({ floor: f, x, level, hp: level * DOOR_BASE, state: "open" });
+  }
   const alive = guards.filter(g => !sv.killed.includes(g.id));
   const ground: GItem[] = sv.ground.map((g, i) => ({ id: i + 1, ...g }));
   return {
     site, seed, rng: run, w: W, alerted: false, guardCount: site.guards, killed: [...sv.killed], time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4 * tr.hp)), maxHp: Math.round(mh * 1.4 * tr.hp),
     spots, searchId: 0, searchWait: 0, foes: alive, nextId: gid2, wave: 0, raidT: tr.firstRaid, raidHold: 0, spellQ: [], bag: {}, bagCap: tr.bagCap, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
     atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), tr, searched: 0, shots: 0, kills: 0, found: 0, fx: [],
-    ground, gid: ground.length + 1, proj: [], locks, keys: [...sv.keys], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
+    ground, gid: ground.length + 1, proj: [], locks, doors, fort: null, keys: [...sv.keys], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
 }
 
@@ -325,7 +336,33 @@ export function nearSpot(n: Scav): Spot | undefined {
   if (n.climbing) return undefined;
   return n.spots.filter(q => !q.done && q.floor === n.floor && Math.abs(q.x - n.px) <= 8).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
 }
-export function beginSearch(n: Scav): boolean { const sp = nearSpot(n); if (!sp || n.phase !== "play") return false; n.searchId = sp.id; n.searchWait = 0; return true; }
+/** Yakındaki (±7) kapı. */
+export const doorNear = (n: Scav): Door | undefined => n.climbing ? undefined : n.doors.filter(d => d.floor === n.floor && Math.abs(d.x - n.px) <= 7).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
+export const canFortify = (d: Door) => d.state === "broken" || d.level < DOOR_MAX_LEVEL;
+/** Kapının önünde dururken güçlendirmeye ya da onarmaya başla. */
+export function beginFortify(n: Scav): "ok" | "max" | "none" {
+  const d = doorNear(n); if (!d || n.phase !== "play") return "none"; if (!canFortify(d)) return "max";
+  n.fort = { d, prog: 0 }; n.searchId = 0; return "ok";
+}
+/** Bir katta, x'in iki yanındaki kapalı kapıların sınırı (düşman geçemez). */
+function walls(n: Scav, floor: number, x: number) {
+  let lo = -Infinity, hi = Infinity; let dl: Door | undefined, dr: Door | undefined;
+  for (const d of n.doors) { if (d.floor !== floor || d.state !== "closed") continue; if (d.x <= x) { if (d.x + 3 > lo) { lo = d.x + 3; dl = d; } } else if (d.x - 3 < hi) { hi = d.x - 3; dr = d; } }
+  return { lo, hi, dl, dr };
+}
+function hitDoor(n: Scav, d: Door, dmg: number) {
+  d.hp -= dmg; n.fx.push({ k: "doorhit", x: d.x, floor: d.floor, dmg: Math.round(dmg) });
+  if (d.hp <= 0) { d.hp = 0; d.state = "broken"; n.fx.push({ k: "doorbreak", x: d.x, floor: d.floor }); }
+}
+/** Düşmanı hedefe doğru yürüt; kapalı kapıya çarparsa kapıyı döver. Gerçek yürüme mesafesi döner. */
+function moveFoe(n: Scav, f: SFoe, target: number, step: number, dt: number, free: [number, number]) {
+  const w = walls(n, f.floor, f.x); const lo = Math.max(free[0], w.lo), hi = Math.min(free[1], w.hi);
+  const want = f.x + Math.sign(target - f.x) * Math.min(Math.abs(target - f.x), step);
+  f.x = Math.max(lo, Math.min(hi, want));
+  const door = want > f.x + 0.01 ? w.dr : want < f.x - 0.01 ? w.dl : undefined;
+  if (door && Math.abs(f.x - door.x) <= 3.6 && f.cd <= 0) { f.cd = 1.5; hitDoor(n, door, f.dmg * 1.2); }
+}
+export function beginSearch(n: Scav): boolean { const sp = nearSpot(n); if (!sp || n.phase !== "play") return false; n.searchId = sp.id; n.searchWait = 0; n.fort = null; return true; }
 export function placeTrap(n: Scav): boolean {
   const tr = n.traps.find(q => q.state === "hand"); if (!tr || n.phase !== "play" || n.climbing) return false;
   tr.state = "placed"; tr.x = n.px; tr.floor = n.floor; return true;
@@ -435,6 +472,8 @@ export function stepScav(n: Scav, dt: number) {
   // yönlendirme
   const { dx, dy } = n.input; const moveIn = Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2; n.moving = false;
   if (moveIn && n.searchId) n.searchId = 0;
+  if (moveIn && n.fort) n.fort = null;
+  const px0 = n.px;
   const onLadder = Math.abs(n.py - Math.round(n.py)) > 0.02;
   if (!n.searchId) {
     if (onLadder) {
@@ -447,6 +486,7 @@ export function stepScav(n: Scav, dt: number) {
         const lk = n.locks.find(l => l.floor === n.floor && !l.open && ((l.side === "R" && nx >= l.x - 3) || (l.side === "L" && nx <= l.x + 3)));
         if (lk) { const ki = n.keys.indexOf(lk.key); if (ki >= 0) { n.keys.splice(ki, 1); lk.open = true; n.fx.push({ k: "unlock", x: lk.x, floor: lk.floor }); } else { n.fx.push({ k: "locked", x: lk.x, floor: lk.floor }); nx = lk.side === "R" ? lk.x - 3 : lk.x + 3; } }
         n.px = Math.max(lo, Math.min(hi, nx));
+        for (const d of n.doors) if (d.floor === n.floor && d.state === "open" && ((px0 < d.x && n.px >= d.x) || (px0 > d.x && n.px <= d.x))) { d.state = "closed"; n.fx.push({ k: "door", x: d.x, floor: d.floor }); }
       }
       if (Math.abs(dy) > 0.25) {
         const up = dy < 0; const gap = up ? n.floor : n.floor - 1;
@@ -457,7 +497,18 @@ export function stepScav(n: Scav, dt: number) {
   n.climbing = Math.abs(n.py - Math.round(n.py)) > 0.02; n.floor = Math.round(n.py); if (n.climbing) n.moving = false;
   // arama: kutunun yanında durunca kendiliğinden başlar; hareket edince bırakılır; her aşama arasında kısa bir ara vardır
   n.searchWait = Math.max(0, n.searchWait - dt);
-  if (!n.searchId && !moveIn && !n.climbing && n.searchWait <= 0 && nearSpot(n)) beginSearch(n);
+  if (n.fort) {
+    if (n.climbing || n.fort.d !== doorNear(n)) n.fort = null;
+    else {
+      n.fort.prog += dt / fortifySeconds(n.fort.d);
+      if (n.fort.prog >= 1) {
+        const d = n.fort.d; n.fort = null;
+        if (d.state === "broken") { d.state = "closed"; d.hp = doorMax(d); } else { d.level++; d.hp = Math.min(doorMax(d), d.hp + DOOR_BASE); }
+        n.fx.push({ k: "fortify", x: d.x, floor: d.floor, level: d.level });
+      }
+    }
+  }
+  if (!n.searchId && !n.fort && !moveIn && !n.climbing && n.searchWait <= 0 && nearSpot(n)) beginSearch(n);
   if (n.searchId) {
     const sp = n.spots.find(q => q.id === n.searchId);
     if (!sp || sp.done || n.climbing) n.searchId = 0;
@@ -498,12 +549,12 @@ export function stepScav(n: Scav, dt: number) {
     const sp = f.speed * (f.slow > 0 ? 0.45 : 1);
     if (f.floor !== pf) {
       const gap = pf > f.floor ? f.floor : f.floor - 1; const lx = ladderAt(n.w, gap); const d = lx - f.x;
-      if (Math.abs(d) > 1) f.x += Math.sign(d) * Math.min(Math.abs(d), sp * dt);
+      if (Math.abs(d) > 1) moveFoe(n, f, lx, Math.min(Math.abs(d), sp * dt), dt, [-Infinity, Infinity]);
       else { f.x = lx; f.toFloor = pf > f.floor ? f.floor + 1 : f.floor - 1; f.climbT = 1.6; }
       continue;
     }
     const d = n.px - f.x;
-    if (Math.abs(d) > 5.5) { const [lo, hi] = freeRange(n, f.floor); f.x = Math.max(lo, Math.min(hi, f.x + Math.sign(d) * Math.min(Math.abs(d) - 5, sp * dt))); }
+    if (Math.abs(d) > 5.5) moveFoe(n, f, n.px, Math.min(Math.abs(d) - 5, sp * dt), dt, freeRange(n, f.floor));
     else if (f.cd <= 0 && exposed) { f.cd = 1.5;
       if (n.moving && n.rng.chance(60)) { n.fx.push({ k: "dodge", x: n.px, floor: n.floor }); continue; }   // koşarken yanından sıyrılırsın
       const dm = f.dmg * Math.max(0.35, 1 - n.armor / 40); n.hp -= dm; n.fx.push({ k: "hurt", dmg: Math.round(dm) }); }
@@ -547,7 +598,7 @@ export interface ScavResult { result: "exit" | "dead"; items: Record<string, num
 function saveRun(s: GameState, n: Scav, dead: boolean) {
   const sv = harabeSave(s, n.site.id);
   for (const sp of n.spots) if (sp.stage > 0) sv.stages[sp.id] = Math.max(sv.stages[sp.id] ?? 0, sp.stage);
-  sv.opened = n.locks.filter(l => l.open).map(l => l.floor); sv.keys = [...n.keys]; sv.killed = [...n.killed];
+  sv.doors = Object.fromEntries(n.doors.filter(d => d.level > 1).map(d => [`${d.floor}:${d.x}`, d.level])); sv.opened = n.locks.filter(l => l.open).map(l => l.floor); sv.keys = [...n.keys]; sv.killed = [...n.killed];
   const ground = n.ground.map(g => ({ item: g.item, x: g.x, floor: g.floor }));
   // ölünce çanta düştüğün yerde kalır; geri gelip alabilirsin
   if (dead) for (const [item, k] of Object.entries(n.bag)) for (let i = 0; i < k; i++) ground.push({ item, x: n.px + (i % 5) * 3 - 6, floor: n.floor });
