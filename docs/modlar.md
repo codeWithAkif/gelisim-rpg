@@ -69,6 +69,16 @@ defter sayfası dolunca üç karttan biri seçilir. **Bunların hepsi o nöbetle
 ve kalıcı güçlenme ağacının gelişim sistemiyle yarışması) böylece ortadan kalktı. Büyü burada da çizilir; çizerken ve
 hedefe dokunana kadar zaman durur.
 
+Büyü barikat savaşındakiyle aynı kuralla uygulanır (`spellAim`): ateş topu, meteor ve zincir büyüleri kuleden ileri
+atılır (ok ve düşeceği yer önizlenir, menzil sınırlı); duvar büyüleri yere çizilir (ateş duvarı patlamaz: çizilen şerit
+yanar, içinden geçen tutuşur ve çıktıktan sonra da yanar; buz duvarı dondurur, taş duvarı yavaşlatır); gerisi hedefe
+dokunarak. Büyü avuçtayken zaman durur; Vazgeç düğmesi var.
+
+Kartlar bildiğin büyülere göre süzülür: Zincir şimşek şimşek sayfası, Ayaz halkası ayaz sayfası, Ateşli ok ateş sayfası
+ister. Büyüye özel kartlar yalnız o büyü elindeyse çıkar: ateş topu için Kızgın top (+%25 hasar), Geniş patlama
+(+%15 alan), Çabuk top (%20 daha çabuk dolar); ateş duvarı için Uzun şerit (+%20 boy), Kor şerit (+%25 yakış, +1 sn),
+Çabuk duvar (%20 daha çabuk dolar).
+
 Uzun dayanmanın karşılığı (güç değil, gelişim, bilgi, ün ve para):
 - Gelişim dalgayla azalan hızla büyür (atış karşılığı 5. dalgada 60, 20.de 120, 30.da ~147); okçuluk 5/20/30 dalgada ≈ +2,8 / +5,5 / +6,7.
 - Her beşinci dalganın lideri, o düşmanın açılmamış bir zayıf noktasını Gözlemler'e yazdırır.

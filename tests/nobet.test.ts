@@ -104,3 +104,70 @@ test("uzun dayanmak karşılığını verir: gelişim dalgayla azalan hızda bü
   const n2 = createNobet(cfg, s, nobetSite("yayla")!, 2); n2.wave = 12; n2.waveLeft = 1; finishNobet(cfg, s, n2);
   expect(repOf(s, "taspinar", "taninirlik")).toBe(before);
 });
+
+/* ---------- büyüler nöbette: barikat savaşıyla aynı kural ---------- */
+function withFire(seed = 5) {
+  const s = fresh(); s.knownElements = ["el_ates"]; s.attrs.ates.level = 20; s.mana = 99;
+  return { s, n: createNobet(cfg, s, nobetSite("yayla")!, seed) };
+}
+const wolf = (n: Nobet, x: number, y: number, hp = 200) => { n.foes.push({ id: n.nextId++, def: "kurt", x, y, hp, max: hp, speed: 0, dmg: 0, cd: 9, r: 3, boss: false, burn: 0, slow: 0, root: 0, stun: 0, peck: 0, human: false, reward: 1 }); return n.foes[n.foes.length - 1]; };
+
+test("kartlar bildiğin büyülere göre süzülür: şimşek ya da ayaz sayfan yoksa zincir şimşek ve ayaz halkası çıkmaz", async () => {
+  const { availableCards } = await import("../src/engine/nobet");
+  const { s, n } = withFire();
+  const ids = () => availableCards(s, n).map(c => c.id);
+  expect(ids()).toContain("ates"); expect(ids()).not.toContain("zincir"); expect(ids()).not.toContain("buz");
+  s.knownElements.push("el_simsek", "el_ayaz");
+  expect(ids()).toContain("zincir"); expect(ids()).toContain("buz");
+});
+
+test("ateş topu ve ateş duvarı kartları yalnız o büyü elindeyse çıkar ve gerçekten güçlendirir", async () => {
+  const { availableCards, addNobetSpell } = await import("../src/engine/nobet");
+  const { discover } = await import("../src/engine/synthesis");
+  const { s, n } = withFire();
+  const has = (id: string) => availableCards(s, n).some(c => c.id === id);
+  expect(has("top_guc")).toBe(true); expect(has("duvar_kor")).toBe(false);          // ateş topu var, ateş duvarı henüz yok
+  discover(s, "sy_el_ates_duvar"); expect(addNobetSpell(cfg, s, n, "sy_el_ates_duvar")).toBe(true);
+  expect(has("duvar_kor")).toBe(true); expect(has("duvar_uzun")).toBe(true); expect(has("duvar_hiz")).toBe(true);
+  const pick = (id: string) => { n.phase = "card"; n.offer = [id]; pickCard(s, n, id); };
+  const top = { ...n.spells.ates_topu }, duv = { ...n.spells.sy_el_ates_duvar };
+  pick("top_guc"); pick("top_alan"); pick("top_hiz");
+  expect(n.spells.ates_topu.mul).toBeCloseTo(top.mul * 1.25, 5); expect(n.spells.ates_topu.r).toBeCloseTo(top.r * 1.15, 5); expect(n.spells.ates_topu.max).toBeCloseTo(top.max * 0.8, 5);
+  pick("duvar_uzun"); pick("duvar_kor"); pick("duvar_hiz");
+  expect(n.spells.sy_el_ates_duvar.len!).toBeGreaterThan(20); expect(n.spells.sy_el_ates_duvar.mul).toBeCloseTo(duv.mul * 1.25, 5);
+  expect(n.spells.sy_el_ates_duvar.dur).toBe(8); expect(n.spells.sy_el_ates_duvar.max).toBeCloseTo(duv.max * 0.8, 5);
+});
+
+test("ateş topu kuleden ileri atılır: varacağı yer menzil kadar, kule noktası çıkış", async () => {
+  const { nobetAim, throwLanding, TOWER } = await import("../src/engine/nobet");
+  const { THROW_RANGE } = await import("../src/engine/siege");
+  const { n } = withFire();
+  expect(nobetAim(n, "ates_topu")).toBe("throw");
+  const far = throwLanding(TOWER.x, TOWER.y - 500); expect(Math.hypot(far.x - TOWER.x, far.y - (TOWER.y - 6))).toBeCloseTo(THROW_RANGE, 3);
+  n.spells.ates_topu.cd = 0; const w = wolf(n, TOWER.x, TOWER.y - THROW_RANGE + 2);
+  expect(useSpell(n, "ates_topu", TOWER.x, TOWER.y - 500)).toBe(true);        // çok uzağı gösterdi: menzilin ucuna düşer ve vurur
+  const fx = n.fx.filter(e => e.k === "spell").pop() as { from?: [number, number]; y: number };
+  expect(fx.from).toEqual([TOWER.x, TOWER.y - 6]); expect(w.hp).toBeLessThan(200); expect(w.burn).toBeGreaterThan(0);
+});
+
+test("ateş duvarı patlamaz: çizilen şerit yanar; içinden geçen tutuşur ve çıktıktan sonra da yanmaya devam eder", async () => {
+  const { nobetAim, useWall, addNobetSpell, TOWER } = await import("../src/engine/nobet");
+  const { discover } = await import("../src/engine/synthesis");
+  const { s, n } = withFire();
+  discover(s, "sy_el_ates_duvar"); addNobetSpell(cfg, s, n, "sy_el_ates_duvar");
+  expect(nobetAim(n, "sy_el_ates_duvar")).toBe("wall");
+  n.spells.sy_el_ates_duvar.cd = 0;
+  const w = wolf(n, TOWER.x, TOWER.y - 30);
+  expect(useWall(n, "sy_el_ates_duvar", TOWER.x - 10, TOWER.y - 30, TOWER.x + 10, TOWER.y - 30).ok).toBe(true);
+  const fx = n.fx.filter(e => e.k === "spell").pop() as { wall?: boolean; hits: number[] };
+  expect(fx.wall).toBe(true); expect(fx.hits).toHaveLength(0);                   // patlama yok
+  expect(n.lines).toHaveLength(1); expect(w.hp).toBe(200);                       // henüz kimse geçmedi
+  stepNobet(s, n, 0.05); expect(w.burn).toBeGreaterThan(3); expect(w.burnMul!).toBeGreaterThan(2); const first = w.hp; expect(first).toBeLessThan(200);
+  w.y = TOWER.y - 60;                                                            // şeritten çıktı
+  for (let i = 0; i < 60; i++) stepNobet(s, n, 0.05);                            // ~3 sn (motor adımı en çok 0,05 sn)
+  expect(first - w.hp).toBeGreaterThanOrEqual(8);                                // yanma hasarı sürdü
+  n.spells.sy_el_ates_duvar.cd = 0; expect(useWall(n, "sy_el_ates_duvar", TOWER.x, TOWER.y, TOWER.x + 12, TOWER.y).ok).toBe(false);   // kule üstüne kurulmaz
+  expect(useWall(n, "sy_el_ates_duvar", 10, 10, 11, 10).ok).toBe(false);        // çok kısa
+  for (let i = 0; i < 200; i++) { if (n.phase === "card") pickCard(s, n, n.offer[0]); stepNobet(s, n, 0.05); }   // kurt yanıp ölürse kart ekranı oyunu durdurur
+  expect(n.lines).toHaveLength(0);                                               // süre doldu
+});
