@@ -35,9 +35,21 @@ Sahneler `src/content/scenes.ts` içinde saf veridir. Her sahne bir dizi "vuruş
 | `{ t: "bekle", ms: 900 }` | Sessiz bir an. |
 | `{ t: "ad" }` | Oyuncunun adını sorar. Metinde `{ad}` yerine ad konur. |
 | `{ t: "sis" }` | Oynanan an (çanın sesini izleme). Yeni oynanan anlar `scene-view.ts`'e eklenir. |
+| `{ t: "gorsel", art: "yer_yayla", gece: true }` | Görseli gece gibi karartır (aynı yerin gece hâli için yeni çizim gerekmez). |
+| `{ t: "tek", id: "harabe_uluma", vol: 0.8 }` | Tek seferlik ses: uluma, uzaktan kurtlar. Dosya `src/assets/ses/` içinde. |
+| `{ t: "incele", prompt: "…", spots: [{ x, y, label, text }] }` | Oyuncu görselin üstünde parlayan yerlere dokunarak inceler; hepsi bulununca sahne sürer. Gizemi oyuncunun kendisi bulsun. |
 
 Bir hikâye sayfasını (`src/content/story.ts` içindeki kilometre taşı) sahneye bağlamak için ona
 `scene: "<sahne kimliği>"` ekle. O sayfa açıldığında "Yeni sayfa" penceresi yerine sahne oynar.
+Sahnede bir işe söz veriliyorsa (`"Yarın gece orada bekleyelim"`) `accept: "<iş>"` ile o iş kendiliğinden üstlenilir.
+Ana hikâyenin işlerine (`src/content/world.ts`) `story: true` ver: "Ana görev" diye görünür, ödül penceresi araya girmez.
+Gece geçen işlere `night: true` ver: gündüz başlanırsa akşam beklenir.
+
+## Bölüm 1 örneği
+
+Açılış → sis → Hasan → **Muhtara haber** (Ayşe sahnesi) → **Ağılda nöbet** (gece, inceleme: donmuş kuzu) →
+Hasan pusuyu öğretir → **Kurt avı** (savaş) → kaçan kurt, kuzeyden uluma, "Kovalanıyorlar" → Ayşe: annenin izi.
+Her adım bir soru bırakır; rütbe ve ev ancak annenin izi bulununca gelir.
 
 ## Kontrol listesi
 

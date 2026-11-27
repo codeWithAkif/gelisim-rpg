@@ -4,10 +4,11 @@ import { GAME_ITEMS, ENEMIES } from "./world";
 
 /* ---------- rütbe ---------- */
 export interface RankDef { id: number; name: string; at: number; unlocks: string }
+// Eşikler hikâyeyle hizalı: Köy dostu annenin izi bulununca (ev ve adam ondan sonra), bir sonraki rütbe Bölüm 1 ortasından sonra.
 export const RANKS: RankDef[] = [
   { id: 0, name: "Yabancı", at: 0, unlocks: "Henüz kimse seni tanımıyor." },
-  { id: 1, name: "Köy dostu", at: 10, unlocks: "Ev satın alabilirsin; bir adam tutabilirsin." },
-  { id: 2, name: "Taşpınar'ın adamı", at: 28, unlocks: "İşletme kurabilirsin; iki adam tutabilirsin." },
+  { id: 1, name: "Köy dostu", at: 22, unlocks: "Ev satın alabilirsin; bir adam tutabilirsin." },
+  { id: 2, name: "Taşpınar'ın adamı", at: 40, unlocks: "İşletme kurabilirsin; iki adam tutabilirsin." },
   { id: 3, name: "Vadi ağası", at: 55, unlocks: "Evi büyütebilirsin; üç adam; ağır işler." },
   { id: 4, name: "Bölgenin sözü geçeni", at: 95, unlocks: "Dört adam; büyük işletmeler; gece savunmalarını adamlarına devredebilirsin." },
   { id: 5, name: "Diyar efendisi", at: 150, unlocks: "Beş adam. Sözün her yerde geçiyor." },

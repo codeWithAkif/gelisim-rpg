@@ -39,8 +39,8 @@ function finish(s: GameState, id: string) {
 
 test("bölüm 2 → 3 → 4: yerler açılır, elementler öğrenilir, hikâye biter", () => {
   const s = newGame(cfg, 7); s.introDone = true;
-  for (const q of ["mesaj", "kurt", "annenin_izi"]) s.quests[q] = { status: "bitti", count: 1 };
-  s.story.reached = ["varis", "ilk_is", "suru", "iz", "kivilcim", "ates_kurt", "mektup"];
+  for (const q of ["mesaj", "agil_nobet", "kurt", "annenin_izi"]) s.quests[q] = { status: "bitti", count: 1 };
+  s.story.reached = ["varis", "ilk_is", "donmus_kuzu", "suru", "iz", "kivilcim", "ates_kurt", "mektup"];
   advanceStory(s);
   const kc = place("karacam")!; const ak = place("ayazkale")!; const ar = place("ardic")!;
   expect(isOpen(kc, s)).toBe(true); expect(isOpen(ak, s)).toBe(false); expect(isOpen(ar, s)).toBe(false);

@@ -210,7 +210,11 @@ export function startApp(root: HTMLElement) {
     const playScenes = (k: number) => {
       if (k >= toPlay.length) { showPages(fresh, after); return; }
       const m = toPlay[k]; s.story.flags["sahne_" + m.id] = s.day; persist();
-      playScene(SCENES[m.scene!], { name: s.name }, () => playScenes(k + 1));
+      playScene(SCENES[m.scene!], { name: s.name }, () => {
+        // sahnede söz verilen iş kendiliğinden üstlenilir
+        if (m.accept && s.quests[m.accept]?.status !== "aktif" && !(s.quests[m.accept]?.count)) { acceptQuest(s, m.accept); persist(); render(); }
+        playScenes(k + 1);
+      });
     };
     playScenes(0);
   }
@@ -454,6 +458,8 @@ export function startApp(root: HTMLElement) {
         const r = walkQuest(cfg, s, id);
         if ("error" in r) { toast(r.error); return; }
         persist(); render();
+        // ana hikâye işinde ödül penceresi araya girmez: sahne oynar, ödül kısa bir notla gelir
+        if (QUESTS.find(q => q.id === id)?.story) { toast(r.note ?? "İş bitti."); storyTick(); return; }
         sfx(r.relics.length ? "perfect" : "page");
         modal(`<h2>${esc(QUESTS.find(q => q.id === id)!.title)}</h2>${rewardHtml(r)}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
         return;
@@ -486,6 +492,8 @@ export function startApp(root: HTMLElement) {
   function doFight(id: string) {
         const q = QUESTS.find(x => x.id === id)!;
         if (s.energy < 15) { toast("Bu yorgunlukla savaşa giremezsin; dinlen."); return; }
+        // ilk pusudan önce Hasan öğretir (bir kez)
+        if (id === "kurt" && s.story.flags.sahne_pusu === undefined) { s.story.flags.sahne_pusu = s.day; persist(); playScene(SCENES.pusu, { name: s.name }, () => doFight(id)); return; }
         const siegeEnd = (won: boolean, gains: Record<string, number>, foes?: string[], hs: string[] = []) => {
           let extra = heroLinesHtml(afterBattle(s, hs, won ? "won" : "lost"));
           if (won) { const r = completeQuest(cfg, s, id, foes ? bonusOf(s, q.battle!.enemies, foes) : bonusOf(s, [], [])); extra = `<h3>Ödül</h3>${rewardHtml(r)}`; }

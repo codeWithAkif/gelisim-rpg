@@ -28,6 +28,7 @@ export interface Milestone {
   effects?: { learnElement?: string; items?: Record<string, number>; flag?: string };
   side?: boolean;                    // yan hikâye: bölümün bitmesini beklemez
   scene?: string;                    // varsa "Yeni sayfa" penceresi yerine bu sahne oynar (content/scenes.ts)
+  accept?: string;                   // sahne bitince bu iş kendiliğinden üstlenilir (sahnede söz verildiyse)
 }
 export interface Chapter { id: string; title: string; place: string; milestones: Milestone[]; soon?: boolean }
 
@@ -40,9 +41,11 @@ export const CHAPTERS: Chapter[] = [
     milestones: [
       { id: "varis", title: "Taşpınar'a varış", hint: "", reached: s => s.introDone, scene: "varis",
         text: "Dağ yolu bir yaylaya çıkıyor. Yaşlı bir çoban sürüsünü topluyor; gözleri yorgun, geceleri uyumadığı belli. Adı Hasan. Aşağıda vadide Taşpınar köyü görünüyor." },
-      { id: "ilk_is", title: "İlk iş", hint: "Hasan'dan işi al, sonra Harita'dan köy meydanına in ve muhtara haber ver.", reached: s => done(s, "mesaj"),
+      { id: "ilk_is", title: "İlk iş", hint: "Köy meydanına in, muhtar Ayşe'ye olanları anlat.", reached: s => done(s, "mesaj"), scene: "ayse",
         text: "Muhtar Ayşe haberi dinledi, sonra uzun uzun yüzüne baktı. \"Seni bir yerden tanıyor gibiyim,\" dedi. Sonra vazgeçti." },
-      { id: "suru", title: "Sürünün bekçisi", hint: "Hasan'ın sürüsüne dadanan kurtları uzaklaştır.", reached: s => done(s, "kurt"),
+      { id: "donmus_kuzu", title: "Donmuş kuzu", hint: "Yaylaya dön; Hasan'la gece ağılda nöbet tut.", reached: s => done(s, "agil_nobet"), scene: "donmus_kuzu", accept: "kurt",
+        text: "Kuzu ısırılmamıştı; donmuştu. Basılan toprak donmuş, yazın ortasında ağılın duvarında kırağı. Kurt kuzuyu yer; dondurmaz." },
+      { id: "suru", title: "Sürünün bekçisi", hint: "Hasan'la meradaki kayalıklarda pusu kur; kurtları sürüden uzaklaştır.", reached: s => done(s, "kurt"), scene: "suru",
         text: "Köyde adın anılmaya başladı. Muhtar Ayşe seni çağırttı: \"On iki yıl önce buraya bir kadın geldi. Bir defteri vardı; seninkine benziyordu. Şifacı Zehra'ya bir şey bıraktı.\"" },
       { id: "iz", title: "Annenin izi", hint: "Muhtardan işi al; Zehra'nın evi yaylaya çıkan patikada.", reached: s => done(s, "annenin_izi"),
         effects: { learnElement: "el_ates" },

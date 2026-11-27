@@ -10,11 +10,14 @@ export interface AmbCue { id: string; vol: number }
 export type Beat =
   | { t: "metin"; text: string; voice?: Voice; center?: boolean }   // anlatıcı (ben) ya da annenin el yazısı
   | { t: "soz"; who: string; text: string }                          // konuşma: who = kişi kimliği ya da "sen"
-  | { t: "gorsel"; art: string | null }                               // arka plan: hikaye_/yer_ görsel anahtarı, null = karanlık
+  | { t: "gorsel"; art: string | null; gece?: boolean }               // arka plan: hikaye_/yer_ görsel anahtarı, null = karanlık; gece = karartılmış
+  | { t: "tek"; id: string; vol?: number }                            // tek seferlik ses (src/assets/ses/ içinden: harabe_uluma, kurt_uzak…)
+  | { t: "incele"; prompt: string; spots: Spot[] }                    // görselin üstünde dokunarak incelenecek yerler (hepsi bulununca sürer)
   | { t: "ses"; layers: AmbCue[] }                                    // sahnenin ortam sesi (src/assets/ses/ortam_<id>.ogg)
   | { t: "bekle"; ms: number }
   | { t: "ad" }                                                       // oyuncunun adı sorulur
   | { t: "sis" };                                                     // sisin içinde çan sesini izleme (oynanır)
+export interface Spot { x: number; y: number; label: string; text: string }   // x, y: görselin üstünde 0–1
 export interface Scene { id: string; beats: Beat[] }
 
 const m = (text: string, center = false): Beat => ({ t: "metin", text, center });
@@ -72,12 +75,77 @@ export const SCENES: Record<string, Scene> = {
     { t: "ses", layers: [{ id: "ruzgar", vol: 0.3 }, { id: "koyun", vol: 0.6 }] },
     soz("hasan", "Ben sürüyü bırakamam. Köye in, muhtar Ayşe'ye anlat. Belki seni dinler."),
   ] },
+
+  /** Muhtar Ayşe: kurda inanıyor, ama seni tanır gibi. Gece ağılda bekleyip kendi gözünle görmeni ister. */
+  ayse: { id: "ayse", beats: [
+    { t: "ses", layers: [{ id: "meydan", vol: 0.8 }] },
+    { t: "gorsel", art: "hikaye_ilk_is" },
+    m("Köy meydanında taştan bir pınar. Başında su dolduran kadınlar beni görünce sustu."),
+    soz("ayse", "Yabancısın. Hasan mı gönderdi seni?"),
+    soz("sen", "Her gece sürüden bir kuzu eksiliyor. Hasan, kurt böyle avlanmaz diyor."),
+    soz("ayse", "Hasan yaşlandı. Kurt kurttur."),
+    m("Sonra yüzüme baktı. Uzun uzun."),
+    soz("ayse", "Seni bir yerden tanıyor gibiyim."),
+    m("Bir şey diyecekti. Vazgeçti."),
+    soz("ayse", "Madem merak ettin, bu gece Hasan'la ağılda bekle. Kendi gözünle gör, sonra gel bana anlat."),
+  ] },
+
+  /** Ağılda nöbet: gece, uzaktan kurtlar, kuzu meler; fenerle ağılı incelersin. Kuzu donmuş. */
+  donmus_kuzu: { id: "donmus_kuzu", beats: [
+    { t: "ses", layers: [{ id: "gece", vol: 0.6 }, { id: "ruzgar", vol: 0.3 }, { id: "muzik_orman", vol: 0.3 }] },
+    { t: "gorsel", art: "yer_yayla", gece: true },
+    m("Gece yarısı. Hasan'la ağılın taş duvarının dibinde bekliyoruz."),
+    m("Fener söndü. Ay bulutların arkasında."),
+    { t: "bekle", ms: 900 },
+    { t: "tek", id: "kurt_uzak", vol: 0.7 },
+    soz("hasan", "Duydun mu? Geldiler."),
+    m("Ağılın öbür ucunda koyunlar birden sustu. Sonra bir kuzu meledi. Bir kez."),
+    m("Koştuğumuzda gölgeler kayalıklara doğru çoktan kaybolmuştu."),
+    { t: "incele", prompt: "Feneri yaktım. Ağılın içine bakıyorum.", spots: [
+      { x: 0.3, y: 0.68, label: "Kuzu", text: "Kuzu yerde. Üstünde ne diş izi var ne kan. Tüyleri kırağı tutmuş; buz gibi." },
+      { x: 0.62, y: 0.74, label: "İzler", text: "Pençe izleri. Ama basılan yerlerde toprak donmuş; sanki ayaklarının altı soğumuş." },
+      { x: 0.8, y: 0.5, label: "Duvar", text: "Duvarın taşlarında ince bir kırağı. Mevsimlerden yaz." },
+    ] },
+    soz("hasan", "Otuz yıldır çobanım. Kurt kuzuyu yer. Dondurmaz."),
+    m("Kuzuyu elime aldım. Soğuğu avucuma işledi. Annemin defterindeki cümle aklımdan çıkmadı."),
+    anne(MOTTO),
+    soz("hasan", "İzler meradaki kayalıklara gidiyor. Yarın gece orada bekleyelim."),
+  ] },
+
+  /** Pusudan önce Hasan öğretir: rüzgâr, meşale, yüksek yer. Ardından plan senin. */
+  pusu: { id: "pusu", beats: [
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.5 }, { id: "gece", vol: 0.3 }] },
+    { t: "gorsel", art: "hikaye_suru" },
+    m("Hasan beni meraya çıkardı. Kayalıkların dibinde, kuzunun yanındaki izlerin aynısı."),
+    soz("hasan", "Kurt rüzgârı arkasına alır. Kokunu alırsa ya yaklaşmaz, ya da ansızın gelir."),
+    soz("hasan", "Meşale yak ama elinde tutma. Kayaya dik; ışık onların gözünü alır."),
+    soz("hasan", "Yüksek yere çık. Yukarıdan vuran, aşağıdan vurulandan uzun yaşar."),
+    m("Nereden gireceğim, ne zaman bekleyeceğim, ne kuracağım: gerisi bana kaldı."),
+  ] },
+
+  /** Sürünün bekçisi: bir kurt yaralı kaçar, kuzeyden uluma; "kovalanıyorlar"; Ayşe seni annenin izine yollar. */
+  suru: { id: "suru", beats: [
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.4 }, { id: "gece", vol: 0.5 }] },
+    { t: "gorsel", art: "hikaye_suru", gece: true },
+    m("Kurtlardan biri yere serildi. Öbürü yaralı, kayalıklara kaçtı."),
+    m("Peşinden gitmedim. Dağın arkasından, kuzeyden bir uluma cevap verdi."),
+    { t: "tek", id: "harabe_uluma", vol: 0.85 },
+    { t: "bekle", ms: 700 },
+    soz("hasan", "Bu kurtlar aç değil, evlat. Kovalanıyorlar."),
+    soz("hasan", "Kuzeyde bir şey onları aşağı itiyor. Soğuk gibi bir şey."),
+    { t: "ses", layers: [{ id: "meydan", vol: 0.8 }] },
+    { t: "gorsel", art: "yer_koy_meydani" },
+    m("Ertesi sabah köyde adım anılmaya başlamıştı. Muhtar Ayşe beni çağırttı."),
+    soz("ayse", "On iki yıl önce buraya bir kadın geldi. Bir defteri vardı; seninkine benziyordu."),
+    soz("ayse", "Gitmeden önce Şifacı Zehra'ya bir şey bıraktı. Git, ona sor."),
+  ] },
 };
 
 /** Konuşanın görünen adı ve portresi: "sen" oyuncudur. */
 export const SPEAKERS: Record<string, { name: string; portrait?: string }> = {
   sen: { name: "Ben" },
   hasan: { name: "Hasan", portrait: "portre_hasan" },
+  ayse: { name: "Muhtar Ayşe", portrait: "portre_ayse" },
 };
 
 /** Sis oyunu: çan sesi hangi yandan gelir (0 sol, 1 sağ). Tohumdan, art arda aynı yan en çok iki kez. */

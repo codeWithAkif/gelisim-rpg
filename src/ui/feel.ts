@@ -224,6 +224,11 @@ export function howl() {
   void ambBuf(c, "harabe_uluma").then(buf => { if (!buf) return; const src = c.createBufferSource(); src.buffer = buf; const p = c.createStereoPanner(); p.pan.value = Math.random() * 0.8 - 0.4; const g = c.createGain(); g.gain.value = 0.9; src.connect(g).connect(p).connect(master!); src.start(); });
 }
 
+/** Tek seferlik kayıt (sahnelerde: uluma, uzaktan kurtlar…). */
+export function oneShot(id: string, vol = 0.8) {
+  if (!settings().sound) return; const c = ac(); if (!c || !master) return;
+  void ambBuf(c, id).then(buf => { if (!buf) return; const src = c.createBufferSource(); src.buffer = buf; const g = c.createGain(); g.gain.value = vol; src.connect(g).connect(master!); src.start(); });
+}
 /** Ortak ses bağlamı ve ana çıkış (müzik çalar da kullanır). */
 export function audioOut(): { c: AudioContext; out: GainNode } | null { const c = ac(); return c && master ? { c, out: master } : null; }
 

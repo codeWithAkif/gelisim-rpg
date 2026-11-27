@@ -1,10 +1,10 @@
 // Sahne oynatıcı: hikâyenin büyük anlarını sinema gibi gösterir. Karanlık zemin, üstte ve altta şerit,
 // yavaşça yakınlaşan görsel, satır satır beliren yazı, sahnenin kendi sesi. Dokun: satırı tamamla / sonraki.
 // "Geç" sahneyi atlar (ad sorusu ve sis oyunu atlanmaz, onlara gelir). Veri: content/scenes.ts.
-import { type Scene, type Beat, SPEAKERS, sisSides, fill } from "../content/scenes";
+import { type Scene, type Beat, type Spot, SPEAKERS, sisSides, fill } from "../content/scenes";
 import { artUrl } from "./art";
 import { esc } from "./sketch";
-import { sfx, sceneAmbience, bellCue, stepsBurst } from "./feel";
+import { sfx, sceneAmbience, bellCue, stepsBurst, oneShot } from "./feel";
 import { animScale } from "./settings";
 
 export interface SceneOpts { name?: string; seed?: number; onName?: (name: string) => void }
@@ -23,7 +23,8 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
   const speed = animScale();
   let i = -1; let typing: { full: string; node: HTMLElement; timer: number } | null = null; let waiting = false; let busy = false;
 
-  const setArt = (key: string | null) => {
+  const setArt = (key: string | null, night = false) => {
+    el.classList.toggle("night", night);
     const url = key ? artUrl(key) : undefined; const next = imgs[1 - front];
     if (url) { next.src = url; next.classList.remove("zoom"); void next.offsetWidth; next.classList.add("zoom"); }
     next.classList.toggle("show", !!url); imgs[front].classList.remove("show"); front = 1 - front;
@@ -64,6 +65,23 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
     inp.addEventListener("click", e => e.stopPropagation());
   };
 
+  /* ---------- incele: görselin üstünde dokunarak bak ---------- */
+  const inspect = (prompt: string, spots: Spot[]) => {
+    busy = true; tapHint.classList.remove("on"); el.classList.add("inspect");
+    const found = new Set<number>();
+    stage.innerHTML = `<div class="sc-line anlatici center"><p class="sc-text">${esc(prompt)}</p><p class="sc-sub">Parlayan yerlere dokun (${spots.length}).</p></div>`;
+    const layer = document.createElement("div"); layer.className = "sc-spots";
+    layer.innerHTML = spots.map((p, k) => `<button class="sc-spot" data-k="${k}" style="left:${(p.x * 100).toFixed(1)}%;top:${(p.y * 100).toFixed(1)}%" aria-label="${esc(p.label)}"><i></i><span>${esc(p.label)}</span></button>`).join("");
+    el.appendChild(layer);
+    layer.addEventListener("click", e => {
+      e.stopPropagation();
+      const b = (e.target as HTMLElement).closest<HTMLElement>("[data-k]"); if (!b) return;
+      const k = +b.dataset.k!; if (found.has(k)) return; found.add(k); b.classList.add("seen"); sfx("page");
+      stage.innerHTML = `<div class="sc-line anlatici"><p class="sc-text">${esc(spots[k].text)}</p>${found.size < spots.length ? `<p class="sc-sub">${spots.length - found.size} yer daha.</p>` : ""}</div>`;
+      if (found.size >= spots.length) setTimeout(() => { layer.remove(); el.classList.remove("inspect"); busy = false; tapHint.classList.add("on"); }, 400);
+    });
+  };
+
   /* ---------- sis: çanın sesini izle ---------- */
   const fog = () => {
     busy = true; tapHint.classList.remove("on"); el.classList.add("fog");
@@ -102,7 +120,9 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
     while (++i < scene.beats.length) {
       const b = scene.beats[i];
       if (b.t === "ses") { sceneAmbience(b.layers); continue; }
-      if (b.t === "gorsel") { setArt(b.art); continue; }
+      if (b.t === "gorsel") { setArt(b.art, !!b.gece); continue; }
+      if (b.t === "tek") { oneShot(b.id, b.vol); continue; }
+      if (b.t === "incele") { inspect(b.prompt, b.spots); return; }
       if (b.t === "bekle") { waiting = true; stage.innerHTML = ""; setTimeout(() => { waiting = false; next(); }, b.ms * Math.max(0.3, speed || 0.3)); return; }
       if (b.t === "ad") { askName(); return; }
       if (b.t === "sis") { fog(); return; }
@@ -117,8 +137,8 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
       // atla: bir sonraki etkileşime ya da sona (ses ve görsel güncellenir)
       while (++i < scene.beats.length) {
         const b = scene.beats[i];
-        if (b.t === "ses") sceneAmbience(b.layers); else if (b.t === "gorsel") setArt(b.art);
-        else if (b.t === "ad") { askName(); return; } else if (b.t === "sis") { fog(); return; }
+        if (b.t === "ses") sceneAmbience(b.layers); else if (b.t === "gorsel") setArt(b.art, !!b.gece);
+        else if (b.t === "ad") { askName(); return; } else if (b.t === "sis") { fog(); return; } else if (b.t === "incele") { inspect(b.prompt, b.spots); return; }
       }
       finish(); return;
     }
