@@ -15,12 +15,13 @@ import { sitesAt, TIER_NAMES } from "./scavenge";
 import { olcerOpen, nextLevel, solvedLevels, OLCER_PLACE, OLCER_LEVELS, canStartOlcer } from "./olcer";
 import { PET_TYPES, canAdopt } from "./pet";
 import { pagesAt } from "./synthesis";
+import { nobetSite, nobetSave } from "./nobet";
 import { tradeOpen, postAt, tradeOf, cartsFree, papersAt, hasPaper, feastHere } from "./trade";
 import { REGION_NAMES, paper } from "../content/trade";
 import { homeBed, candidatesAt, canHire, canBuyHouse, HOUSES, HOME_PLACES, ROLE_NAMES } from "./estate";
 
 export interface PlaceAction {
-  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "study" | "market" | "show-place" | "partner" | "sleep" | "scav" | "pet-adopt" | "hire" | "house" | "olcer" | "caravan" | "paper" | "feast" | "mpage";
+  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "study" | "market" | "show-place" | "partner" | "sleep" | "scav" | "pet-adopt" | "hire" | "house" | "olcer" | "caravan" | "paper" | "feast" | "mpage" | "nobet";
   id: string; label: string; sub?: string; disabled?: string; primary?: boolean;
 }
 /** Bulunduğun yerde yapılabilecekler, önem sırasıyla. */
@@ -48,6 +49,9 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
   if (HOME_PLACES.includes(placeId) && !(s.estate?.house)) { const c = canBuyHouse(cfg, s, placeId); out.push({ act: "house", id: placeId, label: `Ev kur: ${HOUSES[0].name}`, sub: `${HOUSES[0].cost.money} bakır + ${Object.entries(HOUSES[0].cost.items).map(([k, n]) => `${n} ${k}`).join(", ")} · ${HOUSES[0].desc}`, disabled: placeId === s.location ? (c.ok ? undefined : c.reason) : "Oraya git" }); }
   if (placeId === OLCER_PLACE && olcerOpen(s)) { const l = nextLevel(s); const n = solvedLevels(s).length; const c = canStartOlcer(s);
     out.push({ act: "olcer", id: l.id, label: `Ölçer işi: ${l.title}`, sub: n >= OLCER_LEVELS.length ? "Hepsini çözdün · alıştırma" : `Isıyı ölç ve taşı · ${n}/${OLCER_LEVELS.length}`, disabled: c.ok ? undefined : c.reason }); }
+  // sonsuz nöbet: ne kadar dayanacaksın (güçlenmeler yalnız o nöbette)
+  const ns = nobetSite(placeId);
+  if (ns && !ns.unlock(s)) out.push({ act: "nobet", id: placeId, label: `Nöbet tut: ${ns.name}`, sub: `Sonsuz dalga · rekor ${nobetSave(s).best[placeId] ?? 0}. dalga`, disabled: placeId === s.location ? undefined : "Oraya git" });
   const ruins = sitesAt(placeId).filter(x => !x.unlock(s));
   if (ruins.length) out.push({ act: "scav", id: placeId, label: ruins.length > 1 ? `Harabeler (${ruins.length})` : `Harabeyi ara: ${ruins[0].name}`,
     sub: ruins.map(x => `${x.name} · ${TIER_NAMES[x.tier]}`).join(" / "), disabled: placeId === s.location ? undefined : "Oraya git" });
