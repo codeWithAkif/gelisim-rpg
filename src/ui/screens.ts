@@ -314,7 +314,7 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
       <h3 class="eq-h">Eller</h3><div class="eq-row">${slot("Sağ el", s.equipped.weapon, "weapon")}${isTwoHanded(s.equipped.weapon) ? `<div class="eq-slot two"><span class="muted tiny">iki elli</span><span class="eq-l">Sol el</span></div>` : slot("Sol el", s.equipped.offhand, "offhand")}${slot("Yay", s.equipped.bow, "bow")}</div>
       <h3 class="eq-h">Çanta</h3><div class="eq-row">${slot("Çanta", bagOf(s), "bag")}${Array.from({ length: MAX_POUCHES }, (_, i) => slot(`Ek ${i + 1}`, pouchesOf(s)[i], "pouch" + i)).join("")}</div>
       <p class="muted tiny" style="margin:0">${esc(itemInfo(cfg, bagOf(s)).name)} ${itemInfo(cfg, bagOf(s)).capacity} göz${pouchesOf(s).map(p => ` + ${esc(itemInfo(cfg, p).name)} ${pouchSlots(cfg, p)}`).join("")} = <b>${cap} göz</b>. Boştaki bir çantayı ana çantaya dikersen kendi gözünün ancak %${Math.round(POUCH_SHARE * 100)}'ını katar.</p></section>
-    <section class="sec">${detail}</section></div>`;
+    <section class="sec inv-detail">${detail}</section></div>`;
   if (bp === "pazar") return `<div class="page">${seg}${pazarSection(cfg, s)}</div>`;
   if (bp === "elisi") return `<div class="page">${seg}${header("El işi", "")}
     ${craftingSection(cfg, s, crafts)}</div>`;
@@ -322,7 +322,7 @@ export function cantaScreen(cfg: Config, s: GameState, ui: UiState): string {
     <div class="inv-tabs" role="tablist">${INV_TABS.map(x => { const n = x.id === "hepsi" ? st.length : st.filter(v => inTab(cfg, v.id, x.id)).length;
       return `<button role="tab" class="inv-tab ${tab === x.id ? "on" : ""}" data-act="invtab" data-id="${x.id}" aria-selected="${tab === x.id}">${x.name}<small>${n}</small></button>`; }).join("")}</div>
     <div class="grid">${cells || `<p class="muted tiny" style="grid-column:1/-1;margin:6px 0">Bu bölmede bir şey yok.</p>`}</div>
-    <section class="sec">${detail}</section>
+    <section class="sec inv-detail">${detail}</section>
   </div>`;
 }
 
