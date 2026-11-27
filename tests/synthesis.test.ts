@@ -127,3 +127,13 @@ test("şimşek kuralı her sahnede aynı: zincir elden çıkar, yıldırım üst
     if (!lightning) expect(st(sp.id), sp.id).toBeNull();
   }
 });
+
+test("her özelliğin ne işe yaradığı yazılı; hiçbir şeyi etkilemeyenler bunu açıkça söyler; sıradaki açılış veriden gelir", async () => {
+  const { ATTR_USE, attrUse } = await import("../src/content/attr-use");
+  const { nextThreshold } = await import("../src/engine/thresholds");
+  for (const a of cfg.data.attributes) { expect(attrUse(a.id), a.id).not.toBe(""); expect(attrUse(a.id).length, a.id).toBeLessThan(230); }
+  expect(Object.keys(ATTR_USE).filter(id => !cfg.attr.has(id))).toEqual([]);             // olmayan özellik yazılmamış
+  const s = newGame(cfg, 3); s.knownElements = ["el_ates"]; s.attrs.ates.level = 2;
+  const nx = nextThreshold(cfg, s, "ates")!; expect(nx.at).toBe(5); expect(nx.t.text).toMatch(/Ateş topu/);
+  s.attrs.ates.level = 6; expect(nextThreshold(cfg, s, "ates")?.t.text ?? "").not.toMatch(/duvar/i);   // keşfedilmemiş sentez büyüsü açık edilmez
+});
