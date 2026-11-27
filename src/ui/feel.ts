@@ -1,6 +1,7 @@
 // His: ses efektleri, ortam sesi ve titreşim.
 // Sesler dosya değil, WebAudio ile anında üretilir (tamamen offline, paket büyümez).
 import { settings } from "./settings";
+import { MOTIF, motifLength, type Scape } from "../engine/soundscape";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -98,28 +99,93 @@ export function buzz(k: Buzz) {
 }
 
 /* ---------- ortam sesi ---------- */
-let amb: { gain: GainNode; timer: number; night: boolean; src: AudioBufferSourceNode } | null = null;
-/** Ortam: gündüz rüzgâr + ara ara kuş, gece cırcırböceği. Sessizce süregelir. */
-export function ambience(on: boolean, night = false) {
+// Yere göre katmanlar (hepsi dosyasız): rüzgâr her yerde; derede ve pınarda su; çarşıda uğultu;
+// ocak ve ev içinde çıtırtı; yaylada koyun çanı; demirhanede uzak örs; gündüz kuşlar, gece cırcır ve baykuş.
+type Amb = { gain: GainNode; timer: number; key: string; srcs: AudioBufferSourceNode[] };
+let amb: Amb | null = null;
+/** Sürekli bir gürültü katmanı: süzgeç türü, frekans ve ses düzeyi. */
+function bed(c: AudioContext, out: AudioNode, type: BiquadFilterType, freq: number, q: number, vol: number): { src: AudioBufferSourceNode; f: BiquadFilterNode; g: GainNode } {
+  const src = c.createBufferSource(); src.buffer = noise(c); src.loop = true;
+  const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  const g = c.createGain(); g.gain.value = vol;
+  src.connect(f).connect(g).connect(out); src.start(0, Math.random() * 1.5);
+  return { src, f, g };
+}
+/** Koyun çanı: metalik iki kısmi ses, hızlı sönüm. */
+function bell(out: AudioNode, base: number, vol: number, delay = 0) { tone(base, base, 0.9, vol, "triangle", delay, out); tone(base * 2.76, base * 2.7, 0.5, vol * 0.4, "sine", delay, out); }
+/**
+ * Ortam sesi. on: oyun ekranında mıyız; night: gece mi; scape: yerin sesi.
+ * Aynı yer ve aynı vakitte yeniden kurulmaz; değişince yumuşakça geçer.
+ */
+export function ambience(on: boolean, night = false, scape: Scape = { kind: "yayla", cold: false }) {
   const want = on && settings().ambient && settings().sound && !document.hidden;
-  if (!want) { if (amb) { amb.gain.gain.setTargetAtTime(0, ctx!.currentTime, 0.4); clearInterval(amb.timer); const g = amb.gain, sr = amb.src; setTimeout(() => { try { sr.stop(); } catch { /* */ } g.disconnect(); }, 1500); amb = null; } return; }
-  if (amb && amb.night === night) return;
+  if (!want) {
+    if (amb) { const a = amb; amb = null; a.gain.gain.setTargetAtTime(0, ctx!.currentTime, 0.4); clearInterval(a.timer); setTimeout(() => { a.srcs.forEach(x => { try { x.stop(); } catch { /* */ } }); a.gain.disconnect(); }, 1500); }
+    return;
+  }
+  const key = `${scape.kind}|${scape.cold}|${night}`;
+  if (amb && amb.key === key) return;
   ambience(false);
   const c = ac(); if (!c || !master) return;
   const g = c.createGain(); g.gain.value = 0; g.connect(master); g.gain.setTargetAtTime(1, c.currentTime, 0.8);
-  // sürekli hafif rüzgâr
-  const src = c.createBufferSource(); src.buffer = noise(c); src.loop = true;
-  const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = night ? 300 : 450;
-  const wg = c.createGain(); wg.gain.value = night ? 0.025 : 0.04;
-  src.connect(f).connect(wg).connect(g); src.start();
+  const k = scape.kind; const srcs: AudioBufferSourceNode[] = [];
+  const indoor = k === "ev" || k === "ocak";
+  // rüzgâr: açıkta ve soğukta sert, içeride ve şehirde hafif
+  const windVol = scape.cold || k === "kar" ? 0.09 : indoor ? 0.012 : k === "sehir" ? 0.018 : k === "yayla" || k === "yol" ? 0.05 : 0.035;
+  const wind = bed(c, g, "lowpass", night ? 300 : 450, 0.7, night ? windVol * 0.7 : windVol); srcs.push(wind.src);
+  // su: dere gür, meydanda pınar ince
+  const water = k === "dere" ? bed(c, g, "bandpass", 1500, 0.8, 0.05) : k === "meydan" ? bed(c, g, "bandpass", 2400, 1.4, 0.016) : null;
+  if (water) srcs.push(water.src);
+  // çarşı ve meydan uğultusu (gece susar)
+  const crowd = !night && (k === "sehir" || k === "meydan") ? bed(c, g, "bandpass", 650, 1.1, k === "sehir" ? 0.045 : 0.014) : null;
+  if (crowd) srcs.push(crowd.src);
   const tick = () => {
-    if (night) { for (let i = 0; i < 3; i++) tone(4300, 4200, 0.04, 0.025, "sine", i * 0.07, g); }
-    else if (Math.random() < 0.45) { const b = 1800 + Math.random() * 1400; tone(b, b * 1.35, 0.09, 0.03, "sine", 0, g); tone(b * 1.2, b * 0.9, 0.12, 0.025, "sine", 0.12, g); }
-    f.frequency.setTargetAtTime((night ? 250 : 380) + Math.random() * 200, c.currentTime, 1.5);
+    const t = c.currentTime; const r = Math.random;
+    // rüzgâr dalgalanır; soğukta ara ara sert esinti
+    wind.f.frequency.setTargetAtTime((night ? 250 : 380) + r() * 220, t, 1.5);
+    if ((scape.cold || k === "kar") && r() < 0.25) { wind.g.gain.setTargetAtTime(windVol * 1.8, t, 0.6); wind.g.gain.setTargetAtTime(windVol, t + 1.4, 1.2); }
+    if (water) water.f.frequency.setTargetAtTime((k === "dere" ? 1200 : 2100) + r() * 900, t, 0.25);   // suyun şırıltısı
+    if (crowd) crowd.g.gain.setTargetAtTime((k === "sehir" ? 0.035 : 0.01) + r() * 0.02, t, 0.8);
+    // çıtırtı: ocak ve ev içinde
+    if (indoor) for (let i = 0; i < (k === "ocak" ? 3 : 1); i++) if (r() < 0.7) hiss(0.015 + r() * 0.02, 0.05 + r() * 0.06, 3000 + r() * 2500, 2, r() * 0.6, "highpass", g);
+    if (night) {
+      if (!indoor && k !== "sehir") for (let i = 0; i < 3; i++) tone(4300, 4200, 0.04, 0.025, "sine", i * 0.07, g);   // cırcır
+      if ((k === "koru" || k === "yayla") && r() < 0.06) { tone(390, 370, 0.35, 0.05, "sine", 0, g); tone(360, 330, 0.5, 0.05, "sine", 0.45, g); }   // baykuş
+    } else {
+      const birdChance = k === "koru" ? 0.55 : k === "dere" || k === "yayla" ? 0.35 : k === "meydan" ? 0.15 : indoor || k === "sehir" || scape.cold ? 0 : 0.2;
+      if (r() < birdChance) { const b = 1800 + r() * 1400; tone(b, b * 1.35, 0.09, 0.03, "sine", 0, g); tone(b * 1.2, b * 0.9, 0.12, 0.025, "sine", 0.12, g); }
+      if (k === "yayla" && r() < 0.3) { const f0 = 620 + r() * 260; bell(g, f0, 0.03); if (r() < 0.5) bell(g, f0 * 1.06, 0.02, 0.35); }   // koyun çanları
+      if (k === "ocak" && r() < 0.18) { tone(1250, 1200, 0.4, 0.035, "triangle", 0, g); tone(1880, 1820, 0.25, 0.02, "sine", 0.01, g); }   // uzak örs
+      if (k === "kale" && r() < 0.08) tone(180, 170, 0.6, 0.03, "triangle", 0, g);   // uzak bir kapı ya da zincir
+    }
   };
-  const timer = window.setInterval(tick, night ? 900 : 2300);
-  amb = { gain: g, timer, night, src };
+  const timer = window.setInterval(tick, night ? 900 : 1600);
+  amb = { gain: g, timer, key, srcs };
 }
+
+/* ---------- annenin ezgisi ---------- */
+/** Kopuz gibi telli bir sesle bir nota: üçgen gövde, hafif testere parıltısı, hızlı çekiş, uzun sönüm. */
+function pluck(f: number, delay: number, vol: number) {
+  tone(f, f * 0.998, 1.1, vol, "triangle", delay);
+  tone(f * 2, f * 1.996, 0.45, vol * 0.25, "sawtooth", delay);
+  tone(f * 3, f * 3, 0.2, vol * 0.08, "sine", delay);
+}
+const SCALE = [294, 330, 392, 440, 523, 587];
+/** Annenin ezgisi: hikâye sayfalarında kısa, büyük anlarda tam. Müzik ayarına bağlıdır. Süresini (sn) döner. */
+export function theme(which: "kisa" | "tam"): number {
+  if (!settings().music || !settings().sound) return 0;
+  const beat = which === "tam" ? 0.42 : 0.36; let t = 0.05;
+  for (const x of MOTIF[which]) { pluck(SCALE[x.n % 6], t, 0.16); t += x.d * beat; }
+  const len = motifLength(MOTIF[which], beat);
+  duck?.(len + 0.6);
+  return len;
+}
+/** Ezgi çalarken müzik kısılsın (music.ts bağlar). */
+let duck: ((sec: number) => void) | undefined;
+export function onDuck(fn: (sec: number) => void) { duck = fn; }
+/** Ortak ses bağlamı ve ana çıkış (müzik çalar da kullanır). */
+export function audioOut(): { c: AudioContext; out: GainNode } | null { const c = ac(); return c && master ? { c, out: master } : null; }
+
 /** Tarayıcı sesi ilk dokunuştan sonra açar. */
 export function unlockAudio() {
   const go = () => { ac(); window.removeEventListener("pointerdown", go); };
