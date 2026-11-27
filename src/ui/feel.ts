@@ -149,15 +149,6 @@ export function ambience(on: boolean, night = false, scape: Scape = { kind: "yay
   }, 3000);
 }
 
-/* ---------- annenin ezgisi ---------- */
-/**
- * Annenin ezgisi: gerçek çalgı kaydıyla çalınacak (seçim bekliyor). Kayıt yokken susar; eski sentez
- * sesi kaldırıldı. Çaldığı süreyi (sn) döner; 0 ise çalmadı.
- */
-export function theme(_which: "kisa" | "tam"): number { return 0; }
-/** Ezgi çalarken müzik kısılsın (music.ts bağlar). */
-let duck: ((sec: number) => void) | undefined;
-export function onDuck(fn: (sec: number) => void) { duck = fn; }
 /** Ortak ses bağlamı ve ana çıkış (müzik çalar da kullanır). */
 export function audioOut(): { c: AudioContext; out: GainNode } | null { const c = ac(); return c && master ? { c, out: master } : null; }
 

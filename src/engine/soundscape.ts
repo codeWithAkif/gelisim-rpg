@@ -1,5 +1,5 @@
-// Ses haritası: bulunduğun yerde hangi ortam sesi ve hangi müzik çalar. Yalnız karar; ses üretimi ui/feel.ts
-// ve ui/music.ts içinde. Müzik dosyası yoksa sessiz kalınır (ortam sesi ve annenin ezgisi dosyasızdır). DOM yok.
+// Ses haritası: bulunduğun yerde hangi ortam kaydı ve hangi müzik çalar. Yalnız karar; çalma ui/feel.ts
+// ve ui/music.ts içinde. Kaydı ya da müzik dosyası olmayan katman sessiz kalır. DOM yok.
 import type { Place } from "../content/map";
 
 export type ScapeKind = "yayla" | "dere" | "meydan" | "koru" | "ocak" | "ev" | "sehir" | "kale" | "kar" | "yol";
@@ -14,7 +14,7 @@ export function scapeOf(place: Pick<Place, "id" | "icon" | "region"> | undefined
 }
 
 /* ---------- ortam katmanları (kayıtlar: src/assets/ses/ortam_<ad>.ogg) ---------- */
-export type AmbId = "ruzgar" | "kar" | "dere" | "koyun" | "meydan" | "carsi" | "demirhane" | "koru" | "gece" | "ocak";
+export type AmbId = "ruzgar" | "kar" | "dere" | "koyun" | "meydan" | "carsi" | "demirhane" | "koru" | "gece";
 export interface AmbLayer { id: AmbId; vol: number }
 export interface AmbPlan { layers: AmbLayer[]; owls: boolean }
 /**
@@ -30,8 +30,8 @@ export function ambientPlan(sc: Scape, night: boolean): AmbPlan {
     case "dere": layers = night ? [L("dere", 0.8), L("gece", 0.5)] : [L("dere", 0.9), wind(0.2)]; break;
     case "meydan": layers = night ? [L("gece", 0.5), wind(0.2)] : [L("meydan", 1)]; break;
     case "koru": layers = night ? [L("gece", 0.8), wind(0.15)] : [L("koru", 1), wind(0.15)]; break;
-    case "ocak": layers = night ? [L("ocak", 0.6), wind(0.15)] : [L("demirhane", 1)]; break;
-    case "ev": layers = [L("ocak", 0.7), wind(0.12)]; break;
+    case "ocak": layers = night ? [wind(0.15)] : [L("demirhane", 1)]; break;
+    case "ev": layers = [wind(0.1)]; break;   // içeride: dışarıdan hafif rüzgâr
     case "sehir": layers = night ? [wind(0.3), L("gece", 0.3)] : [L("carsi", 1)]; break;
     case "kale": layers = [wind(0.6)]; break;
     case "kar": layers = [L("kar", 1)]; break;
@@ -39,7 +39,7 @@ export function ambientPlan(sc: Scape, night: boolean): AmbPlan {
   }
   return { layers, owls: night && (sc.kind === "koru" || sc.kind === "yayla") };
 }
-/** Elde kaydı olmayan katmanlar çıkarılır (ör. ocak kaydı henüz seçilmediyse). */
+/** Elde kaydı olmayan katmanlar çıkarılır. */
 export const playableLayers = (p: AmbPlan, available: Set<string>) => p.layers.filter(l => available.has(l.id));
 
 /** Müzik bağlamı: savaş ve Ölçer işi kendi parçasını ister; yoksa bölgenin parçası. */
@@ -61,15 +61,3 @@ export const pickTrack = (candidates: string[], available: Set<string> | string[
   const has = available instanceof Set ? available : new Set(available);
   return candidates.find(c => has.has(c)) ?? null;
 };
-
-/* ---------- annenin ezgisi ---------- */
-// Kopuz gibi tellerde, beşli dizide kısa bir motif. Notalar note()'taki dizinin sıraları (0–5), süreler vuruş.
-export interface MotifNote { n: number; d: number }
-export const MOTIF: Record<"kisa" | "tam", MotifNote[]> = {
-  // "Isı kaybolmaz" — iniş, sonra yerine dönüş
-  kisa: [{ n: 3, d: 1 }, { n: 2, d: 1 }, { n: 1, d: 1 }, { n: 2, d: 2 }],
-  // "… bir yere gider" — aynı iniş, ardından bir üst oktavda kapanış
-  tam: [{ n: 3, d: 1 }, { n: 2, d: 1 }, { n: 1, d: 1 }, { n: 2, d: 2 }, { n: 0, d: 1 }, { n: 1, d: 1 }, { n: 3, d: 1 }, { n: 5, d: 3 }],
-};
-/** Motifin saniye cinsinden süresi (bir vuruş beat saniye). */
-export const motifLength = (m: MotifNote[], beat: number) => m.reduce((a, x) => a + x.d, 0) * beat;
