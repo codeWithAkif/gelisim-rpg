@@ -171,3 +171,19 @@ test("ateş duvarı patlamaz: çizilen şerit yanar; içinden geçen tutuşur ve
   for (let i = 0; i < 200; i++) { if (n.phase === "card") pickCard(s, n, n.offer[0]); stepNobet(s, n, 0.05); }   // kurt yanıp ölürse kart ekranı oyunu durdurur
   expect(n.lines).toHaveLength(0);                                               // süre doldu
 });
+
+test("nöbette şimşek: zincir hedefe en yakından başlayıp en çok üç komşuya atlar, yıldırım alandaki herkese düşer", async () => {
+  const { addNobetSpell, TOWER } = await import("../src/engine/nobet");
+  const s = fresh(); s.knownElements = ["el_simsek", "el_hava", "el_su"]; s.attrs.simsek_buyu.level = 60; s.attrs.hava_buyu.level = 60; s.mana = 99;
+  const n = createNobet(cfg, s, nobetSite("yayla")!, 7);
+  expect(addNobetSpell(cfg, s, n, "simsek_zinciri")).toBe(true); expect(addNobetSpell(cfg, s, n, "yildirim_firtinasi")).toBe(true);
+  expect(n.spells.simsek_zinciri.bolt).toBe("chain"); expect(n.spells.yildirim_firtinasi.bolt).toBe("sky");
+  const cx = TOWER.x, cy = TOWER.y - 40;
+  const ws = [wolf(n, cx, cy), wolf(n, cx + 8, cy), wolf(n, cx - 8, cy), wolf(n, cx, cy - 8), wolf(n, cx + 16, cy - 8)];   // 5 kurt, hepsi yakın
+  n.spells.simsek_zinciri.cd = 0; expect(useSpell(n, "simsek_zinciri", cx, cy)).toBe(true);
+  const hurtN = ws.filter(w => w.hp < 200).length; expect(hurtN).toBe(4);                // ilk + üç komşu; beşincisi zincire girmez
+  const fx = n.fx.filter(e => e.k === "spell").pop() as { pts?: [number, number][] }; expect(fx.pts).toHaveLength(4);
+  for (const w of ws) w.hp = 200; n.spells.yildirim_firtinasi.cd = 0;
+  expect(useSpell(n, "yildirim_firtinasi", cx, cy)).toBe(true);
+  expect(ws.filter(w => w.hp < 200).length).toBe(5);                                      // yıldırım alandaki herkese
+});

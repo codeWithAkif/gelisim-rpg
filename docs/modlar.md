@@ -131,3 +131,19 @@ Sonraki adım (karar bekliyor): bu kural savaşa ve Soğuk Ocak bölümüne taş
 
 Yeni mod eklenmez kuralı iki bilinçli istisnayla kaldırıldı: kervan ticareti (finans ve adamlar) ve büyü sentezi.
 Tasarım: `docs/finans-ve-buyu.md`. Kalıcı güçlenme ya da kart sistemi yine eklenmez; güç karakterden ve bilgisinden gelir.
+
+## Tutarlılık: aynı büyü her savaş sahnesinde aynı çalışır ve aynı görünür
+
+Dört savaş sahnesi var: altıgen savaş, barikat (gece savunması), sonsuz nöbet, harabe. Bir büyü ya da mekanik birine
+eklendiyse dördünde de aynı kuralla çalışır. Kurallar tek yerde durur, sahneler yalnız onu okur:
+
+| Kural | Nerede | İçeriği |
+|---|---|---|
+| Nasıl uygulanır | `engine/siege.ts` `spellAim` | duvar yere çizilir; top, fırlatma ve zincir kahramandan ileri atılır; gerisi hedefe dokunarak |
+| Şimşek | `engine/spellfx.ts` `boltStyle` | **zincir** kahramanın elinden çıkar, hedeften hedefe atlar; **yıldırım** üstten aşağı düşer; duvar biçimi şerit olarak kalır |
+| Ateş | `ui/fire-fx.ts` | alev çizimi ortak; yanma: tutuşur, birkaç saniye belirli hasar yer |
+| Avuçta zaman | her sahnede | büyü hazırken zaman durur; Vazgeç |
+| Nişan önizlemesi | her sahnede | atılan büyüde ok ve düşeceği yer; duvarda çizgi |
+
+Yeni büyü ya da mekanik eklerken: önce bu tabloya bak, dört sahneyi de tara, ortak yere koy, her sahne için test yaz.
+Tek sahnede yapılan bir şey tutarsızlıktır; sonradan düzeltmek eklemekten pahalıdır.

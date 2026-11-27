@@ -10,6 +10,7 @@ import { maxHp } from "./combat";
 import { maxMana } from "./derived";
 import { spellOptions, SPELL_FX } from "./magic";
 import { spellSequence } from "./synthesis";
+import { boltStyle } from "./spellfx";
 import { Rng } from "./rng";
 import { ENEMIES, GAME_ITEMS, CONFIG_WEAPON_DAMAGE } from "../content/world";
 import { weaponSet, totalArmor, hasBow } from "./gear";
@@ -33,7 +34,7 @@ export interface Arrow { x: number; y: number; vx: number; vy: number; dmg: numb
 export type SiegeFx =
   | { k: "hit"; x: number; y: number; dmg: number; crit?: boolean; by: "ok" | "kilic" | "buyu" | "kopek" | "ates" }
   | { k: "hurt"; dmg: number } | { k: "die"; x: number; y: number } | { k: "bar"; id: number; broken: boolean }
-  | { k: "cast"; spell: string; x: number; y: number; r: number; chain?: [number, number][]; fire?: boolean; from?: [number, number]; line?: [number, number, number, number] } | { k: "shoot" } | { k: "wave"; n: number };
+  | { k: "cast"; spell: string; x: number; y: number; r: number; chain?: [number, number][]; bolt?: "chain" | "sky"; fire?: boolean; from?: [number, number]; line?: [number, number, number, number] } | { k: "shoot" } | { k: "wave"; n: number };
 
 export interface Siege {
   def: SiegeDef; phase: "build" | "fight" | "rest" | "won" | "lost"; time: number; wave: number;
@@ -207,7 +208,8 @@ export function cast(cfg: Config, s: GameState, sg: Siege, id: string, x: number
     if (fx.ignite) ignite(f, Math.max(2, Math.round(sp.dmg * 0.15)));   // hayvanlar yarı canla ateşten kaçar
   }
   const cf = sg.fx.find(e => e.k === "cast" && e.spell === id && e.x === x && e.y === y) as Extract<SiegeFx, { k: "cast" }> | undefined;
-  if (cf) { cf.fire = !!fx.ignite; if (fx.chain || id.includes("simsek") || id.includes("yildirim")) cf.chain = hits.map(f => [f.x, f.y] as [number, number]); }
+  const bs = boltStyle(cfg, id);
+  if (cf) { cf.fire = !!fx.ignite; if (bs) { cf.chain = hits.map(f => [f.x, f.y] as [number, number]); cf.bolt = bs; } }
   if (fx.ignite) sg.zones.push({ x, y, r: sp.r * 0.8, kind: "ates", t: 4, dps: Math.max(2, Math.round(sp.dmg * 0.12)) });
   if (fx.mud) sg.zones.push({ x, y, r: sp.r, kind: "camur", t: 6 });
   return true;

@@ -16,6 +16,7 @@ import { addItem } from "./inventory";
 import { spellOptions } from "./magic";
 import { scavSpellInfo } from "./scavenge";
 import { spellAim, wallLen, THROW_RANGE, type SiegeAim } from "./siege";
+import { boltStyle, type BoltStyle } from "./spellfx";
 import { SPELL_FX } from "./magic";
 import { weaponSet, hasBow } from "./gear";
 import { trapEffect, barricadeMul, trapsOwned, owned } from "./engineering";
@@ -82,7 +83,7 @@ export interface NFoe { id: number; def: string; x: number; y: number; hp: numbe
 export interface Shot { x: number; y: number; tx: number; ty: number; target: number; dmg: number; crit: boolean; pierce: number; burn: boolean; hit: number[] }
 export type NFx =
   | { k: "hit"; x: number; y: number; dmg: number; crit: boolean } | { k: "die"; x: number; y: number; coins: number; boss: boolean }
-  | { k: "hurt"; dmg: number } | { k: "zap"; pts: [number, number][] } | { k: "wave"; n: number; boss: boolean } | { k: "card" } | { k: "reward"; wave: number; loot: Loot } | { k: "spell"; id: SpellId; kind: SpellKind; x: number; y: number; r: number; x2?: number; y2?: number; hits: number[]; from?: [number, number]; wall?: boolean } | { k: "bite"; x: number; y: number }
+  | { k: "hurt"; dmg: number } | { k: "zap"; pts: [number, number][] } | { k: "wave"; n: number; boss: boolean } | { k: "card" } | { k: "reward"; wave: number; loot: Loot } | { k: "spell"; id: SpellId; kind: SpellKind; x: number; y: number; r: number; x2?: number; y2?: number; hits: number[]; pts?: [number, number][]; from?: [number, number]; wall?: boolean } | { k: "bite"; x: number; y: number }
   | { k: "melee"; x: number; y: number } | { k: "trap"; x: number; y: number; type: string; r: number } | { k: "barbreak"; x: number; y: number };
 export interface Nobet {
   site: NobetSite; phase: "play" | "card" | "over"; time: number; wave: number; waveLeft: number; spawnT: number; breakT: number;
@@ -192,7 +193,7 @@ export const petGuard = (n: Nobet) => 16 + (n.pet?.lv ?? 1) * 3 + (n.petBond >= 
 /* ---------- büyüler: yalnızca gerçekten bildiklerin ---------- */
 export type SpellKind = "simsek" | "ates" | "buz" | "camur" | "sarmasik" | "karga" | "kilic";
 export type SpellId = string;
-export interface NSpell { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number; len?: number; dur?: number }
+export interface NSpell { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number; len?: number; dur?: number; bolt?: BoltStyle | null }   // bolt: şimşek büyüsü zincir mi (elden) yıldırım mı (gökten); engine/spellfx.ts
 /** Yere çizilen şerit (ateş duvarı, buz ve taş duvarı): süresi dolana kadar üstünden geçenleri etkiler. */
 export interface NLine { id: number; x1: number; y1: number; x2: number; y2: number; t: number; max: number; kind: "ates" | "buz" | "yavas"; mul: number; hit: number[] }
 /** Nöbette karşılığı olan büyüler (config kimliği → etki). Diğer büyüler nöbette kullanılamaz. */
@@ -208,7 +209,7 @@ function startSpells(cfg: Config, s: GameState): Nobet["spells"] {
   for (const o of spellOptions(cfg, { ...s, mana: 999 } as GameState)) {
     if (!o.ok) continue; const info = SPELL_KIND[o.spell.id] ?? scavSpellInfo(cfg, o.spell.id); if (!info) continue;
     const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0;
-    out[o.spell.id] = { id: o.spell.id, kind: info.kind, name: o.spell.name, cd: 3 + Object.keys(out).length * 1.5, max: info.cd * Math.max(0.6, 1 - m / 120), mul: info.mul * (1 + m / 100), r: info.r };
+    out[o.spell.id] = { id: o.spell.id, kind: info.kind, name: o.spell.name, cd: 3 + Object.keys(out).length * 1.5, max: info.cd * Math.max(0.6, 1 - m / 120), mul: info.mul * (1 + m / 100), r: info.r, bolt: boltStyle(cfg, o.spell.id) };
   }
   return out;
 }
@@ -224,7 +225,7 @@ export function addNobetSpell(cfg: Config, s: GameState, n: Nobet, id: string): 
   const o = spellOptions(cfg, { ...s, mana: 999 } as GameState).find(x => x.spell.id === id && x.ok); if (!o) return false;
   const info = SPELL_KIND[id] ?? scavSpellInfo(cfg, id); if (!info) return false;
   const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0;
-  n.spells[id] = { id, kind: info.kind, name: o.spell.name, cd: 0, max: info.cd * Math.max(0.6, 1 - m / 120), mul: info.mul * (1 + m / 100), r: info.r };
+  n.spells[id] = { id, kind: info.kind, name: o.spell.name, cd: 0, max: info.cd * Math.max(0.6, 1 - m / 120), mul: info.mul * (1 + m / 100), r: info.r, bolt: boltStyle(cfg, id) };
   return true;
 }
 export const spellReady = (n: Nobet, id: SpellId) => !!n.spells[id] && n.spells[id].cd <= 0 && n.phase === "play" && !n.prep;
@@ -248,8 +249,16 @@ export function useSpell(n: Nobet, id: SpellId, tx?: number, ty?: number): boole
   const R = sp.r; const c = tx !== undefined && ty !== undefined ? { x: tx, y: ty } : crowdCenter(n, R); const hits: number[] = [];
   const inR = (f: NFoe, r = R) => Math.hypot(f.x - c.x, f.y - c.y) < r;
   let x2: number | undefined, y2: number | undefined, fx0 = c.x, fy0 = c.y;
+  const pts: [number, number][] = [];
   if (sp.kind === "simsek") {
-    for (const f of [...n.foes]) if (inR(f)) { hits.push(f.id); f.slow = Math.max(f.slow, 1.5); hurt(n, f, n.dmg * sp.mul, false); }
+    // zincir şimşek: hedefe en yakın düşmandan başlar, ondan en yakın üçüne atlar; yıldırım: alandaki herkese üstten düşer
+    let list: NFoe[];
+    if (sp.bolt === "chain") {
+      const first = [...n.foes].filter(f => inR(f, R * 1.3)).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
+      list = first ? [first, ...n.foes.filter(f => f !== first && Math.hypot(f.x - first.x, f.y - first.y) < 24).sort((a, b) => Math.hypot(a.x - first.x, a.y - first.y) - Math.hypot(b.x - first.x, b.y - first.y)).slice(0, 3)] : [];
+    } else list = n.foes.filter(f => inR(f));
+    for (const f of list) { pts.push([f.x, f.y]); hits.push(f.id); f.slow = Math.max(f.slow, 1.5); hurt(n, f, n.dmg * sp.mul, false); }
+    if (!pts.length) pts.push([c.x, c.y]);
   } else if (sp.kind === "ates") {
     for (const f of [...n.foes]) if (inR(f)) { hits.push(f.id); f.burn = Math.max(f.burn, 3.5); hurt(n, f, n.dmg * sp.mul, false); }
   } else if (sp.kind === "buz") {
@@ -270,7 +279,7 @@ export function useSpell(n: Nobet, id: SpellId, tx?: number, ty?: number): boole
       if (Math.hypot(f.x - (x1 + vx * u), f.y - (y1 + vy * u)) < 5 + f.r) { hits.push(f.id); f.stun = Math.max(f.stun, 1.4); hurt(n, f, n.dmg * sp.mul, true); }
     }
   }
-  n.fx.push({ k: "spell", id, kind: sp.kind, x: fx0, y: fy0, r: sp.kind === "kilic" ? 5 : R, x2, y2, hits, from });
+  n.fx.push({ k: "spell", id, kind: sp.kind, x: fx0, y: fy0, r: sp.kind === "kilic" ? 5 : R, x2, y2, hits, pts, from });
   sp.cd = sp.max; n.stats.skills++;
   return true;
 }

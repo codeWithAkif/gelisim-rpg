@@ -7,3 +7,4 @@
 - Denge değişince `npm test` içindeki `tests/balance.test.ts` aralıklarını kontrol et.
 - Görsel yön: kâğıt/mürekkep defter. Renkler `src/ui/style.css` başındaki değişkenlerde; yeni görsel öğeler `src/ui/sketch.ts` içindeki titrek çizgi yardımcılarıyla çizilir.
 - Hedef: dikey ekran telefon, tamamen offline (dış ağ isteği yok, fontlar `@fontsource` ile paketli).
+- Tutarlılık: bir büyü ya da mekanik birden çok savaş sahnesinde (altıgen savaş, barikat, nöbet, harabe) aynı kuralla çalışır ve aynı görünür. Kural tek yerde durur (`engine/spellfx.ts`, `engine/siege.ts` `spellAim`, `ui/fire-fx.ts`); yeni bir şey eklerken dört sahneyi de tara. Ayrıntı: `docs/modlar.md` "Tutarlılık".

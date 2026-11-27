@@ -112,3 +112,18 @@ test("her yerde aynı kural: keşfedilen büyü harabede de seçilir, gece savun
   const sg = createSiege(cfg, s, def, 3);
   expect(siegeSpells(cfg, s, sg).some(x => x.id === "sy_magma_firlat")).toBe(true);
 });
+
+test("şimşek kuralı her sahnede aynı: zincir elden çıkar, yıldırım üstten düşer; her şimşekli büyünün biçimi belli", async () => {
+  const { boltStyle } = await import("../src/engine/spellfx");
+  const { baseElements } = await import("../src/engine/magic");
+  const st = (id: string) => boltStyle(cfg, id);
+  expect(st("simsek_zinciri")).toBe("chain"); expect(st("sy_plazma_zincir")).toBe("chain"); expect(st("sy_miknatis_zincir")).toBe("chain");
+  expect(st("yildirim_firtinasi")).toBe("sky"); expect(st("sy_el_simsek_top")).toBe("sky"); expect(st("elektrik_golu")).toBe("sky"); expect(st("sy_firtina_perde")).toBe("sky");
+  expect(st("sy_plazma_duvar")).toBeNull();                          // duvar yere çizilen şerit
+  expect(st("ates_topu")).toBeNull(); expect(st("buz_duvari")).toBeNull();
+  for (const sp of cfg.data.spells) {
+    const lightning = sp.sources.some(x => baseElements(cfg, x.id).includes("el_simsek")); const form = spellSequence(sp.id)?.form;
+    if (lightning && form !== "duvar") expect(st(sp.id), sp.id).not.toBeNull();
+    if (!lightning) expect(st(sp.id), sp.id).toBeNull();
+  }
+});
