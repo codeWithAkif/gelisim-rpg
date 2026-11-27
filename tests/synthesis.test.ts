@@ -137,3 +137,19 @@ test("her özelliğin ne işe yaradığı yazılı; hiçbir şeyi etkilemeyenler
   const nx = nextThreshold(cfg, s, "ates")!; expect(nx.at).toBe(5); expect(nx.t.text).toMatch(/Ateş topu/);
   s.attrs.ates.level = 6; expect(nextThreshold(cfg, s, "ates")?.t.text ?? "").not.toMatch(/duvar/i);   // keşfedilmemiş sentez büyüsü açık edilmez
 });
+
+import { addRep } from "../src/engine/state";
+import { stealthSkill } from "../src/engine/stealth";
+test("görgü olumlu itibar kazancını artırır, olumsuzu değiştirmez", () => {
+  const a = newGame(cfg, 1), b = newGame(cfg, 1);
+  b.attrs.gorgu.level = 50;
+  addRep(a, "tas", "guven", 10); addRep(b, "tas", "guven", 10);
+  expect(b.rep.tas.guven).toBeGreaterThan(a.rep.tas.guven);
+  addRep(a, "tas", "guven", -10); addRep(b, "tas", "guven", -10);
+  expect(b.rep.tas.guven - a.rep.tas.guven).toBeCloseTo(2, 5);
+});
+test("aldatma gizlenmede kuşkuyu azaltır", () => {
+  const a = newGame(cfg, 1), b = newGame(cfg, 1);
+  b.attrs.aldatma.level = 60;
+  expect(stealthSkill(b)).toBeLessThan(stealthSkill(a));
+});

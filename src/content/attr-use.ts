@@ -29,8 +29,8 @@ export const ATTR_USE: Record<string, string> = {
   // sosyal
   hitabet: "Pazarda mallarını biraz daha iyi fiyata satarsın.",
   insan_okuma: "Pazarda mallarını biraz daha iyi fiyata satarsın.",
-  gorgu: "Henüz oyunda bir şeyi etkilemiyor.",
-  aldatma: "Henüz oyunda bir şeyi etkilemiyor.",
+  gorgu: "İyi davranışların bölge halkının nezdinde daha çok yankılanır (güven ve itibar kazancı artar).",
+  aldatma: "Gizlenirken nöbetçilerin kuşkusu daha yavaş dolar.",
   // büyü
   mana: "Mana deposunu büyütür (10 + 1,5 × seviye); harabede büyünün vuruş gücünü artırır.",
   ates: "Ateş büyülerinin hasarını artırır ve sönme şansını düşürür; yeni ateş büyülerini açar.",
@@ -44,7 +44,7 @@ export const ATTR_USE: Record<string, string> = {
   okculuk: "Ok isabetini ve kritik şansını artırır; harabede sadağı büyütür; nöbette kulenin hasarını artırır.",
   anatomi_insan: "İnsanların zayıf noktalarını fark etmeni sağlar; kritik şansını artırır.",
   anatomi_hayvan: "Hayvanların (kurt gibi) zayıf noktalarını fark etmeni sağlar.",
-  iz_surme: "Henüz oyunda bir şeyi etkilemiyor.",
+  iz_surme: "Yolculukta pusuya ve sürprize daha az denk gelirsin.",
   ilk_yardim: "Sargı bezi ve merhem daha çok can verir; uykuda yaralar daha çabuk kapanır.",
   simya: "Otlardan yapılan ilaçlar (merhem) daha güçlü olur; 100. seviyede iki kat.",
   demircilik: "Silahı bilemek daha çok güç katar; 100. seviyede %25.",

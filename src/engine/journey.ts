@@ -48,7 +48,9 @@ export function startJourney(cfg: Config, s: GameState, to: string, now: number)
   const night = isNight(s);
   // kedi (bağ 30) gece pusularını sezer, şahin (bağ 50) yoldaki tehlikeyi önceden haber verir
   const pet = s.pet, pb = pet?.bond ?? 0; const petCut = (pet?.id === "kedi" && pb >= 30 && night ? 0.7 : 1) * (pet?.id === "sahin" && pb >= 50 ? 0.7 : 1);
-  const chance = Math.min(night ? 95 : 85, p.minutes / 60 * 70 * (night ? 1.6 : 1)) * petCut;
+  // iz sürme: izleri okuyan, pusuyu ve hayvanı önceden sezer (en çok %25 az sürpriz)
+  const izCut = 1 - Math.min(0.25, Math.max(0, (s.attrs.iz_surme?.level ?? 10) - 10) / 200);
+  const chance = Math.min(night ? 95 : 85, p.minutes / 60 * 70 * (night ? 1.6 : 1)) * petCut * izCut;
   const wt = (d: TravelEventDef) => d.weight * (night && ["kurt", "iz", "suru"].includes(d.id) ? 3 : 1);
   const pick = () => { const total = pool.reduce((a, d) => a + wt(d), 0); let r = rng.next() * total; for (const d of pool) { r -= wt(d); if (r <= 0) return d; } return pool[0]; };
   if (pool.length && rng.chance(chance)) events.push({ id: pick().id, at: 0.2 + rng.next() * 0.3 });

@@ -155,7 +155,8 @@ penceresinde açık, çalışma listesinde "Ne işe yarar?" altında) ve Vücut 
 (`5'de: Ateş topu büyüsünü yapabilirsin`) mevcut eşik verisinden (`engine/thresholds.ts` `nextThreshold`) gelir; keşfedilmemiş
 sentez büyüleri açık edilmez.
 
-Yalnızca kodda gerçekten işleyen etkiler yazılır. Şu an oyunda hiçbir şeyi etkilemeyen üç özellik var ve açıklaması bunu
-söyler: **Görgü, Aldatma, İz sürme**. Hitabet ve İnsan okuma yalnız pazarda satış fiyatını biraz artırır. Bunlara bir etki
-verilene kadar çalışmaları bir şey kazandırmaz; yeni bir özellik eklerken ya da etki verirken `attr-use.ts`'i güncelle
+Yalnızca kodda gerçekten işleyen etkiler yazılır. Önceden etkisiz olan üç özellik bağlandı: **Görgü** olumlu itibar/güven
+kazancını artırır (`state.ts addRep`, en çok %25); **Aldatma** gizlenmede kuşkunun dolma hızını düşürür (`stealth.ts
+stealthSkill`); **İz sürme** yolculukta pusu/sürpriz ihtimalini azaltır (`journey.ts`, en çok %25). Hitabet ve İnsan okuma
+pazarda satış fiyatını artırır. Bir özelliğe etki verirken ya da çıkarırken `attr-use.ts`'i güncelle
 (`tests/synthesis.test.ts` her özelliğin açıklamasının olduğunu denetler).
