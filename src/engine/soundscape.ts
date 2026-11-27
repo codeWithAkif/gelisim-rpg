@@ -13,6 +13,35 @@ export function scapeOf(place: Pick<Place, "id" | "icon" | "region"> | undefined
   return { kind: byIcon[place.icon], cold };
 }
 
+/* ---------- ortam katmanları (kayıtlar: src/assets/ses/ortam_<ad>.ogg) ---------- */
+export type AmbId = "ruzgar" | "kar" | "dere" | "koyun" | "meydan" | "carsi" | "demirhane" | "koru" | "gece" | "ocak";
+export interface AmbLayer { id: AmbId; vol: number }
+export interface AmbPlan { layers: AmbLayer[]; owls: boolean }
+/**
+ * Bu yerde ve vakitte hangi kayıtlar döngüyle çalar (ses düzeyi 0–1). Gece kuşlar ve kalabalık susar,
+ * açıkta cırcır başlar; koruda ve yaylada ara ara baykuş öter. Ayazkale'de rüzgârın yerini kar fırtınası alır.
+ */
+export function ambientPlan(sc: Scape, night: boolean): AmbPlan {
+  const L = (id: AmbId, vol: number): AmbLayer => ({ id, vol });
+  const wind = (v: number) => (sc.cold ? L("kar", v) : L("ruzgar", v));
+  let layers: AmbLayer[];
+  switch (sc.kind) {
+    case "yayla": layers = night ? [wind(0.4), L("gece", 0.7)] : [wind(0.6), L("koyun", 0.8)]; break;
+    case "dere": layers = night ? [L("dere", 0.8), L("gece", 0.5)] : [L("dere", 0.9), wind(0.2)]; break;
+    case "meydan": layers = night ? [L("gece", 0.5), wind(0.2)] : [L("meydan", 1)]; break;
+    case "koru": layers = night ? [L("gece", 0.8), wind(0.15)] : [L("koru", 1), wind(0.15)]; break;
+    case "ocak": layers = night ? [L("ocak", 0.6), wind(0.15)] : [L("demirhane", 1)]; break;
+    case "ev": layers = [L("ocak", 0.7), wind(0.12)]; break;
+    case "sehir": layers = night ? [wind(0.3), L("gece", 0.3)] : [L("carsi", 1)]; break;
+    case "kale": layers = [wind(0.6)]; break;
+    case "kar": layers = [L("kar", 1)]; break;
+    case "yol": layers = night ? [wind(0.4), L("gece", 0.5)] : [wind(0.6)]; break;
+  }
+  return { layers, owls: night && (sc.kind === "koru" || sc.kind === "yayla") };
+}
+/** Elde kaydı olmayan katmanlar çıkarılır (ör. ocak kaydı henüz seçilmediyse). */
+export const playableLayers = (p: AmbPlan, available: Set<string>) => p.layers.filter(l => available.has(l.id));
+
 /** Müzik bağlamı: savaş ve Ölçer işi kendi parçasını ister; yoksa bölgenin parçası. */
 export type MusicContext = "bolge" | "savas" | "olcer";
 /**
