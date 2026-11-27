@@ -13,7 +13,7 @@ import { Rng } from "./rng";
 import { ENEMIES } from "../content/world";
 import { addItem, removeItem, capacity } from "./inventory";
 import { weaponSet, hasBow, totalArmor, slotsFor } from "./gear";
-import { spellOptions } from "./magic";
+import { spellOptions, SPELL_FX } from "./magic";
 import { trapsOwned, trapEffect } from "./engineering";
 import { petMul } from "./pet";
 import { healOf, healPower } from "./healing";
@@ -26,6 +26,17 @@ export const SPELL_KIND: Record<string, { kind: SpellKind; mul: number; r: numbe
   simsek_zinciri: { kind: "simsek", mul: 3.5, r: 14, cd: 18 }, elektrik_golu: { kind: "simsek", mul: 2.2, r: 12, cd: 12 }, yildirim_firtinasi: { kind: "simsek", mul: 5.5, r: 26, cd: 30 },
   sarmasik: { kind: "sarmasik", mul: 0.6, r: 18, cd: 14 }, karga_surusu: { kind: "karga", mul: 0.5, r: 26, cd: 20 }, yer_kiliclari: { kind: "kilic", mul: 4, r: 5, cd: 16 },
 };
+
+/** Harabede bir büyünün karşılığı: kitaptaki ve kadim büyüler tabloda; sentez büyüleri etkisinden türetilir
+ * (alevli → ateş, zincir → şimşek, çamur → çamur, duvar ya da soğuk → buz, bağ → sarmaşık, körlük → karga, sersemletme → kılıç). */
+export function scavSpellInfo(cfg: Config, id: string): { kind: SpellKind; mul: number; r: number; cd: number } | undefined {
+  if (SPELL_KIND[id]) return SPELL_KIND[id];
+  if (!id.startsWith("sy_")) return undefined;
+  const sp = cfg.spell.get(id); const fx = SPELL_FX[id]; if (!sp || !fx) return undefined;
+  const kind: SpellKind = fx.chain ? "simsek" : fx.ignite ? "ates" : fx.mud ? "camur" : fx.root ? "sarmasik" : fx.blind ? "karga" : fx.stun ? "kilic" : "buz";
+  const dmg = sp.damage ?? 10; const area = sp.area ?? 0;
+  return { kind, mul: Math.max(0.4, Math.min(5.5, dmg / 6)), r: 10 + area * 1.2, cd: 8 + (sp.manaCost ?? 10) / 2 };
+}
 
 export const ROOM_W = 100;              // bir oda 100 birim genişlikte
 export const EXIT_X = 8;               // çıkış, zemin katın solunda
@@ -173,7 +184,7 @@ export const FOUND_WEAPONS: FoundWeapon[] = [
 
 /* ---------- başlangıç seçimi: yalnız TEK şey götürürsün ---------- */
 export type LoadKind = "yumruk" | "melee" | "bow" | "dog" | "trap" | "spell";
-export interface Loadout { kind: LoadKind; id?: string }
+export interface Loadout { kind: LoadKind; id?: string; q?: number }   // q: büyünün girişte çizilen dizisinin kalitesi (0–1)
 export interface LoadOption { kind: LoadKind; id?: string; label: string; note: string }
 export const hasBowItem = (s: GameState) => !!s.equipped.bow || Object.keys(s.inventory).some(id => (s.inventory[id] ?? 0) > 0 && slotsFor(id).includes("bow"));
 export function loadoutOptions(cfg: Config, s: GameState): LoadOption[] {
@@ -184,7 +195,7 @@ export function loadoutOptions(cfg: Config, s: GameState): LoadOption[] {
   if (hasBowItem(s)) { const ok = Math.min(12, s.inventory.ok ?? 0); out.push({ kind: "bow", label: "Yay", note: ok ? `uzaktan · ${ok} ok` : "okun yok; kutulardan ok bulursan atarsın" }); }
   if (s.pet) out.push({ kind: "dog", label: s.pet.name, note: "arada koşup düşmanla dövüşür" });
   for (const tp of trapsOwned(s)) out.push({ kind: "trap", id: tp.id, label: `Tuzak: ${tp.id.replace(/_/g, " ")}`, note: `${Math.min(3, tp.n)} tane taşırsın; tetiklenince dolana kadar bekler` });
-  for (const o of spellOptions(cfg, { ...s, mana: 999 } as GameState)) if (o.ok && SPELL_KIND[o.spell.id]) out.push({ kind: "spell", id: o.spell.id, label: o.spell.name, note: "büyü; her kullanımdan sonra dolması gerekir" });
+  for (const o of spellOptions(cfg, { ...s, mana: 999 } as GameState)) if (o.ok && scavSpellInfo(cfg, o.spell.id)) out.push({ kind: "spell", id: o.spell.id, label: o.spell.name, note: "büyü; her kullanımdan sonra dolması gerekir" });
   return out;
 }
 export function defaultLoadout(cfg: Config, s: GameState): Loadout {
@@ -278,8 +289,8 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   if (load.kind === "bow") { bow = true; ammo = Math.min(tr.ammoCap, s.inventory.ok ?? 0); weaponName = "Yay"; }
   if (load.kind === "dog" && s.pet) dog = { x: EXIT_X + 10, floor: 0, state: "yanda", t: 12, cd: 0, moving: false, face: 1, lag: 0 };
   if (load.kind === "trap" && load.id) { const own = trapsOwned(s).find(x => x.id === load.id); for (let i = 0; i < Math.min(3, own?.n ?? 0); i++) traps.push({ id: load.id, state: "hand", x: 0, floor: 0, t: 0 }); }
-  if (load.kind === "spell" && load.id) { const o = spellOptions(cfg, { ...s, mana: 999 } as GameState).find(x => x.spell.id === load.id && x.ok); const info = SPELL_KIND[load.id];
-    if (o && info) { const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0; spell = { id: load.id, kind: info.kind, name: o.spell.name, cd: 4, max: 5 * Math.max(0.8, 1 - m / 300), mul: info.mul * (1 + m / 100), r: info.r }; } }
+  if (load.kind === "spell" && load.id) { const o = spellOptions(cfg, { ...s, mana: 999 } as GameState).find(x => x.spell.id === load.id && x.ok); const info = scavSpellInfo(cfg, load.id);
+    if (o && info) { const m = o.spell.mastery ? s.attrs[o.spell.mastery]?.level ?? 0 : 0; spell = { id: load.id, kind: info.kind, name: o.spell.name, cd: 4, max: 5 * Math.max(0.8, 1 - m / 300), mul: info.mul * (1 + m / 100) * (load.q === undefined ? 1 : 0.8 + 0.4 * load.q), r: info.r }; } }
   // içeride uyuyan bekçiler: yaklaşınca uyanır (kilitli odada daha güçlüler); girişin hemen yanında olmaz
   const guards: SFoe[] = []; let gid2 = 1;
   for (let k = 0; k < site.guards; k++) {

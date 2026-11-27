@@ -1,6 +1,7 @@
 // Ölçer işi ekranı: annenin defterinden bir sayfa gibi çizilmiş ısı ağı.
 // Bir yere dokun (kaynak), sonra yolla bağlı bir komşuya dokun: bir birim ısı taşınır.
 // "Ölç" kipinde gizli bir yere dokunursan ısısı açılır. Toplam ısı hep aynı kalır.
+import { withGuide } from "./guide";
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import { type HState, type HNode, createPuzzle, transfer, measure, totalHeat, linked, nodeOk, finishOlcer, olcerLevel } from "../engine/olcer";
@@ -13,7 +14,7 @@ export interface OlcerEnd { won: boolean; title: string; gains: GainReport; firs
 const goalText = (n: HNode) => n.atLeast !== undefined && n.atMost !== undefined ? (n.atLeast === n.atMost ? `tam ${n.atLeast}` : `${n.atLeast}–${n.atMost}`)
   : n.atLeast !== undefined ? `en az ${n.atLeast}` : n.atMost !== undefined ? (n.atMost === 0 ? "boşalt" : `en çok ${n.atMost}`) : "";
 
-export function openOlcer(cfg: Config, s: GameState, levelId: string, persist: () => void, onEnd: (r: OlcerEnd) => void) {
+function openOlcerInner(cfg: Config, s: GameState, levelId: string, persist: () => void, onEnd: (r: OlcerEnd) => void) {
   const level = olcerLevel(levelId)!;
   let st: HState = createPuzzle(s, level);
   let sel: string | null = null; let mode: "tasi" | "olc" = "tasi"; let flash: { id: string; t: number } | null = null;
@@ -79,3 +80,6 @@ export function openOlcer(cfg: Config, s: GameState, levelId: string, persist: (
   });
   draw();
 }
+
+/** İlk girişte öğüt, sonra ekran. */
+export function openOlcer(...a: Parameters<typeof openOlcerInner>) { withGuide("olcer", a[1], () => openOlcerInner(...a)); }

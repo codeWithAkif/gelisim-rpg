@@ -25,3 +25,25 @@ test("zaten kurdun yanındaysan yürüme adımı atlanır; oyunlar kapalıysa ka
   expect(coachLine("vur", false)!.text).not.toMatch(/açık/);
   expect(coachLine("kac", true)!.text).toMatch(/yana/);
 });
+
+test("Zehra'nın büyü dersi: aç → çiz → hedef → anladım; sönerse ya da vazgeçerse başa döner", async () => {
+  const { spellCoachNext, spellCoachLine } = await import("../src/engine/coach");
+  expect(spellCoachNext("ac", "acildi")).toBe("ciz");
+  expect(spellCoachNext("ciz", "sondu")).toBe("ac");
+  expect(spellCoachNext("ciz", "cizildi")).toBe("hedef");
+  expect(spellCoachNext("hedef", "yapti")).toBe("son");
+  expect(spellCoachNext("son", "tamam")).toBe("bitti");
+  expect(spellCoachLine("ciz")!.text).toMatch(/Alev, sonra Hilal/);
+});
+
+test("Selim'in kervan öğüdü o an yapılacak tek şeyi söyler; öğütler kısa", async () => {
+  const { caravanTip } = await import("../src/engine/coach");
+  const { GUIDES } = await import("../src/content/guides");
+  const base = { carts: 1, freeCarts: 1, dests: 1, to: "karacam", units: 4, heroes: 1, guards: 1 };
+  expect(caravanTip({ ...base, carts: 0 })).toMatch(/araba al/);
+  expect(caravanTip({ ...base, to: undefined })).toMatch(/Nereye/);
+  expect(caravanTip({ ...base, units: 0 })).toMatch(/Yük ekle/);
+  expect(caravanTip({ ...base, guards: 0 })).toMatch(/İzci/);
+  expect(caravanTip(base)).toMatch(/Yola çıkar/);
+  for (const g of Object.values(GUIDES)) { expect(g.steps.length).toBeGreaterThanOrEqual(3); for (const t of g.steps) expect(t.length).toBeLessThan(170); }
+});

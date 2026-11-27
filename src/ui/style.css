@@ -745,3 +745,11 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .rune-glyph { display: inline-block; vertical-align: middle; }
 .spell-seq { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .spell-seq .sep { color: var(--ink-soft); }
+/* ilk giriş öğüdü */
+.modal.guide .guide-line { display: flex; gap: 10px; align-items: flex-start; }
+.modal.guide .guide-line img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; object-position: 50% 20%; border: 1.5px solid var(--ink); flex: none; }
+.modal.guide .guide-dots { display: flex; gap: 6px; justify-content: center; }
+.modal.guide .guide-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-soft); opacity: .35; }
+.modal.guide .guide-dots i.on { opacity: 1; background: var(--ink); }
+.caravan .cv-tip { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border: 1.5px dashed var(--ink-soft); border-radius: 10px; background: rgba(255,255,255,.3); }
+.caravan .cv-tip img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; object-position: 50% 20%; flex: none; }

@@ -264,10 +264,11 @@ export function runePrompt(host: HTMLElement, o: { runes: string[]; ease: number
 /* ---------- serbest büyü: işaretleri aklından çiz ---------- */
 /** Maddenin işaretlerini sırayla, en sonda biçim işaretini çizersin. Biçim çizilince büyü tamamlanır.
  * Rehber yok: dizi akılda tutulur. Dönen: tanınan işaretler ve en zayıf çizimin kalitesi; vazgeçilirse null. */
-export function castDrawPrompt(host: HTMLElement, o: { allowed: string[]; ease: number; limitMs: number }): Promise<{ runes: string[]; q: number; timeout?: boolean } | null> {
+export function castDrawPrompt(host: HTMLElement, o: { allowed: string[]; ease: number; limitMs: number; tip?: string }): Promise<{ runes: string[]; q: number; timeout?: boolean } | null> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 1);
     const L = layer(host, "rune cast", "Büyü çiz: maddenin işaretleri, en sonda biçim", W, H);
+    addTip(L, o.tip);
     const chips = document.createElement("div"); chips.className = "cast-seq"; L.box.after(chips);
     const bar = document.createElement("div"); bar.className = "gx-bar"; chips.after(bar);
     const row = document.createElement("div"); row.className = "row cast-row";

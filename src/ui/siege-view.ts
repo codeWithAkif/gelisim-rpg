@@ -1,6 +1,7 @@
 // Kuşatma ekranı: gerçek zamanlı savunma. Kurulum: parmakla barikat çek, köpeği yerleştir.
 // Savaş: kendinden geriye çekip bırak → ok; büyüye dokun, sonra hedefe dokun → büyü (dolma süreli).
 // Dalga aralarında dinlen, kazık ekle.
+import { withGuide } from "./guide";
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
@@ -14,12 +15,18 @@ import { esc } from "./sketch";
 import { sfx, buzz } from "./feel";
 import { quad, drawQuad, walkFrame, gait } from "./anim";
 import { chain, drawBolt, drawImpact, impact, type BoltFx, type Impact, type Pt } from "./lightning";
+import { castDrawPrompt } from "./gesture-view";
+import { settings } from "./settings";
+import { skillEase } from "../engine/timing";
+import { synthesize, discover } from "../engine/synthesis";
+import { ELEMENT_RUNES, FORM_RUNES } from "../engine/gesture";
+import type { FormId } from "../content/synthesis";
 
 const CX = ARENA.w / 2, CY = ARENA.h / 2;
 const imgCache = new Map<string, HTMLImageElement | null>();
 const img = (key: string) => { if (!imgCache.has(key)) { const u = artUrl(key); imgCache.set(key, u ? Object.assign(new Image(), { src: u }) : null); } const i = imgCache.get(key)!; return i && i.complete && i.naturalWidth ? i : null; };
 
-export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number, onEnd: (won: boolean, gains: GainReport, heroes: string[]) => void, persist: () => void, called: string[] = []) {
+function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, onEnd: (won: boolean, gains: GainReport, heroes: string[]) => void, persist: () => void, called: string[] = []) {
   const sg: Siege = createSiege(cfg, s, def, seed, called);
   const el = document.createElement("div"); el.className = "siege"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Kuşatma");
   el.innerHTML = `<div class="siege-top"><div class="siege-title hand"></div><div class="siege-bars"><div class="gb"><div class="gf" id="sgHp" style="background:var(--red)"></div></div><div class="gb"><div class="gf" id="sgMana" style="background:var(--blue)"></div></div></div></div>
@@ -56,6 +63,15 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
     }
     if (sg.phase === "fight") {
       const sp = siegeSpells(cfg, s, sg); const bow = canShoot(s, sg);
+      // zamanlama oyunları açıksa büyü burada da aklından çizilir; düğmeler yalnız dolma süresini gösterir
+      const drawMode = settings().timing && s.knownElements.length > 0;
+      const armedName = armed ? sp.find(x => x.id === armed)?.name ?? "" : "";
+      if (drawMode) {
+        panel.innerHTML = `<div class="row"><button class="btn small blue" data-s="draw" ${sg.mana >= 3 ? "" : "disabled"}>Büyü çiz · mana ${Math.floor(sg.mana)}</button>${armed ? `<span class="hand">${esc(armedName)}: hedefe dokun</span>` : ""}</div>
+          <div class="siege-spells">${sp.map(x => `<span class="spell-btn off ${armed === x.id ? "on" : ""}" data-spell-cd="${x.id}"><span class="cdf" data-cd="${x.id}" style="height:${x.left > 0 ? (x.left / x.cd) * 100 : 0}%"></span><b>${esc(x.name)}</b><small>${x.left > 0 ? "doluyor" : `${x.mana} mana`}</small></span>`).join("")}</div>
+          <p class="tiny" style="margin:0">${bow === "Yayın yok" ? "Yanına gelene kılıcınla kendin vurursun." : `Ok: kendinden geriye doğru çek, bırak (${s.inventory.ok ?? 0} ok).`} Büyü çizerken zaman durur.</p>`;
+        return;
+      }
       panel.innerHTML = `<div class="siege-spells">${sp.map(x => `<button class="spell-btn ${armed === x.id ? "on" : ""}" data-spell="${x.id}" ${x.ok ? "" : "disabled"}><span class="cdf" data-cd="${x.id}" style="height:${x.left > 0 ? (x.left / x.cd) * 100 : 0}%"></span><b>${esc(x.name)}</b><small>${x.mana} mana</small></button>`).join("") || `<span class="muted tiny">Büyün yok.</span>`}</div>
         <p class="tiny" style="margin:0">${armed ? "Hedefe dokun." : bow === "Yayın yok" ? "Yanına gelene kılıcınla kendin vurursun. (Yay pazarda satılır.)" : `Ok: kendinden geriye doğru çek, bırak (${s.inventory.ok ?? 0} ok). Yanına geleni kılıçla kendin vurursun.`}</p>`;
       return;
@@ -64,8 +80,9 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
   function refreshCooldowns() {
     if (sg.phase !== "fight") return;
     for (const x of siegeSpells(cfg, s, sg)) {
-      const b = panel.querySelector<HTMLButtonElement>(`[data-spell="${x.id}"]`); if (!b) continue;
-      b.disabled = !x.ok; const f = b.querySelector<HTMLElement>(".cdf"); if (f) f.style.height = `${x.left > 0 ? (x.left / x.cd) * 100 : 0}%`;
+      const b = panel.querySelector<HTMLButtonElement>(`[data-spell="${x.id}"]`);
+      if (b) b.disabled = !x.ok;
+      const f = panel.querySelector<HTMLElement>(`[data-cd="${x.id}"]`); if (f) f.style.height = `${x.left > 0 ? (x.left / x.cd) * 100 : 0}%`;
     }
   }
   panel.addEventListener("click", e => {
@@ -73,7 +90,26 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
     if (b.dataset.s === "pet") { petMode = !petMode; renderPanel(); return; }
     if (b.dataset.s === "go") { if (sg.phase === "rest") restBetween(s, sg); petMode = false; startWave(sg); sfx("beat"); buzz("medium"); renderPanel(); return; }
     if (b.dataset.spell) { armed = armed === b.dataset.spell ? null : b.dataset.spell; sfx("tap"); renderPanel(); }
+    if (b.dataset.s === "draw") void drawSpell();
   });
+  /** Büyüyü çiz: zaman durur; dizi bir büyü ederse ve dolmuşsa hedefe dokunulur. Uymazsa söner, biraz mana yanar. */
+  async function drawSpell() {
+    if (sg.phase !== "fight" || frozen) return;
+    frozen = true; armed = null;
+    const allowed = [...ELEMENT_RUNES.filter(r => s.knownElements.includes(r)), ...FORM_RUNES];
+    const res = await castDrawPrompt(stage, { allowed, ease: skillEase(s, "odak"), limitMs: 9000 });
+    frozen = false; last = performance.now();
+    const say = (t: string, c = C("--ink-soft")) => pops.push({ x: CX, y: CY - 14, t: performance.now(), text: t, color: c });
+    if (!res) { renderPanel(); return; }
+    const f = res.runes[res.runes.length - 1]?.startsWith("f_") ? res.runes[res.runes.length - 1].slice(2) as FormId : undefined;
+    const r = f ? synthesize(s, res.runes.filter(x => !x.startsWith("f_")), f) : { ok: false, reason: "Biçimsiz büyü dağıldı." };
+    if (!r.ok) { sg.mana = Math.max(0, sg.mana - 3); say("Söndü"); sfx("bad"); renderPanel(); return; }
+    if (r.spellId!.startsWith("sy_") && discover(s, r.spellId!)) { say(`Yeni büyü: ${cfg.spell.get(r.spellId!)!.name}!`, C("--blue")); sfx("perfect"); buzz("heavy"); persist(); }
+    const x = siegeSpells(cfg, s, sg).find(q => q.id === r.spellId);
+    if (!x) { say("Ustalığın yetmiyor"); sfx("bad"); renderPanel(); return; }
+    if (!x.ok) { say(x.reason ?? "Olmadı"); sfx("bad"); renderPanel(); return; }
+    armed = x.id; sfx("spark"); renderPanel();
+  }
 
   /* ---------- dokunma ---------- */
   cv.addEventListener("pointerdown", e => {
@@ -182,10 +218,10 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
   }
 
   /* ---------- döngü ---------- */
-  let last = performance.now(); let raf = 0; let cdTick = 0; let ended = false;
+  let last = performance.now(); let raf = 0; let cdTick = 0; let ended = false; let frozen = false;   // frozen: büyü çizilirken zaman durur
   const loop = (now: number) => {
     const dt = (now - last) / 1000; last = now;
-    const before = sg.phase; step(cfg, s, sg, dt);
+    const before = sg.phase; if (!frozen) step(cfg, s, sg, dt);
     for (const f of sg.fx.splice(0)) {
       if (f.k === "hit") { pops.push({ x: f.x, y: f.y - 6, t: now, text: `${f.crit ? "Kritik! " : ""}−${f.dmg}`, color: f.by === "kopek" ? C("--green") : f.crit ? C("--red") : C("--ink"), big: f.crit }); if (f.by === "kilic") { swing = now + 180; sfx(f.crit ? "crit" : "hit"); } else if (f.by === "ok") sfx("hit"); }
       if (f.k === "hurt") { shake = 8; flash = 1; sfx("hurt"); buzz("medium"); }
@@ -217,3 +253,6 @@ export function openSiege(cfg: Config, s: GameState, def: SiegeDef, seed: number
   const ro = new ResizeObserver(layout); ro.observe(stage);
   layout(); renderPanel(); raf = requestAnimationFrame(loop);
 }
+
+/** İlk girişte öğüt, sonra ekran. */
+export function openSiege(...a: Parameters<typeof openSiegeInner>) { withGuide("barikat", a[1], () => openSiegeInner(...a)); }
