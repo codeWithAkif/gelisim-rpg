@@ -60,7 +60,7 @@ function layoutReport(): { ok: boolean; text: string } {
 export function checkLayout(onOk: () => void) {
   let tries = 0;
   const tick = () => {
-    if (document.querySelector(".intro, .battle[role=dialog], .modal-bg, .session-screen, .minigame, .siege, .olcer")) { if (tries++ < 60) setTimeout(tick, 2000); else onOk(); return; }
+    if (document.querySelector(".intro, .battle[role=dialog], .modal-bg, .session-screen, .minigame, .siege, .olcer, .scene")) { if (tries++ < 60) setTimeout(tick, 2000); else onOk(); return; }
     const rep = layoutReport();
     if (rep.ok) onOk(); else showProblem("Ekran düzgün yerleşmedi", rep.text);
   };
@@ -68,6 +68,6 @@ export function checkLayout(onOk: () => void) {
   // elle tanı: ekrana 2 saniye basılı tut
   let timer = 0;
   // oyun alanlarında (mini oyun, savaş haritası) basılı tutmak oyunun parçası; tanı açılmasın
-  window.addEventListener("pointerdown", e => { clearTimeout(timer); if ((e.target as Element | null)?.closest?.("canvas, .minigame, .qt, .siege, .olcer")) return; timer = window.setTimeout(() => { shown = false; showProblem("Tanı bilgisi", layoutReport().text); }, 2000); });
+  window.addEventListener("pointerdown", e => { clearTimeout(timer); if ((e.target as Element | null)?.closest?.("canvas, .minigame, .qt, .siege, .olcer, .scene")) return; timer = window.setTimeout(() => { shown = false; showProblem("Tanı bilgisi", layoutReport().text); }, 2000); });
   for (const ev of ["pointerup", "pointercancel", "pointermove"]) window.addEventListener(ev, () => clearTimeout(timer));
 }

@@ -1,6 +1,7 @@
-// Açılış: annenin defterinden sayfalar, sonra oyuncunun adını defterin ilk boş sayfasına yazması.
-import { INTRO, type IntroPage } from "../content/story";
-import { esc, roughPath } from "./sketch";
+// Giriş görselleri: çizilmiş sahne görseli varsa o, yoksa titrek çizgili eskiz (ana menüde kullanılır).
+// Oyunun açılışı artık sahne olarak oynar: content/scenes.ts, ui/scene-view.ts.
+import type { IntroPage } from "../content/story";
+import { roughPath } from "./sketch";
 import { artUrl } from "./art";
 
 export function art(kind: IntroPage["art"]): string {
@@ -30,41 +31,4 @@ export function art(kind: IntroPage["art"]): string {
       + `<circle cx="46" cy="44" r="14" fill="none" stroke="var(--red)" opacity=".7"/>`;
   }
   return `<svg viewBox="0 0 220 170" width="100%" style="max-width:300px" aria-hidden="true"><g fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
-}
-
-export function showIntro(onDone: (name: string) => void) {
-  const el = document.createElement("div");
-  el.className = "intro"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Giriş");
-  document.body.appendChild(el);
-  let i = 0;
-  const render = () => {
-    if (i < INTRO.length) {
-      const p = INTRO[i];
-      el.innerHTML = `<div class="intro-page" key="${i}">
-        <div class="intro-art">${art(p.art)}</div>
-        <h1>${esc(p.title)}</h1><p class="intro-text">${esc(p.text)}</p>
-        <div class="intro-foot"><span class="muted">${i + 1} / ${INTRO.length + 1}</span>
-          <span class="row">${i > 0 ? `<button class="btn small" data-x="back">Geri</button>` : `<button class="btn small" data-x="skip">Atla</button>`}<button class="btn primary" data-x="next">Devam</button></span></div></div>`;
-    } else {
-      el.innerHTML = `<div class="intro-page">
-        <div class="intro-art">${art("defter")}</div>
-        <h1>İlk boş sayfa</h1><p class="intro-text">Annemin defterinin ilk boş sayfasına adımı yazıyorum. Bundan sonrası benim.</p>
-        <label for="introName" class="hand">Adın</label>
-        <input id="introName" class="name-input" maxlength="18" autocomplete="off" value="" placeholder="Yolcu">
-        <div class="intro-foot"><button class="btn small" data-x="back">Geri</button><button class="btn primary" data-x="start">Yaz ve başla</button></div></div>`;
-      setTimeout(() => el.querySelector<HTMLInputElement>("#introName")?.focus(), 50);
-    }
-  };
-  el.addEventListener("click", e => {
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-x]"); if (!b) return;
-    const x = b.dataset.x;
-    if (x === "next") i++; else if (x === "back") i = Math.max(0, i - 1); else if (x === "skip") i = INTRO.length;
-    else if (x === "start") {
-      const name = (el.querySelector<HTMLInputElement>("#introName")?.value ?? "").trim().slice(0, 18) || "Yolcu";
-      el.remove(); onDone(name); return;
-    }
-    render();
-  });
-  el.addEventListener("keydown", e => { if (e.key === "Enter" && (e.target as HTMLElement).id === "introName") el.querySelector<HTMLButtonElement>('[data-x="start"]')?.click(); });
-  render();
 }

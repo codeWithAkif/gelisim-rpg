@@ -35,7 +35,6 @@ import { addItem } from "../engine/inventory";
 import { isNight } from "../engine/state";
 import type { BattleOutcome } from "../engine/combat";
 import { SIEGES, escalate } from "../engine/siege";
-import { showIntro } from "./intro";
 import { applyDaylight } from "./daylight";
 import { notifyAt, clearNotify } from "../notify";
 import { showTitle } from "./title";
@@ -53,6 +52,8 @@ import { itemPic, artUrl } from "./art";
 import { currentChapter } from "../engine/story";
 import { advanceStory } from "../engine/story";
 import { newUnlocks } from "../engine/unlocks";
+import { playScene } from "./scene-view";
+import { SCENES } from "../content/scenes";
 import { crossedThresholds } from "../engine/thresholds";
 
 // "calis" alt çubukta yok: Harita'daki yer kartından açılır, geri düğmesiyle haritaya döner.
@@ -196,10 +197,25 @@ export function startApp(root: HTMLElement) {
   }
   /** Yeni kilometre taşlarını ve ilk kez açılan sistemleri sırayla "Yeni sayfa" olarak gösterir. */
   function storyTick(after?: () => void) {
-    const fresh: { id: string; title: string; text: string }[] = [...advanceStory(s), ...newUnlocks(s)];
+    // sahnesi olan sayfalar pencere yerine sahne olarak oynar; zaten oynandıysa (açılış gibi) atlanır
+    const story = advanceStory(s);
+    const scened = story.filter(m => m.scene && SCENES[m.scene]);
+    const fresh: { id: string; title: string; text: string }[] = [...story.filter(m => !(m.scene && SCENES[m.scene])), ...newUnlocks(s)];
+    const toPlay = scened.filter(m => s.story.flags["sahne_" + m.id] === undefined);
     // aşılan eşikler tek sayfada: "Artık …"
     const th = crossedThresholds(cfg, s);
     if (th.length) fresh.push({ id: "esik", title: "Artık yapabildiğin", text: th.map(t => "Artık " + t.text + ".").join(" ") });
+    persist(); if (story.length) render();   // hikâye ilerlediyse defter hemen güncellensin
+    // önce sahneler sırayla, sonra kalan sayfalar
+    const playScenes = (k: number) => {
+      if (k >= toPlay.length) { showPages(fresh, after); return; }
+      const m = toPlay[k]; s.story.flags["sahne_" + m.id] = s.day; persist();
+      playScene(SCENES[m.scene!], { name: s.name }, () => playScenes(k + 1));
+    };
+    playScenes(0);
+  }
+  /** "Yeni sayfa" pencereleri: birden çoksa tek özet. */
+  function showPages(fresh: { id: string; title: string; text: string }[], after?: () => void) {
     if (!fresh.length) { after?.(); return; }
     persist(); render();
     // birden fazla sayfa birden açıldıysa (eski kayıt, art arda olaylar) tek özet pencere
@@ -581,8 +597,15 @@ export function startApp(root: HTMLElement) {
   window.setInterval(journeyTick, 1000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) journeyTick(); });
 
+  /** Açılış: soğuk açılış sahnesi, sonra sisin içinde Hasan (ad orada sorulur). Hasan'ın işi üstlenilir. */
   function beginIntro() {
-    showIntro(name => { s.name = name; s.introDone = true; persist(); render(false); storyTick(); });
+    playScene(SCENES.acilis, { seed: s.seed }, () => {
+      playScene(SCENES.varis, { onName: n => { s.name = n; } }, () => {
+        s.introDone = true; s.story.flags.sahne_varis = s.day;
+        if (s.quests.mesaj?.status !== "aktif") acceptQuest(s, "mesaj");
+        persist(); render(false); storyTick();
+      });
+    });
   }
 
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });

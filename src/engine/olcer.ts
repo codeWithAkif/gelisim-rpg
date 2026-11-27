@@ -1,4 +1,4 @@
-// Ölçer işi: annenin büyüsü dua değil hesaptır. "Isı kaybolmaz. Bir yere gider."
+// Ölçer işi: annenin büyüsü dua değil hesaptır. "Sönen her ateş, başka bir ocakta yanar."
 // Küçük bir ısı ağı: düğümler (ocak, pınar, ağıl...) ve aralarındaki yollar. Her hamle bir birim ısıyı
 // bir komşuya taşır; toplam ısı hiç değişmez. Bazı düğümlerin ısısı ölçülmeden bilinmez. Soğuk çeken
 // taş ("çekici") her iki hamlede bir en sıcak komşusundan bir birim ısıyı kendine alır.
@@ -36,7 +36,7 @@ export const OLCER_LEVELS: HLevel[] = [
     ],
     links: [["ocak", "agil"], ["agil", "pinar"], ["ocak", "kaya"], ["kaya", "pinar"]] },
   { id: "kor", title: "Soğuk çeken taş", moves: 9, measures: 2,
-    text: "Meydanın dibinde mavi bir taş var. Dokunduğu her şeyi soğutuyor. Isı kaybolmaz: taş onu bir yere topluyor. Ölç ve geri al.",
+    text: "Meydanın dibinde mavi bir taş var. Dokunduğu her şeyi soğutuyor. Sönen ateş bir yerde yanar: taş ısıyı kendine topluyor. Ölç ve geri al.",
     nodes: [
       { id: "ev", name: "Muhtarın evi", heat: 3, atLeast: 3, x: 15, y: 30 },
       { id: "tas", name: "Mavi taş", heat: 3, hidden: true, drain: true, atMost: 0, x: 50, y: 70 },

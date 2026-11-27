@@ -13,7 +13,7 @@ export const UNLOCKS: Unlock[] = [
   { id: "evcil", title: "Yol arkadaşı", when: s => !!s.pet,
     text: "Artık yalnız değilim. Karnını doyurup ilgilendikçe bağımız büyüyor; bağ büyüdükçe yeni şeyler yapıyor. Defter'deki Evcil sayfasında yazıyor." },
   { id: "olcer", title: "Annemin işi", when: olcerOpen,
-    text: "Isı kaybolmaz, bir yere gider. Annem bunu ölçerdi. Köy meydanındaki pınar donmuş; ısıyı ölçüp yerinden taşıyabilirim. Harita'da meydanın kartında yazıyor." },
+    text: "Sönen her ateş başka bir ocakta yanar. Annem bunu ölçerdi. Köy meydanındaki pınar donmuş; ısıyı ölçüp yerinden taşıyabilirim. Harita'da meydanın kartında yazıyor." },
   { id: "diyar", title: "Adım duyuldu", when: diyarOpen,
     text: "Köyde artık beni tanıyorlar. Bir ev kurabilir, yanımda gezecek bir adam tutabilirim. Diyar sayfası açıldı." },
   { id: "ortaklik", title: "Ortaklık", when: financeOpen,

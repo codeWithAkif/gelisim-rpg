@@ -9,7 +9,7 @@ Arayüz, karakterin kendi defteri gibi çizilir.
 
 Annen bir Ölçer'di: büyüyü dua değil hesap olarak gören bir loncanın üyesi. On iki yıl önce başkent Ardıç
 bir gecede yandı (Kül Yangını); kral suçu Ölçerlere yükledi, büyüyü yasakladı, annen kayboldu. O günden beri
-kışlar uzuyor. Annenin defterindeki son cümle: "Isı kaybolmaz. Bir yere gider."
+kışlar uzuyor. Annenin defterindeki son cümle: "Sönen her ateş, başka bir ocakta yanar."
 Köylüden krala doğru tanınarak ısının nereye gittiğini ve annene ne olduğunu bulursun.
 
 Bölümler tanınırlık basamaklarını izler: Taşpınar (köy) → Karaçam (tüccar şehri) → Ayazkale (lordun kalesi) →

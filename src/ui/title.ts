@@ -1,5 +1,6 @@
 // Açılış menüsü: devam et, yeni oyun (sıfırlama), ayarlar.
 import { art } from "./intro";
+import { MOTTO } from "../content/scenes";
 import { esc } from "./sketch";
 import { settings, saveSettings, type Settings, type BoolSetting } from "./settings";
 import { sfx } from "./feel";
@@ -22,7 +23,7 @@ export function showTitle(o: TitleOpts) {
     if (view === "menu") el.innerHTML = `<div class="intro-page title-page">
       <div class="intro-art">${art("defter")}</div>
       <h1 class="title-name">Gezgin Defteri</h1>
-      <p class="intro-text muted" style="text-align:center">Isı kaybolmaz. Bir yere gider.</p>
+      <p class="intro-text muted" style="text-align:center">${esc(MOTTO)}</p>
       ${o.hasSave ? `<p class="hand blue" style="text-align:center;margin:0">${esc(o.summary)}</p>` : ""}
       <div class="title-buttons">
         ${o.hasSave ? `<button class="btn primary" data-x="continue">Devam et</button><button class="btn" data-x="new">Yeni oyun</button>` : `<button class="btn primary" data-x="start">Oyuna başla</button>`}
