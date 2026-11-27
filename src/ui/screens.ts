@@ -1,5 +1,6 @@
 // Ekranlar. Bilgi sayfaları: Defter (Görevler dahil), Vücut. Karar sayfaları: Çanta, Harita (Çalış yer kartından açılır).
 // Her ekran HTML üretir; tıklamalar app.ts'deki data-act işleyicilerine gider.
+import { attrUse } from "../content/attr-use";
 import { RUNES } from "../engine/gesture";
 import { spellSequence, cellCount, EXPERIMENT, pageFound, pageSolved, pagesWaiting } from "../engine/synthesis";
 import { MOTHER_PAGES } from "../content/mother-pages";
@@ -234,9 +235,9 @@ export function vucutScreen(cfg: Config, s: GameState, ui: UiState = {}): string
   const attrs = inCat.filter(a => attrShown(cfg, s, a.id)); const folded = inCat.filter(a => !attrShown(cfg, s, a.id));
   const row = (a: (typeof inCat)[number], i: number) => {
     const st = s.attrs[a.id]; const max = a.max ?? 100;
-    return `<div class="attr${(night[a.id] ?? 0) > 0.01 ? " grew" : ""}"><span class="nm" title="${esc(a.desc ?? "")}">${esc(a.name)}</span><div class="bar">${inkBar(st.level / max, st.pending / max, i + 3)}</div>
+    return `<div class="attr${(night[a.id] ?? 0) > 0.01 ? " grew" : ""}"><span class="nm" title="${esc(attrUse(a.id) || a.desc || "")}">${esc(a.name)}</span><div class="bar">${inkBar(st.level / max, st.pending / max, i + 3)}</div>
       <span class="v">${st.level.toFixed(1)}${st.pending > 0.01 ? `<br><span class="pend">+${st.pending.toFixed(1)}</span>` : ""}</span>${(() => {
-        const nx = nextThreshold(cfg, s, a.id); return nx ? `<span class="next-th">${nx.at}'de: ${esc(nx.t.text)}</span>` : ""; })()}</div>`;
+        const nx = nextThreshold(cfg, s, a.id); return nx ? `<span class="next-th">${nx.at}'de: ${esc(nx.t.text)}</span>` : ""; })()}<span class="attr-use">${esc(attrUse(a.id))}</span></div>`;
   };
   const list = `<section class="sec"><h3 style="color:${esc(cur.color)}">${esc(cur.name)}</h3><div class="attr-group">${attrs.map(row).join("")}</div>
     ${folded.length ? `<details class="more-attrs"><summary class="muted">Diğer ${folded.length} özellik</summary><div class="attr-group">${folded.map((a, i) => row(a, i + attrs.length)).join("")}</div></details>` : ""}</section>`;
@@ -341,6 +342,7 @@ export function calisScreen(cfg: Config, s: GameState, ui: UiState): string {
       <span class="entry-meta">saatte yorgunluk ${Math.round((a.fatigue ?? 0) * perHour)}${t ? ` · ${t.fee ?? 0} bakır/sa` : ""}</span></div>
       ${t ? `<div style="font-size:14px" class="muted">Öğretmen: ${esc(t.name)}</div>` : ""}
       <div class="chips">${chips}</div>
+      <details class="uses-d"><summary class="tiny muted">Ne işe yarar?</summary>${usesHtml(cfg, s, [...a.gains].sort((x, y) => y.w - x.w).slice(0, 4).map(g => g.attribute))}</details>
       ${best ? `<div class="row"><button class="btn small" data-act="session-pick" data-id="${esc(id)}">Başla</button></div>` : `<div class="lock">${esc(any.reason ?? "")}</div>`}
       ${!best && activityPlace(id) && !activityPlace(id)!.includes(s.location) ? `<div class="row"><button class="btn small blue" data-act="show-place" data-id="${esc(activityPlace(id)![0])}">Haritada göster</button></div>` : ""}</div>`;
   };
@@ -365,6 +367,11 @@ export function calisScreen(cfg: Config, s: GameState, ui: UiState): string {
   </div>`;
 }
 
+/** Bir çalışmanın kazandırdığı özellikler ne işe yarar: her biri için tek cümle ve sıradaki açılış. */
+function usesHtml(cfg: Config, s: GameState, attrIds: string[]): string {
+  return attrIds.map(id => { const at = cfg.attr.get(id); if (!at) return ""; const nx = nextThreshold(cfg, s, id);
+    return `<div class="use"><b>${esc(at.name)}</b> <span class="muted">${(s.attrs[id]?.level ?? 0).toFixed(1)}</span><div class="tiny">${esc(attrUse(id))}</div>${nx ? `<div class="tiny blue">${nx.at}'de: ${esc(nx.t.text)}</div>` : ""}</div>`; }).join("");
+}
 /** Süre seçimi: her seçeneğin enerji maliyeti ve kapalıysa nedeni. */
 export function sessionSheet(cfg: Config, s: GameState, actId: string): string {
   const a = cfg.act.get(actId)!; const perHour = 60 / (a.duration ?? 60);
@@ -381,6 +388,7 @@ export function sessionSheet(cfg: Config, s: GameState, actId: string): string {
   return `<p class="hand muted" style="margin:0">Ne kadar çalışacaksın?</p><h2>${esc(a.name)}</h2>
     ${a.desc ? `<p style="margin:0" class="muted">${esc(a.desc)}</p>` : ""}
     <div class="chips"><span class="tiny muted">Oyunda 1 saatte (gerçekte 1 dk):</span>${hourGain}</div>
+    <div class="uses"><p class="hand muted" style="margin:0">Ne işe yarar?</p>${usesHtml(cfg, s, [...a.gains].sort((x, y) => y.w - x.w).slice(0, 4).map(g => g.attribute))}</div>
     <div class="choices">${opts}</div>
     <p class="muted tiny" style="margin:0">Uygulamayı kapatsan da süre işler; yarıda bırakırsan geçen kadar kazanırsın.</p>`;
 }

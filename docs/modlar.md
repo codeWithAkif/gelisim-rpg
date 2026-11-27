@@ -147,3 +147,16 @@ eklendiyse dördünde de aynı kuralla çalışır. Kurallar tek yerde durur, sa
 
 Yeni büyü ya da mekanik eklerken: önce bu tabloya bak, dört sahneyi de tara, ortak yere koy, her sahne için test yaz.
 Tek sahnede yapılan bir şey tutarsızlıktır; sonradan düzeltmek eklemekten pahalıdır.
+
+## Özelliklerin ne işe yaradığı
+
+Her özelliğin tek cümlelik açıklaması `src/content/attr-use.ts` içinde; çalışma ekranında ("Ne kadar çalışacaksın?"
+penceresinde açık, çalışma listesinde "Ne işe yarar?" altında) ve Vücut sayfasında görünür. Sıradaki açılış
+(`5'de: Ateş topu büyüsünü yapabilirsin`) mevcut eşik verisinden (`engine/thresholds.ts` `nextThreshold`) gelir; keşfedilmemiş
+sentez büyüleri açık edilmez.
+
+Yalnızca kodda gerçekten işleyen etkiler yazılır. Önceden etkisiz olan üç özellik bağlandı: **Görgü** olumlu itibar/güven
+kazancını artırır (`state.ts addRep`, en çok %25); **Aldatma** gizlenmede kuşkunun dolma hızını düşürür (`stealth.ts
+stealthSkill`); **İz sürme** yolculukta pusu/sürpriz ihtimalini azaltır (`journey.ts`, en çok %25). Hitabet ve İnsan okuma
+pazarda satış fiyatını artırır. Bir özelliğe etki verirken ya da çıkarırken `attr-use.ts`'i güncelle
+(`tests/synthesis.test.ts` her özelliğin açıklamasının olduğunu denetler).

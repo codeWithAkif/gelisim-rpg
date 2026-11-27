@@ -112,7 +112,9 @@ export function level(s: GameState, id: string): number { return s.attrs[id]?.le
 export function repOf(s: GameState, region: string, dim: string): number { return s.rep[region]?.[dim] ?? 0; }
 export function addRep(s: GameState, region: string, dim: string, v: number) {
   s.rep[region] ??= {};
-  s.rep[region][dim] = Math.max(-100, Math.min(100, (s.rep[region][dim] ?? 0) + v));
+  // Görgü: iyi davranış daha çok yankılanır (yalnız olumlu kazanç, en çok %+25)
+  const gorgu = v > 0 ? 1 + Math.min(0.25, Math.max(0, (s.attrs.gorgu?.level ?? 10) - 10) / 200) : 1;
+  s.rep[region][dim] = Math.max(-100, Math.min(100, (s.rep[region][dim] ?? 0) + v * gorgu));
 }
 
 export function clock(s: GameState): string {

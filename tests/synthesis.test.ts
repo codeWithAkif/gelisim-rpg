@@ -127,3 +127,29 @@ test("şimşek kuralı her sahnede aynı: zincir elden çıkar, yıldırım üst
     if (!lightning) expect(st(sp.id), sp.id).toBeNull();
   }
 });
+
+test("her özelliğin ne işe yaradığı yazılı; hiçbir şeyi etkilemeyenler bunu açıkça söyler; sıradaki açılış veriden gelir", async () => {
+  const { ATTR_USE, attrUse } = await import("../src/content/attr-use");
+  const { nextThreshold } = await import("../src/engine/thresholds");
+  for (const a of cfg.data.attributes) { expect(attrUse(a.id), a.id).not.toBe(""); expect(attrUse(a.id).length, a.id).toBeLessThan(230); }
+  expect(Object.keys(ATTR_USE).filter(id => !cfg.attr.has(id))).toEqual([]);             // olmayan özellik yazılmamış
+  const s = newGame(cfg, 3); s.knownElements = ["el_ates"]; s.attrs.ates.level = 2;
+  const nx = nextThreshold(cfg, s, "ates")!; expect(nx.at).toBe(5); expect(nx.t.text).toMatch(/Ateş topu/);
+  s.attrs.ates.level = 6; expect(nextThreshold(cfg, s, "ates")?.t.text ?? "").not.toMatch(/duvar/i);   // keşfedilmemiş sentez büyüsü açık edilmez
+});
+
+import { addRep } from "../src/engine/state";
+import { stealthSkill } from "../src/engine/stealth";
+test("görgü olumlu itibar kazancını artırır, olumsuzu değiştirmez", () => {
+  const a = newGame(cfg, 1), b = newGame(cfg, 1);
+  b.attrs.gorgu.level = 50;
+  addRep(a, "tas", "guven", 10); addRep(b, "tas", "guven", 10);
+  expect(b.rep.tas.guven).toBeGreaterThan(a.rep.tas.guven);
+  addRep(a, "tas", "guven", -10); addRep(b, "tas", "guven", -10);
+  expect(b.rep.tas.guven - a.rep.tas.guven).toBeCloseTo(2, 5);
+});
+test("aldatma gizlenmede kuşkuyu azaltır", () => {
+  const a = newGame(cfg, 1), b = newGame(cfg, 1);
+  b.attrs.aldatma.level = 60;
+  expect(stealthSkill(b)).toBeLessThan(stealthSkill(a));
+});
