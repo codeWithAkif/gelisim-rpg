@@ -37,7 +37,7 @@ export function openCaravan(s: GameState, done: { persist: () => void; render: (
       <div class="odds"><span>Araba <b>${t.carts}</b> (boşta ${cartsFree(s)})</span><span>Yük yeri <b>${units}/${cap}</b></span><span>Cebin <b>${s.money}</b></span></div>
       ${cc !== null ? `<div class="row"><button class="btn small" data-c="cart" ${s.money >= cc ? "" : "disabled"}>${t.carts ? "Bir araba daha" : "Araba al"} (${cc} bakır, ${CART_CAP} yük)</button></div>` : ""}
       ${dests.length ? `<h3>Nereye?</h3><div class="chips">${dests.map(r => { const rt = route(here, r)!; return `<button class="chip ${to === r ? "on" : ""}" data-c="to" data-id="${r}">${esc(REGION_NAMES[r])} · ${rt.days} gün · tehlike ${rt.danger}</button>`; }).join("")}</div>`
-        : `<p class="hand blue" style="margin:0">Buradan gidilecek başka bir ticaret yeri henüz açılmadı.</p>`}
+        : `<p class="hand blue" style="margin:0">Mal götürebileceğin, daha önce gördüğün başka bir pazar yok. Önce oralara bir kez git.</p>`}
       ${to ? `<h3>Yük</h3><p class="tiny muted" style="margin:0">Sayı: birim başına tahmini kâr. Aynı maldan çok satarsan fiyat düşer; satış varış günündeki fiyatla olur.</p><div class="cv-list">${rows}</div>
         <h3>Korumalar</h3>${heroes.length ? `<div class="chips">${gchips}</div>` : `<p class="tiny muted" style="margin:0">Adamın yok; kervan korumasız gider. Adam tutmak için Diyar'a bak.</p>`}
         <p class="tiny" style="margin:4px 0 0"><b>Yol:</b> ${esc(p?.threat ?? "")}. Pusu ihtimali %${Math.round((p?.ambush ?? 0) * 100)}${gp.scout ? " (izci yolu kolluyor)" : ""}. Korumaların gücü ${Math.round(gp.power)}, gereken ~${Math.round(p?.need ?? 0)}. ${verdict}</p>
