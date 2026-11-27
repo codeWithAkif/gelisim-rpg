@@ -49,7 +49,7 @@ import { sell, partner, partnerLock, stake, invest, withdraw, nightlyFinance } f
 import { nightlyTrade, buyPaper, hasPaper, feast } from "../engine/trade";
 import { paper } from "../content/trade";
 import { openCaravan } from "./trade-view";
-import { experiment } from "../engine/synthesis";
+import { experiment, takePage } from "../engine/synthesis";
 import type { FormId } from "../content/synthesis";
 import { sleepOptions, sleepAt, rest, type SleepKind } from "../engine/rest";
 import { minutesLeft } from "../engine/state";
@@ -350,6 +350,14 @@ export function startApp(root: HTMLElement) {
       case "paper": { const pp = paper(id); if (!pp) break;
         modal(`<p class="hand muted" style="margin:0">${esc(pp.seller)}</p><h2>${esc(pp.name)}</h2><p style="margin:0">${esc(pp.desc)}</p><div class="odds"><span>Bedel <b>${pp.cost} bakır</b></span><span>Cebin <b>${s.money}</b></span></div>`,
           [{ label: `Satın al (${pp.cost})`, cls: "primary", fn: () => { const r = buyPaper(s, id); sfx(r.ok ? "perfect" : "bad"); toast(r.ok ? `${pp.name} artık sende.` : r.reason ?? ""); persist(); render(); } }, { label: "Kapat", fn: () => {} }]);
+        break; }
+      case "mpage": { const pg = takePage(s, id); if (!pg) { toast("Sayfayı burada alamazsın."); break; } persist(); render();
+        playScene({ id: "sayfa_" + pg.id, beats: [
+          { t: "ses", layers: [{ id: "ruzgar", vol: 0.25 }] }, { t: "gorsel", art: pg.art },
+          { t: "metin", text: pg.intro }, { t: "bekle", ms: 600 },
+          { t: "metin", text: pg.riddle, voice: "anne", center: true },
+          { t: "metin", text: "Bilmecenin cevabı bir büyü. Defter → Büyüler'de dene ya da savaşta çiz." },
+        ] }, { name: s.name }, () => { render(); });
         break; }
       case "exp-el": { const e = (ui.exp ??= { els: [] }); e.els = e.els.includes(id) ? e.els.filter(x => x !== id) : [...e.els, id].slice(-3); sfx("tap"); render(false); break; }
       case "exp-form": { const e = (ui.exp ??= { els: [] }); e.form = e.form === id ? undefined : id; sfx("tap"); render(false); break; }

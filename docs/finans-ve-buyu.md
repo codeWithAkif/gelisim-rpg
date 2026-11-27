@@ -104,9 +104,16 @@ oyuncu imza büyüyü bulur. Son sayfa annenin bitiremediği deney.
    Kod: `src/content/trade.ts` (mallar, yollar, belgeler), `src/engine/trade.ts` (kurallar), `src/ui/trade-view.ts` (kervan penceresi),
    Diyar → Kervan sekmesi. Yalnız gördüğün pazarlarla ticaret yapılır. Korumasız kervan pusuda yükün çoğunu (%85'e kadar) kaybeder.
    Ölçüm: Bölüm 1 sonundaki bir cep (100 bakır) ve tek korumayla Taşpınar–Karaçam seferleriyle berat parası ~23 günde birikir (görev gelirleri hariç).
-2. **Finans hikâyesi ve adamlar:** Selim'in defteri (4 adım, sahnelerle); adam ustalığı, ücret ve sadakat.
-3. **Büyü sentezi motoru:** madde × biçim, hesap, imza büyüler; denge testi (hiçbir büyü güç sınırını aşmaz).
-4. **Çizerek büyü:** biçim rünleri, savaşta serbest çizim, keşif, ezber; defterde Deney ve Büyüler sayfaları.
-5. **Büyü hikâyesi:** annenin deney sayfaları.
+2. **Finans hikâyesi ve adamlar** (yapıldı): Selim'in defteri beş sahneyle (Selim'in dersi ve ilk araba, İlk yük,
+   Kayıp kervan, Lonca kapısı: üyelik 100 bakır ve %10 ucuz alış, Kendi kervansarayın: 300 bakır ve Karaçam yollarında
+   dörtte bir az pusu). Bölümler boyu süren yan hikâye (`Milestone.after`), Hikâye sekmesinde "Yan hikâyeler".
+   Adamlar kervan, işletme ve savaşta ayrı ayrı ustalaşır (0–5).
+3. **Büyü sentezi motoru** (yapıldı): `src/content/synthesis.ts`, `src/engine/synthesis.ts`. 21 madde × 6 biçim, 75 geçerli
+   büyü; 10 kitap büyüsü kendi hücresinde, 22 imza büyü. Sentez büyüleri ancak keşfedilince yapılır.
+4. **Çizerek büyü** (yapıldı): biçim işaretleri Hilal, Yatay çizgi, Köşe, Sekiz, Dikey çizgi, Çatı. Savaşta "Büyü çiz";
+   dizi gösterilmez; yeni geçerli dizi keşiftir; uymayan söner (tur ve 3 mana gider). Defter → Büyüler: diziler ve Deney.
+5. **Annenin deney sayfaları** (yapıldı): `src/content/mother-pages.ts`. Yedi sayfa (Zehra, Derya, Gülizar, annem, Kül Ana,
+   Muhtar Ayşe, kırık ocak); her biri bir bilmece ve bir imza büyü. Haritada "Annenin bir sayfası"; kısa sahne; Büyüler
+   sayfasında çözülenler işaretli.
 
 Her aşamanın sonunda testler, tarayıcıda deneme ve yayın.

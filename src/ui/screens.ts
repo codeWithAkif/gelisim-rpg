@@ -1,7 +1,8 @@
 // Ekranlar. Bilgi sayfaları: Defter (Görevler dahil), Vücut. Karar sayfaları: Çanta, Harita (Çalış yer kartından açılır).
 // Her ekran HTML üretir; tıklamalar app.ts'deki data-act işleyicilerine gider.
 import { RUNES } from "../engine/gesture";
-import { spellSequence, cellCount, EXPERIMENT } from "../engine/synthesis";
+import { spellSequence, cellCount, EXPERIMENT, pageFound, pageSolved, pagesWaiting } from "../engine/synthesis";
+import { MOTHER_PAGES } from "../content/mother-pages";
 import { FORMS } from "../content/synthesis";
 import { spellOptions } from "../engine/magic";
 import { openSideStories } from "../engine/story";
@@ -213,7 +214,9 @@ function storySection(_cfg: Config, s: GameState): string {
     return `<div class="story-step"><span class="mk muted">·</span><span class="t muted">…</span></div>`;
   }).join("");
   const sides = openSideStories(s).map(m => `<div class="story-step"><span class="mk muted">◦</span><span><span class="t">${esc(m.title)}</span> <span class="muted tiny">yan hikâye</span><div class="h">${esc(m.hint)}</div></span></div>`).join("");
-  return `<section class="sec">${past}<h2>${esc(ch.title)}</h2><div>${steps}</div></section>${sides ? `<section class="sec"><h2>Yan hikâyeler</h2><div>${sides}</div></section>` : ""}`;
+  const pw = pagesWaiting(s);
+  const pagesLine = pw.length ? `<div class="story-step"><span class="mk muted">◦</span><span><span class="t">Annenin deney sayfaları</span> <span class="muted tiny">yan hikâye</span><div class="h">${pw.map(p => `${esc(p.giver)}: ${esc(place(p.place)?.name ?? p.place)}`).join(" · ")}</div></span></div>` : "";
+  return `<section class="sec">${past}<h2>${esc(ch.title)}</h2><div>${steps}</div></section>${sides || pagesLine ? `<section class="sec"><h2>Yan hikâyeler</h2><div>${sides}${pagesLine}</div></section>` : ""}`;
 }
 
 /* ---------------- Vücut (bilgi) ---------------- */
@@ -545,9 +548,19 @@ function spellsPage(cfg: Config, s: GameState, ui: UiState): string {
   return `<section class="sec"><h2>Büyüler</h2>
     <p class="muted tiny" style="margin:0">Savaşta "Büyü çiz" ile maddenin işaretlerini, en sonda biçimin işaretini çizersin. Savaşta dizi görünmez: aklında tut.
     Bildiğin ${found} büyü; annenin hesabına göre ${total} büyü var.</p>${rows || `<p class="hand blue" style="margin:0">Henüz bir büyü bilmiyorsun.</p>`}</section>
+    ${riddlesHtml(s)}
     <section class="sec"><h2>Deney</h2><p class="muted tiny" style="margin:0">Bir ya da birkaç işaret seç, sonra bir biçim. Deney ${EXPERIMENT.mana} mana ve ${EXPERIMENT.minutes} dakika ister.
       Çalışırsa deftere yazılır; uymazsa söner ve nedenini söyler; birbirini iten işaretler elinde patlar.</p>
       <h3>Madde</h3><div class="chips">${elChips}</div><h3>Biçim</h3><div class="chips">${formChips}</div>
       <div class="row" style="margin-top:6px"><button class="btn primary" data-act="exp-try" ${e.els.length && e.form ? "" : "disabled"}>Dene · mana ${Math.floor(s.mana)}</button></div>
       ${e.last ? `<p class="${e.last.kind === "yeni" ? "hand blue" : e.last.kind === "patladi" ? "red" : ""}" style="margin:4px 0 0">${esc(e.last.text)}</p>` : ""}</section>`;
+}
+
+function riddlesHtml(s: GameState): string {
+  const found = MOTHER_PAGES.filter(p => pageFound(s, p.id)); const waiting = pagesWaiting(s);
+  if (!found.length && !waiting.length) return "";
+  const rows = found.map(p => { const ok = pageSolved(s, p); return `<div class="page-sheet"><div class="ttl">${ok ? "✓ " : ""}${esc(p.giver)}</div>
+    <p class="hand blue" style="margin:0">${esc(p.riddle)}</p>${ok ? `<p class="tiny green" style="margin:0">Çözdün.</p>` : ""}</div>`; }).join("");
+  return `<section class="sec"><h2>Annenin bilmeceleri <span class="muted tiny">${found.filter(p => pageSolved(s, p)).length}/${MOTHER_PAGES.length}</span></h2>${rows}
+    ${waiting.length ? `<p class="tiny muted" style="margin:0">Bekleyen sayfa: ${waiting.map(p => esc(p.giver)).join(", ")}. Haritada yerine git.</p>` : ""}</section>`;
 }

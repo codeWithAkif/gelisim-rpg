@@ -4,6 +4,7 @@
 import type { Config } from "./config";
 import type { GameState } from "./state";
 import { DAY_MINUTES } from "./state";
+import { MOTHER_PAGES, motherPage, type MotherPage } from "../content/mother-pages";
 import { MATTERS, FORMS, CLASHES, BOOK_CELLS, formMismatch, generateSpell, matter, form, type Matter, type FormId } from "../content/synthesis";
 
 export const elementName = (cfg: Config, id: string) => cfg.element.get(id)?.name ?? id;
@@ -66,3 +67,15 @@ export function experiment(cfg: Config, s: GameState, els: string[], f: FormId):
 }
 /** Bütün geçerli hücrelerin sayısı (defterin "kaç büyü var" sayacı). */
 export function cellCount(): number { let n = 0; for (const m of MATTERS) for (const f of FORMS) if (cellSpellId(m, f.id)) n++; return n; }
+
+/* ---------- annenin deney sayfaları ---------- */
+export const pageFound = (s: GameState, id: string) => s.story.flags["sayfa_" + id] !== undefined;
+export const pageSolved = (s: GameState, p: MotherPage) => (s.spellbook ?? []).includes(p.spell);
+/** Bu yerde alınabilecek sayfalar (hikâye o noktaya geldiyse, henüz alınmadıysa). */
+export const pagesAt = (s: GameState, placeId: string) => MOTHER_PAGES.filter(p => p.place === placeId && s.story.reached.includes(p.after) && !pageFound(s, p.id));
+/** Açılmış ama henüz alınmamış sayfalar (nerede olduklarını söylemek için). */
+export const pagesWaiting = (s: GameState) => MOTHER_PAGES.filter(p => s.story.reached.includes(p.after) && !pageFound(s, p.id));
+export function takePage(s: GameState, id: string): MotherPage | null {
+  const p = motherPage(id); if (!p || pageFound(s, id) || s.location !== p.place || !s.story.reached.includes(p.after)) return null;
+  s.story.flags["sayfa_" + id] = s.day; return p;
+}

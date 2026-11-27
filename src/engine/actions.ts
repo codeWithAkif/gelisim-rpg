@@ -14,12 +14,13 @@ import { lodgingAt } from "./rest";
 import { sitesAt, TIER_NAMES } from "./scavenge";
 import { olcerOpen, nextLevel, solvedLevels, OLCER_PLACE, OLCER_LEVELS, canStartOlcer } from "./olcer";
 import { PET_TYPES, canAdopt } from "./pet";
+import { pagesAt } from "./synthesis";
 import { tradeOpen, postAt, tradeOf, cartsFree, papersAt, hasPaper, feastHere } from "./trade";
 import { REGION_NAMES, paper } from "../content/trade";
 import { homeBed, candidatesAt, canHire, canBuyHouse, HOUSES, HOME_PLACES, ROLE_NAMES } from "./estate";
 
 export interface PlaceAction {
-  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "study" | "market" | "show-place" | "partner" | "sleep" | "scav" | "pet-adopt" | "hire" | "house" | "olcer" | "caravan" | "paper" | "feast";
+  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "study" | "market" | "show-place" | "partner" | "sleep" | "scav" | "pet-adopt" | "hire" | "house" | "olcer" | "caravan" | "paper" | "feast" | "mpage";
   id: string; label: string; sub?: string; disabled?: string; primary?: boolean;
 }
 /** Bulunduğun yerde yapılabilecekler, önem sırasıyla. */
@@ -37,6 +38,7 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
   // kervan ticareti: ticaret yerinde yük alıp kervan yollarsın
   const post = postAt(placeId);
   if (post && tradeOpen(s)) { const t = tradeOf(s); out.push({ act: "caravan", id: placeId, label: `Kervan kur: ${REGION_NAMES[post]}`, sub: t.carts ? `${cartsFree(s)}/${t.carts} araba boşta · ${t.caravans.length} kervan yolda` : "Önce bir araba al", disabled: placeId === s.location ? undefined : "Oraya git" }); }
+  for (const p of pagesAt(s, placeId)) out.push({ act: "mpage", id: p.id, label: "Annenin bir sayfası", sub: `${p.giver} · bir bilmece`, disabled: placeId === s.location ? undefined : "Oraya git", primary: true });
   for (const p of papersAt(s, placeId)) out.push({ act: "paper", id: p.id, label: `Satın al: ${p.name}`, sub: `${p.seller} · ${p.cost} bakır`, disabled: placeId === s.location ? (s.money >= p.cost ? undefined : `${p.cost} bakır gerekir; cebinde ${s.money} var`) : "Oraya git", primary: true });
   if (placeId === s.location) { const f = feastHere(s); if (f) out.push({ act: "feast", id: "", label: `Zengin sofra (${f.cost} bakır)`, sub: "Bu gece uykuda kasların %25 daha çok gelişir", disabled: s.feast === s.day ? "Bu akşam zaten doydun" : s.money < f.cost ? `${f.cost} bakır gerekir` : undefined }); }
   for (const p of partnerAt(placeId)) { const lock = partnerLock(s, p); const st = stake(s, p.id);

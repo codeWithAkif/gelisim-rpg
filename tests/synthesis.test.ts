@@ -70,3 +70,28 @@ test("deney: yeni büyü deftere yazılır, bilinen söylenir, uymayan söner, b
   expect(s.mana).toBe(50 - 4 * 6); expect(s.minute).toBe(100);
   s.mana = 2; expect(experiment(cfg, s, ["el_ates"], "top")).toHaveProperty("error");
 });
+
+test("annenin deney sayfaları: yeri ve zamanı gelince alınır; bilmecenin cevabı geçerli bir imza büyü", async () => {
+  const { MOTHER_PAGES } = await import("../src/content/mother-pages");
+  const { pagesAt, takePage, pageSolved, pagesWaiting } = await import("../src/engine/synthesis");
+  const { PLACES } = await import("../src/content/map");
+  const { CHAPTERS } = await import("../src/content/story");
+  const { placeActions } = await import("../src/engine/actions");
+  const ms = new Set(CHAPTERS.flatMap(c => c.milestones.map(m => m.id)));
+  for (const p of MOTHER_PAGES) {
+    expect(PLACES.some(x => x.id === p.place), p.id).toBe(true); expect(ms.has(p.after), p.id).toBe(true);
+    expect(cfg.spell.get(p.spell), p.id).toBeTruthy();
+  }
+  const s = newGame(cfg, 8); s.location = "zehra_evi";
+  expect(pagesAt(s, "zehra_evi")).toHaveLength(0);
+  s.story.reached.push("kivilcim");
+  expect(pagesWaiting(s).map(p => p.id)).toEqual(["ates_duvari"]);
+  expect(placeActions(cfg, s, "zehra_evi").some(a => a.act === "mpage")).toBe(true);
+  const pg = takePage(s, "ates_duvari")!; expect(pg).toBeTruthy(); expect(takePage(s, "ates_duvari")).toBeNull();
+  expect(pagesWaiting(s)).toHaveLength(0);
+  // bilmeceyi çözmek: alev + yatay çizgi
+  s.knownElements = ["el_ates"]; s.mana = 20; s.minute = 60;
+  expect(pageSolved(s, pg)).toBe(false);
+  expect(experiment(cfg, s, ["el_ates"], "duvar")).toMatchObject({ kind: "yeni", spellId: "sy_el_ates_duvar" });
+  expect(pageSolved(s, pg)).toBe(true);
+});
