@@ -267,23 +267,33 @@ export function runePrompt(host: HTMLElement, o: { runes: string[]; ease: number
 export function castDrawPrompt(host: HTMLElement, o: { allowed: string[]; ease: number; limitMs: number; tip?: string }): Promise<{ runes: string[]; q: number; timeout?: boolean } | null> {
   return new Promise(resolve => {
     const [W, H] = stageSize(host, 1);
-    const L = layer(host, "rune cast", "Büyü çiz: maddenin işaretleri, en sonda biçim", W, H);
+    const L = layer(host, "rune cast full", "Büyü çiz: ekranın her yerine çizebilirsin", W, H);
     addTip(L, o.tip);
+    // bütün ekran çizim alanı: geniş işaretler (alev) kutunun dışından başlasa da mürekkep düşer
+    const fc = document.createElement("canvas"); fc.className = "cast-full"; L.el.appendChild(fc);
+    const fg = fc.getContext("2d")!;
+    const fit = () => { const r = L.el.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; fc.width = Math.round(r.width * dpr); fc.height = Math.round(r.height * dpr); fc.style.width = r.width + "px"; fc.style.height = r.height + "px"; fg.setTransform(dpr, 0, 0, dpr, 0, 0); };
+    fit();
     const chips = document.createElement("div"); chips.className = "cast-seq"; L.box.after(chips);
     const bar = document.createElement("div"); bar.className = "gx-bar"; chips.after(bar);
+    // işaretlerin şekilleri (sıraları değil): hangi işaret neye benziyor
+    const legend = document.createElement("div"); legend.className = "cast-legend";
+    legend.innerHTML = o.allowed.map(id => { const r = RUNES[id]; const pts = r.pts.map(([x, y]) => `${(2 + x * 20).toFixed(1)},${(2 + y * 20).toFixed(1)}`).join(" ");
+      return `<span><svg width="22" height="22" viewBox="0 0 24 24"><polyline points="${pts}" fill="none" stroke="${id.startsWith("f_") ? "var(--red)" : "var(--blue)"}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><small>${esc(r.name)}</small></span>`; }).join("");
+    bar.after(legend);
     const row = document.createElement("div"); row.className = "row cast-row";
-    row.innerHTML = `<button class="btn small" data-c="undo">Sil</button><button class="btn small" data-c="cancel">Vazgeç</button>`; bar.after(row);
+    row.innerHTML = `<button class="btn small" data-c="undo">Sil</button><button class="btn small" data-c="cancel">Vazgeç</button>`; legend.after(row);
     const runes: string[] = []; const qs: number[] = []; let trail: P[] = []; let done = false; const t0 = performance.now();
     const show = () => { chips.innerHTML = runes.length ? runes.map(id => `<span class="chip ${id.startsWith("f_") ? "on" : ""}">${esc(RUNES[id].name)}</span>`).join("<span class='muted'>·</span>") : `<span class="tiny muted">Henüz işaret yok.</span>`; };
     const end = (v: { runes: string[]; q: number; timeout?: boolean } | null) => { if (done) return; done = true; void L.close(v ? 600 : 200).then(() => resolve(v)); };
     const draw = () => {
-      if (done) return; const g = L.g; g.clearRect(0, 0, W, H);
-      if (trail.length) inkTrail(g, trail, L.ink);
+      if (done) return; fg.clearRect(0, 0, fc.width, fc.height);
+      if (trail.length) inkTrail(fg, trail, L.ink);
       const left = 1 - (performance.now() - t0) / o.limitMs; bar.style.width = `${Math.max(0, left * 100)}%`;
       if (left <= 0) { result(L, 0, "Zaman doldu"); return end({ runes, q: Math.min(1, ...qs), timeout: true }); }
       requestAnimationFrame(draw);
     };
-    track(L.cv, pts => { trail = pts; if (pts.length % 5 === 0) sfx("draw"); }, pts => {
+    track(fc, pts => { trail = pts; if (pts.length % 5 === 0) sfx("draw"); }, pts => {
       trail = [];
       const r = recognize(pts, o.allowed, o.ease);
       const res = L.el.querySelector<HTMLElement>(".qt-result")!;
