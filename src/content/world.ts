@@ -135,6 +135,7 @@ export interface QuestDef {
   doneText?: string;     // yerinde yapılınca düğme metni
   story?: boolean;       // ana hikâyenin işi: "Ana görev" diye görünür, ödül penceresi yerine sahne gelir
   night?: boolean;       // gece yapılır: gündüz başlanırsa akşam beklenir (saat ilerler)
+  scene?: string;        // bitince ödül penceresi yerine bu sahne oynar (content/scenes.ts)
 }
 export const QUESTS: QuestDef[] = [
   {
@@ -154,7 +155,7 @@ export const QUESTS: QuestDef[] = [
     rewards: { items: { temiz_giysi: 1, el_yapimi_bicak: 1 }, note: "Temiz giysi ve kendi yaptığı bıçak. Bir çoban için büyük fedakârlık." },
   },
   {
-    id: "annenin_izi", title: "Annenin izi", giverNpc: "ayse", importance: "onemli", minutes: 30, requires: ["kurt"], at: "zehra_evi", doneText: "Zehra'yla konuş",
+    id: "annenin_izi", title: "Annenin izi", giverNpc: "ayse", importance: "onemli", story: true, minutes: 30, requires: ["kurt"], at: "zehra_evi", doneText: "Zehra'yla konuş",
     text: "Muhtar Ayşe, on iki yıl önce köye gelen defterli kadının Şifacı Zehra'ya bir şey bıraktığını söylüyor. Zehra köyün en üst evinde, otların arasında yaşıyor.",
     rewards: { items: { annenin_heybesi: 1 }, note: "Zehra'nın sandığından annenin elinden çıkmış bir sayfa ve onun eski heybesi." },
   },
@@ -170,7 +171,7 @@ export const QUESTS: QuestDef[] = [
     rewards: { items: { deri: 1, peynir: 1 }, money: 3, note: "Sabah Hasan ağılı saydı: tek kuzu eksik değil. Bir deri, bir peynir ve üç bakır." },
   },
   {
-    id: "kurt_izi", title: "Kurtlar nereden geliyor?", giverNpc: "hasan", importance: "onemli", minutes: 60, requires: ["kurt"], at: "koru", doneText: "İzleri sür",
+    id: "kurt_izi", title: "Kurtlar nereden geliyor?", giverNpc: "hasan", importance: "onemli", scene: "karaca", minutes: 60, requires: ["kurt"], at: "koru", doneText: "İzleri sür",
     text: "\"Bu dağda otuz yıldır çobanım, hiç bu kadar kurt görmedim,\" diyor Hasan. İzler Meşe korusunun kuzeyine çıkıyor. Nereden geldiklerini bul.",
     rewards: { money: 3, gains: { iz_surme: 1.5, koku: 0.8 }, note: "İzleri sürmek sana iz okumayı öğretti. Hasan üç bakır verdi." },
     afterText: "İzler korunun kuzeyinde, eski bir kaya yarığında bitiyor. Yarığın ağzında, yazın ortasında donmuş bir karaca yatıyor; tüyleri kırağı tutmuş. Kurtlar avlarının peşinden aşağı inmiş.",
@@ -182,7 +183,7 @@ export const QUESTS: QuestDef[] = [
     afterText: "Karabaş ilk gün peşinden ayrılmadı. Burnu senin göremediğin şeyleri buluyor; büyüdükçe kurtlara karşı da yanında duracak.",
   },
   {
-    id: "donmus_av", title: "Donmuş karaca", giverNpc: "zehra", importance: "onemli", minutes: 30, requires: ["kurt_izi", "annenin_izi"], at: "zehra_evi", doneText: "Zehra'ya anlat",
+    id: "donmus_av", title: "Donmuş karaca", giverNpc: "zehra", importance: "onemli", scene: "akyele_haber", minutes: 30, requires: ["kurt_izi", "annenin_izi"], at: "zehra_evi", doneText: "Zehra'ya anlat",
     text: "Yazın ortasında donmuş bir hayvan. Zehra'ya ne gördüğünü anlat.",
     rewards: { money: 4, gains: { anatomi_hayvan: 1.5, analiz: 1 }, note: "Zehra karacanın nasıl öldüğünü gösterirken kurtların yapısını da anlattı." },
     afterText: "Zehra uzun süre sustu. \"Kuzeyde ısı çekiliyor. Önce otlar, sonra karacalar, sonra kurtlar iniyor. Sürüyü Akyele dediğimiz yaşlı bir dişi yönetiyor; boynunda beyaz yele var. O düşerse sürü dağılır, yoksa her gece yenisi gelir.\"",

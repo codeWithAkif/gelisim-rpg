@@ -3,6 +3,7 @@ import { test, expect } from "vitest";
 import { readdirSync } from "node:fs";
 import { SCENES, SPEAKERS, MOTTO, sisSides, fill } from "../src/content/scenes";
 import { CHAPTERS } from "../src/content/story";
+import { QUESTS } from "../src/content/world";
 
 const arts = new Set(readdirSync("src/assets/art").map(f => f.replace(/\.webp$/, "")));
 const sounds = new Set(readdirSync("src/assets/ses").filter(f => f.endsWith(".ogg")).map(f => f.replace(/^ortam_|\.ogg$/g, "")));
@@ -38,4 +39,14 @@ test("sis: çan iki yandan gelir, aynı yandan üst üste üç kez gelmez; tohum
   const all = new Set(Array.from({ length: 50 }, (_, k) => sisSides(k + 1).join("")));
   expect(all.size).toBeGreaterThan(2);
   expect(fill("{ad}… Buralı değil.", "Akif")).toBe("Akif… Buralı değil."); expect(fill("{ad}", "")).toBe("Yolcu");
+});
+
+test("işlere bağlı sahneler ve sahnede söz verilen işler var; Bölüm 1'in bütün ana sayfaları sahne", () => {
+  for (const q of QUESTS) if (q.scene) expect(SCENES[q.scene], q.id).toBeTruthy();
+  const ids = new Set(QUESTS.map(q => q.id));
+  for (const ch of CHAPTERS) for (const m of ch.milestones) if (m.accept) expect(ids.has(m.accept), m.id).toBe(true);
+  const b1 = CHAPTERS.find(c => c.id === "b1")!;
+  for (const m of b1.milestones) expect(m.scene, m.id).toBeTruthy();
+  const last = SCENES.mektup.beats[SCENES.mektup.beats.length - 1];
+  expect(last.t).toBe("baslik");
 });

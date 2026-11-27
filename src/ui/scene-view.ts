@@ -117,12 +117,14 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
     if (busy) return;
     if (typing) { clearInterval(typing.timer); typing.node.textContent = typing.full; typing = null; tapHint.classList.add("on"); return; }
     if (waiting) return;
+    el.classList.remove("titlecard");
     while (++i < scene.beats.length) {
       const b = scene.beats[i];
       if (b.t === "ses") { sceneAmbience(b.layers); continue; }
       if (b.t === "gorsel") { setArt(b.art, !!b.gece); continue; }
       if (b.t === "tek") { oneShot(b.id, b.vol); continue; }
       if (b.t === "incele") { inspect(b.prompt, b.spots); return; }
+      if (b.t === "baslik") { el.classList.add("titlecard"); stage.innerHTML = `<div class="sc-line sc-title"><p class="sc-big">${esc(b.text)}</p>${b.sub ? `<p class="sc-small">${esc(b.sub)}</p>` : ""}</div>`; tapHint.classList.add("on"); return; }
       if (b.t === "bekle") { waiting = true; stage.innerHTML = ""; setTimeout(() => { waiting = false; next(); }, b.ms * Math.max(0.3, speed || 0.3)); return; }
       if (b.t === "ad") { askName(); return; }
       if (b.t === "sis") { fog(); return; }

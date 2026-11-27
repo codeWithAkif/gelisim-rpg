@@ -705,3 +705,9 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .scene .sc-spot.seen span { text-decoration: line-through; opacity: .5; }
 @keyframes scSpot { 50% { transform: scale(1.3); opacity: .6; } }
 .scene.inspect .sc-stage { bottom: calc(var(--safe-bottom) + 7vh + 10px); }
+/* sahne: bölüm kartı */
+.scene.titlecard .sc-art img { opacity: 0 !important; }
+.scene.titlecard .sc-stage { bottom: 40vh; }
+.scene .sc-title { text-align: center; animation: scIn 1.4s ease; }
+.scene .sc-big { margin: 0; font-family: var(--f-hand); font-size: 48px; line-height: 1.1; color: #F4E3C1; }
+.scene .sc-small { margin: 8px 0 0; font-family: var(--f-hand); font-size: 24px; color: #E8C98E; opacity: .85; }

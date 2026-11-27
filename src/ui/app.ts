@@ -459,7 +459,9 @@ export function startApp(root: HTMLElement) {
         if ("error" in r) { toast(r.error); return; }
         persist(); render();
         // ana hikâye işinde ödül penceresi araya girmez: sahne oynar, ödül kısa bir notla gelir
-        if (QUESTS.find(q => q.id === id)?.story) { toast(r.note ?? "İş bitti."); storyTick(); return; }
+        const qd = QUESTS.find(q => q.id === id);
+        if (qd?.scene && SCENES[qd.scene]) { playScene(SCENES[qd.scene], { name: s.name }, () => { toast(r.note ?? "İş bitti."); storyTick(); }); return; }
+        if (qd?.story) { toast(r.note ?? "İş bitti."); storyTick(); return; }
         sfx(r.relics.length ? "perfect" : "page");
         modal(`<h2>${esc(QUESTS.find(q => q.id === id)!.title)}</h2>${rewardHtml(r)}`, [{ label: "Tamam", cls: "primary", fn: () => storyTick() }]);
         return;
