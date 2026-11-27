@@ -4,6 +4,8 @@
 import type { Config } from "../engine/config";
 import { withGuide } from "./guide";
 import { castDrawPrompt } from "./gesture-view";
+import { drawFlames, drawEmbers, type Ember } from "./fire-fx";
+import { THROW_RANGE, wallLen } from "../engine/siege";
 import { settings } from "./settings";
 import { skillEase } from "../engine/timing";
 import { synthesize, discover } from "../engine/synthesis";
@@ -12,7 +14,7 @@ import type { FormId } from "../content/synthesis";
 import type { GameState } from "../engine/state";
 import {
   type Nobet, type StatId, type NobetResult, NFIELD, TOWER, STAT_NAMES, CARDS, createNobet, stepNobet, buyUpgrade, upgradeCost, statValue,
-  pickCard, useSpell, spellReady, placePet, petGuard, type SpellId, type SpellKind, placeBar, placeTrap, pickUp, startWaves, canPlaceNow, structLeft, rerollCards, callWave, canCallWave, useSupply, SUPPLIES, BAR_LEN, finishNobet, nobetSite, nobetSave, canStartNobet, addNobetSpell, isBossWave, waveScale, type Loot,
+  pickCard, useSpell, useWall, nobetAim, throwLanding, spellReady, placePet, petGuard, type SpellId, type SpellKind, placeBar, placeTrap, pickUp, startWaves, canPlaceNow, structLeft, rerollCards, callWave, canCallWave, useSupply, SUPPLIES, BAR_LEN, finishNobet, nobetSite, nobetSave, canStartNobet, addNobetSpell, isBossWave, waveScale, type Loot,
 } from "../engine/nobet";
 import { ENEMIES } from "../content/world";
 import { hasBow } from "../engine/gear";
@@ -78,6 +80,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   const cs = getComputedStyle(document.documentElement); const C = (v: string) => cs.getPropertyValue(v).trim();
   const pops: { x: number; y: number; t: number; text: string; color: string; big?: boolean; dur?: number }[] = [];
   const bolts: BoltFx[] = []; const impacts: Impact[] = []; let whiteFlash = 0; const blades: { x: number; y: number; x2: number; y2: number; t: number }[] = [];
+  const embers: Ember[] = []; const streaks: { x1: number; y1: number; x2: number; y2: number; t: number }[] = [];
   const vines: { x: number; y: number; r: number; t: number }[] = []; const flocks: { x: number; y: number; r: number; t: number }[] = []; const blasts: { x: number; y: number; r: number; t: number }[] = [];
   let shake = 0, flash = 0;
 
@@ -135,28 +138,35 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   const drawMode = settings().timing && s.knownElements.length > 0;
   function renderSpells() {
     const ids = Object.keys(n.spells); const k = ids.join() + (drawMode ? "|ciz" : ""); if (k === barKey) return; barKey = k;
-    spellBar.innerHTML = (drawMode ? `<button class="nb-skill draw" data-draw="1"><span class="ic">✎</span><small>Büyü çiz</small></button>` : "") + ids.map(id => `<button class="nb-skill" data-spell="${id}" aria-label="${esc(n.spells[id].name)}"><span class="cdf"></span><span class="ic">${SPELL_ICON[n.spells[id].kind]}</span><small>${esc(n.spells[id].name)}</small></button>`).join("");
+    spellBar.innerHTML = (drawMode ? `<button class="nb-skill draw" data-draw="1"><span class="ic">✎</span><small>Büyü çiz</small></button>` : "") + `<button class="nb-skill cancel" data-cancel="1" hidden><span class="ic">✕</span><small>Vazgeç</small></button>` + ids.map(id => `<button class="nb-skill" data-spell="${id}" aria-label="${esc(n.spells[id].name)}"><span class="cdf"></span><span class="ic">${SPELL_ICON[n.spells[id].kind]}</span><small>${esc(n.spells[id].name)}</small></button>`).join("");
+    const cb = spellBar.querySelector<HTMLElement>(".cancel"); if (cb) cb.hidden = !armed;
   }
   spellBar.addEventListener("click", e => {
+    if ((e.target as HTMLElement).closest("[data-cancel]")) { arm(null); sfx("tap"); return; }
     if ((e.target as HTMLElement).closest("[data-draw]")) { void drawSpell(); return; }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-spell]"); if (!b) return;
     if (drawMode) { tip.hidden = false; tip.textContent = "Büyüyü \"Büyü çiz\" ile aklından çiz."; return; }
     const id = b.dataset.spell as SpellId;
-    // büyüyü seç, sonra araziye dokunarak nereye düşeceğini işaretle (kılıçlar: hangi yöne)
-    if (armed === id) { armed = null; sfx("tap"); }
-    else if (spellReady(n, id)) { armed = id; sfx("tap"); buzz("light"); }
-    else { sfx("bad"); return; }
-    tip.hidden = !armed; if (armed) tip.textContent = n.spells[armed].kind === "kilic" ? "Kılıçların yükseleceği yöne dokun" : `${n.spells[armed].name}: hedefe dokun`;
-    for (const x of spellBar.querySelectorAll<HTMLElement>("[data-spell]")) x.classList.toggle("armed", x.dataset.spell === armed);
+    // büyüyü seç: duvar yere çizilir, top kuleden ileri atılır, gerisi hedefe dokunulur; seçili iken zaman durur
+    if (armed === id) { arm(null); sfx("tap"); }
+    else if (spellReady(n, id)) { arm(id); sfx("tap"); buzz("light"); }
+    else sfx("bad");
   });
-  let armed: SpellId | null = null; let aim: { x: number; y: number } | null = null;
+  let armed: SpellId | null = null; let aim: { x: number; y: number } | null = null; let aimStart: { x: number; y: number } | null = null;
+  const aimHint = (id: SpellId) => { const k = nobetAim(n, id); return k === "wall" ? "Duvarı yere çiz: parmağını sürükle, bırak." : k === "throw" ? "Kuleden gitmesini istediğin yere doğru sürükle, bırak." : k === "dir" ? "Kılıçların yükseleceği yöne dokun." : "Hedefe dokun."; };
+  /** Büyü avuçtayken zaman durur: uygulayana ya da vazgeçene kadar düşmanlar kıpırdamaz. */
+  function arm(id: SpellId | null) {
+    armed = id; aim = null; aimStart = null; frozen = !!id;
+    tip.hidden = !id; if (id) tip.textContent = `${n.spells[id].name}: ${aimHint(id)} Zaman durdu.`;
+    for (const x of spellBar.querySelectorAll<HTMLElement>("[data-spell]")) x.classList.toggle("armed", x.dataset.spell === id);
+    const cb = spellBar.querySelector<HTMLElement>(".cancel"); if (cb) cb.hidden = !id;
+  }
   /** Büyü çiz: zaman durur; dizi bir büyü ederse ve dolmuşsa hedefe dokunana kadar durmaya devam eder. */
   async function drawSpell() {
     if (n.phase !== "play" || n.prep || frozen) return;
-    frozen = true; armed = null; aim = null;
+    frozen = true; arm(null); frozen = true;
     const allowed = [...ELEMENT_RUNES.filter(r => s.knownElements.includes(r)), ...FORM_RUNES];
     const res = await castDrawPrompt(el.querySelector<HTMLElement>(".siege-stage")!, { allowed, ease: skillEase(s, "odak"), limitMs: 9000 });
-    const say = (t: string) => { tip.hidden = false; tip.textContent = t; setTimeout(() => { if (!armed) tip.hidden = true; }, 2200); };
     const f = res?.runes[res.runes.length - 1]?.startsWith("f_") ? res.runes[res.runes.length - 1].slice(2) as FormId : undefined;
     const r = res && f ? synthesize(s, res.runes.filter(x => !x.startsWith("f_")), f) : null;
     if (!res) { frozen = false; return; }
@@ -166,16 +176,18 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     if (!addNobetSpell(cfg, s, n, id)) { frozen = false; say(`${cfg.spell.get(id)?.name ?? "Bu büyü"} nöbette olmaz ya da ustalığın yetmiyor.`); sfx("bad"); return; }
     renderSpells();
     if (!spellReady(n, id)) { frozen = false; say(`${n.spells[id].name} henüz dolmadı.`); sfx("bad"); return; }
-    armed = id; sfx("spark");
-    tip.hidden = false; tip.textContent = `${n.spells[id].kind === "kilic" ? "Kılıçların yükseleceği yöne dokun" : `${n.spells[id].name}: hedefe dokun`}. Zaman durdu.`;
-    for (const x of spellBar.querySelectorAll<HTMLElement>("[data-spell]")) x.classList.toggle("armed", x.dataset.spell === armed);
+    arm(id); sfx("spark");
   }
-  function castAt(x: number, y: number) {
-    const id = armed!; armed = null; aim = null; tip.hidden = true; frozen = false;
-    for (const b of spellBar.querySelectorAll<HTMLElement>("[data-spell]")) b.classList.remove("armed");
-    const kd = n.spells[id].kind;
-    if (useSpell(n, id, x, y)) { sfx(kd === "simsek" ? "spark" : kd === "kilic" ? "clang" : kd === "karga" ? "whoosh" : kd === "ates" ? "fire" : kd === "buz" ? "splash" : "thunk"); if (kd !== "karga") sfx("crit"); buzz("heavy"); shake = kd === "sarmasik" || kd === "camur" ? 4 : 10; } else sfx("bad");
+  function afterCast(id: SpellId, ok: boolean) {
+    const kd = n.spells[id].kind; const wasWall = nobetAim(n, id) === "wall";
+    if (!ok) { sfx("bad"); return false; }
+    arm(null);
+    sfx(kd === "simsek" ? "spark" : kd === "kilic" ? "clang" : kd === "karga" ? "whoosh" : kd === "ates" ? "fire" : kd === "buz" ? "splash" : "thunk");
+    if (kd !== "karga" && !wasWall) sfx("crit"); buzz(wasWall ? "medium" : "heavy"); shake = wasWall ? 2 : kd === "sarmasik" || kd === "camur" ? 4 : 10;
+    return true;
   }
+  function castAt(x: number, y: number) { const id = armed!; afterCast(id, useSpell(n, id, x, y)); }
+  const say = (t: string) => { tip.hidden = false; tip.textContent = t; setTimeout(() => { if (armed) tip.textContent = `${n.spells[armed].name}: ${aimHint(armed)} Zaman durdu.`; else tip.hidden = true; }, 1800); };
   // köpeğin bekleyeceği yer: araziye dokun
   const tip = el.querySelector<HTMLElement>("#nbTip")!;
   tip.hidden = true;
@@ -205,7 +217,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
   cv.addEventListener("pointerdown", e => {
     if (n.phase !== "play") return;
     const p = at(e);
-    if (armed) { aim = p; cv.setPointerCapture(e.pointerId); return; }   // parmağı kaldırınca atılır; sürükleyerek nişan düzeltilir
+    if (armed) { aim = p; aimStart = p; cv.setPointerCapture(e.pointerId); return; }   // parmağı kaldırınca uygulanır; sürükleyerek nişan düzeltilir
     if (buildSel) {
       if (!canPlaceNow(n)) { sfx("bad"); return; }
       if (pickUp(n, p.x, p.y)) { sfx("tap"); renderBuild(); return; }
@@ -214,8 +226,18 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
     if (n.pet && placePet(n, p.x, p.y)) { sfx("tap"); petMark = performance.now(); }
   });
   cv.addEventListener("pointermove", e => { if (armed && aim) aim = at(e); });
-  cv.addEventListener("pointerup", e => { if (armed && aim) { const p = at(e); castAt(p.x, p.y); } });
-  cv.addEventListener("pointercancel", () => { aim = null; });
+  cv.addEventListener("pointerup", e => {
+    if (!armed || !aim) return;
+    const p = at(e); const id = armed; const k = nobetAim(n, id);
+    if (k === "wall") {
+      const a = aimStart ?? p; const r = useWall(n, id, a.x, a.y, p.x, p.y);
+      if (r.ok) afterCast(id, true); else { say(r.reason ?? "Olmadı"); sfx("bad"); aim = null; aimStart = null; }
+      return;
+    }
+    if (k === "throw" && Math.hypot(p.x - TOWER.x, p.y - TOWER.y) < 5) { say("Kuleden ileri doğru sürükle."); sfx("bad"); aim = null; return; }
+    castAt(p.x, p.y);
+  });
+  cv.addEventListener("pointercancel", () => { aim = null; aimStart = null; });
   let petMark = 0;
 
   /* ---------- çizim ---------- */
@@ -285,13 +307,39 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       if (f.slow > 0) { g.fillStyle = "rgba(159,211,232,.6)"; g.beginPath(); g.arc(X(f.x), Y(f.y), scale * 2, 0, 7); g.fill(); }
       if (f.hp < f.max || f.boss) { const w = f.boss ? 40 : 20; g.fillStyle = "rgba(234,224,200,.9)"; g.fillRect(X(f.x) - w / 2, Y(f.y) - h * scale * 0.95, w, 4); g.fillStyle = C("--red"); g.fillRect(X(f.x) - w / 2, Y(f.y) - h * scale * 0.95, w * Math.max(0, f.hp / f.max), 4); }
     }
-    // nişan: seçili büyünün düşeceği yer / kılıçların hattı
+    // nişan: duvar çizgisi / kuleden ileri ok ve düşeceği yer / kılıçların hattı / dokunulan nokta
     if (armed && aim) {
-      g.setLineDash([5, 5]); g.strokeStyle = C("--red"); g.lineWidth = 2;
-      if (armed === "kilic") { const a = Math.atan2(aim.y - TOWER.y, aim.x - TOWER.x); g.beginPath(); g.moveTo(X(TOWER.x + Math.cos(a) * 8), Y(TOWER.y + Math.sin(a) * 8)); g.lineTo(X(TOWER.x + Math.cos(a) * 48), Y(TOWER.y + Math.sin(a) * 48)); g.lineWidth = 10 * scale / 4; g.globalAlpha = 0.35; g.stroke(); g.globalAlpha = 1; }
-      else { const R = armed === "simsek" ? 14 : armed === "sarmasik" ? 18 : 26; g.beginPath(); g.arc(X(aim.x), Y(aim.y), R * scale, 0, 7); g.stroke(); g.fillStyle = "rgba(158,52,35,.08)"; g.fill(); }
-      g.setLineDash([]);
+      const sp = n.spells[armed]; const k = nobetAim(n, armed); const fire = sp.kind === "ates";
+      g.save(); g.lineCap = "round";
+      if (k === "wall") {
+        const a = aimStart ?? aim; const L = Math.hypot(aim.x - a.x, aim.y - a.y); const m = Math.min(1, (sp.len ?? wallLen(armed)) / (L || 1));
+        g.setLineDash([6, 4]); g.strokeStyle = fire ? "rgba(230,110,40,.9)" : "rgba(120,180,220,.95)"; g.lineWidth = scale * 1.6;
+        g.beginPath(); g.moveTo(X(a.x), Y(a.y)); g.lineTo(X(a.x + (aim.x - a.x) * m), Y(a.y + (aim.y - a.y) * m)); g.stroke();
+      } else if (k === "throw") {
+        const l = throwLanding(aim.x, aim.y); const x0 = X(TOWER.x), y0 = Y(TOWER.y - 6), x1 = X(l.x), y1 = Y(l.y);
+        g.strokeStyle = C("--red"); g.lineWidth = 2.5; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+        const ang = Math.atan2(y1 - y0, x1 - x0); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x1 - Math.cos(ang - 0.4) * 12, y1 - Math.sin(ang - 0.4) * 12); g.moveTo(x1, y1); g.lineTo(x1 - Math.cos(ang + 0.4) * 12, y1 - Math.sin(ang + 0.4) * 12); g.stroke();
+        g.setLineDash([4, 4]); g.globalAlpha = 0.75; g.beginPath(); g.arc(x1, y1, sp.r * scale, 0, 7); g.stroke(); g.fillStyle = "rgba(158,52,35,.08)"; g.fill();
+      } else if (k === "dir") {
+        const a = Math.atan2(aim.y - TOWER.y, aim.x - TOWER.x); g.setLineDash([5, 5]); g.strokeStyle = C("--red"); g.lineWidth = 6 * scale / 4;
+        g.beginPath(); g.moveTo(X(TOWER.x + Math.cos(a) * 8), Y(TOWER.y + Math.sin(a) * 8)); g.lineTo(X(TOWER.x + Math.cos(a) * 48), Y(TOWER.y + Math.sin(a) * 48)); g.stroke();
+      } else {
+        g.setLineDash([5, 5]); g.strokeStyle = C("--red"); g.lineWidth = 2; g.beginPath(); g.arc(X(aim.x), Y(aim.y), sp.r * scale, 0, 7); g.stroke(); g.fillStyle = "rgba(158,52,35,.08)"; g.fill();
+      }
+      g.restore();
     }
+    // yere çizilmiş şeritler: ateş duvarı alev alev yanar; buz ve taş duvarı kendi renginde
+    for (const l of n.lines) {
+      const len = Math.hypot(l.x2 - l.x1, l.y2 - l.y1); const nSeg = Math.max(2, Math.round(len / 3.2)); const fade = Math.min(1, l.t / 1.2);
+      for (let i = 0; i <= nSeg; i++) { const x = l.x1 + (l.x2 - l.x1) * i / nSeg, y = l.y1 + (l.y2 - l.y1) * i / nSeg;
+        if (l.kind === "ates") drawFlames(g, embers, X(x), Y(y), scale * 3.3, l.id * 13 + i, now, fade);
+        else { g.save(); g.globalAlpha = fade * 0.9; g.fillStyle = l.kind === "buz" ? "rgba(200,230,242,.95)" : "rgba(150,130,105,.9)"; g.strokeStyle = l.kind === "buz" ? "#4E7F8F" : "#6B5A40"; g.lineWidth = 1.2;
+          g.beginPath(); g.moveTo(X(x) - scale * 1.4, Y(y)); g.lineTo(X(x) - scale * 0.4, Y(y) - scale * 3.2); g.lineTo(X(x) + scale * 0.9, Y(y) - scale * 2.2); g.lineTo(X(x) + scale * 1.4, Y(y)); g.closePath(); g.fill(); g.stroke(); g.restore(); } }
+    }
+    // atılan büyünün izi
+    for (let i = streaks.length - 1; i >= 0; i--) { const t = (now - streaks[i].t) / 260; if (t > 1) { streaks.splice(i, 1); continue; } const st = streaks[i];
+      g.strokeStyle = `rgba(240,140,50,${1 - t})`; g.lineWidth = scale * 1.4 * (1 - t * 0.5); g.beginPath(); g.moveTo(X(st.x1), Y(st.y1)); g.lineTo(X(st.x1 + (st.x2 - st.x1) * Math.min(1, t * 2)), Y(st.y1 + (st.y2 - st.y1) * Math.min(1, t * 2))); g.stroke(); }
+    drawEmbers(g, embers, now);
     // adamlar kulenin çevresinde
     for (const h of n.helpers) { const hx = TOWER.x + Math.cos(h.a) * 11, hy = TOWER.y + Math.sin(h.a) * 8 + 4; artUrl("dusman_h_" + h.role) ? figure("dusman_h_" + h.role, hx, hy, 9, Math.cos(h.a) < 0) : figure("poz_kahraman_durus", hx, hy, 9, Math.cos(h.a) < 0, ENEMIES["h_" + h.role]?.tint ?? "none"); }
     // kule ve sen
@@ -370,7 +418,9 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
         pts.slice(1).forEach(([x, y], i) => impacts.push(Object.assign(impact(x, y, scale * 4, seed + i, now), { t0: now + i * 70 })));
         sfx("spark"); if (speed === 1) sfx("thunder");
       }
-      if (f.k === "spell") {
+      if (f.k === "spell" && f.from) streaks.push({ x1: f.from[0], y1: f.from[1], x2: f.x, y2: f.y, t: now });
+      if (f.k === "spell" && f.wall) { pops.push({ x: f.x, y: f.y - 8, t: now, text: n.spells[f.id]?.name ?? "", color: C("--blue"), dur: 1000 }); }
+      else if (f.k === "spell") {
         if (f.kind === "simsek") {
           const px = X(f.x), py = Y(f.y); bolts.push({ b: skyBolt([px, py], -10, (now | 0) % 9973), t0: now, delay: 0, dur: 520 }); impacts.push(impact(px, py, f.r * scale, (now | 0) % 997, now)); whiteFlash = 1; sfx("thunder");
           for (const id of f.hits.slice(0, 5)) { const t = n.foes.find(q => q.id === id); if (t) impacts.push(impact(X(t.x), Y(t.y), scale * 5, id, now + 60)); }
