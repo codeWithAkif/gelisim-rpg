@@ -40,7 +40,9 @@ import { applyDaylight } from "./daylight";
 import { notifyAt, clearNotify } from "../notify";
 import { showTitle } from "./title";
 import { applySettings } from "./settings";
-import { sfx, buzz, ambience, unlockAudio } from "./feel";
+import { sfx, buzz, ambience, unlockAudio, theme } from "./feel";
+import { playMusic } from "./music";
+import { scapeOf, musicCandidates } from "../engine/soundscape";
 import { darkness } from "./daylight";
 import { beginSearch, collectFind, deliverRequest } from "../engine/explore";
 import { openSeek } from "./seek-view";
@@ -73,7 +75,16 @@ export function startApp(root: HTMLElement) {
 
   function persist() { save(s); }
   let titleOpen = true;
-  function syncAmbience() { ambience(!titleOpen && !document.querySelector(".battle, .minigame"), darkness(s.minute) > 0.7); }
+  /** Ortam sesi ve müzik: yere, vakte ve açık ekrana göre (savaş, kuşatma, Ölçer işi). */
+  function syncAmbience() {
+    const night = darkness(s.minute) > 0.7; const pl = place(s.journey ? s.journey.to : s.location);
+    const fight = !!document.querySelector(".battle, .siege"); const busyScreen = fight || !!document.querySelector(".minigame");
+    ambience(!titleOpen && !busyScreen, night, scapeOf(pl, !!s.journey));
+    playMusic(titleOpen ? null : musicCandidates(pl?.region ?? "taspinar", night, fight ? "savas" : document.querySelector(".olcer") ? "olcer" : "bolge"));
+  }
+  // tam ekranlar (savaş, kuşatma, Ölçer, mini oyun) açılıp kapanınca ses de değişsin
+  let ambT = 0;
+  new MutationObserver(() => { clearTimeout(ambT); ambT = window.setTimeout(syncAmbience, 150); }).observe(document.body, { childList: true });
   window.addEventListener("gelisim-ayar", syncAmbience);
   document.addEventListener("visibilitychange", syncAmbience);
   function toast(t: string) { const el = root.querySelector("#toast")!; el.textContent = t; el.classList.add("on"); clearTimeout((toast as any).t); (toast as any).t = setTimeout(() => el.classList.remove("on"), 2400); }
@@ -194,6 +205,7 @@ export function startApp(root: HTMLElement) {
     // birden fazla sayfa birden açıldıysa (eski kayıt, art arda olaylar) tek özet pencere
     if (fresh.length > 1) {
       const last = fresh[fresh.length - 1];
+      theme("kisa");
       modal(`<p class="hand muted" style="margin:0">Defterin önceki sayfaları</p><h2>${esc(last.title)}</h2>
         <div>${fresh.slice(0, -1).map(m => `<div class="story-step done"><span class="mk" style="color:var(--green)">✓</span><span class="t">${esc(m.title)}</span></div>`).join("")}</div>
         <p style="font-size:18px;line-height:1.5">${esc(last.text)}</p>`, [{ label: "Deftere işle", cls: "primary", fn: () => after?.() }]);
@@ -201,7 +213,7 @@ export function startApp(root: HTMLElement) {
     }
     const show = (i: number) => {
       if (i >= fresh.length) { after?.(); return; }
-      const m = fresh[i]; sfx("page"); const pic = artUrl("hikaye_" + m.id);
+      const m = fresh[i]; sfx("page"); theme("kisa"); const pic = artUrl("hikaye_" + m.id);
       modal(`<p class="hand muted" style="margin:0">Yeni sayfa</p><h2>${esc(m.title)}</h2>${pic ? `<img class="story-art small" src="${pic}" alt="">` : ""}<p style="font-size:18px;line-height:1.5">${esc(m.text)}</p>`,
         [{ label: "Deftere işle", cls: "primary", fn: () => show(i + 1) }]);
     };
@@ -571,7 +583,7 @@ export function startApp(root: HTMLElement) {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) journeyTick(); });
 
   function beginIntro() {
-    showIntro(name => { s.name = name; s.introDone = true; persist(); render(false); storyTick(); });
+    showIntro(name => { s.name = name; s.introDone = true; persist(); render(false); theme("tam"); storyTick(); });
   }
 
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });

@@ -38,7 +38,8 @@ export function showTitle(o: TitleOpts) {
         <p class="muted tiny" style="margin:0">Yürüme, saldırı, ateş topu ve hasar yazılarının hızı.</p></section>
       ${toggle("timing", "Savaşta parmak hareketleri", "Kurdun üstünden kesik çekmek, kaçmak için kaydırmak, büyü işaretini çizmek, itmek için sürüklemek. Kapalıysa savaş eskisi gibi zar ile.")}
       ${toggle("sound", "Ses efektleri", "Vuruş, adım, kâğıt hışırtısı.")}
-      ${toggle("ambient", "Ortam sesi", "Gündüz kuşlar ve rüzgâr, gece cırcırböcekleri.")}
+      ${toggle("ambient", "Ortam sesi", "Yere göre: yaylada çanlar, derede su, çarşıda uğultu, ocak başında çıtırtı; gece cırcırböcekleri.")}
+      ${toggle("music", "Müzik", "Annenin ezgisi ve bölge müzikleri.")}
       ${toggle("haptic", "Titreşim", "Vuruşta, kritikte ve yaralanınca.")}
       ${toggle("notify", "Bildirimler", "Çalışma bitince telefona haber ver.")}
       <section class="sec"><h3>Yazı boyutu</h3><div class="choices">${chip("text", "normal", "Normal")}${chip("text", "buyuk", "Büyük")}</div></section>

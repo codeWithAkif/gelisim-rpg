@@ -1,8 +1,8 @@
 // Oyuncu ayarları (kayıttan ayrı tutulur; yeni oyun başlatmak ayarları silmez).
-export interface Settings { anim: "yavas" | "normal" | "hizli" | "kapali"; text: "normal" | "buyuk"; notify: boolean; sound: boolean; ambient: boolean; haptic: boolean; timing: boolean }
-export type BoolSetting = "notify" | "sound" | "ambient" | "haptic" | "timing";
+export interface Settings { anim: "yavas" | "normal" | "hizli" | "kapali"; text: "normal" | "buyuk"; notify: boolean; sound: boolean; ambient: boolean; music: boolean; haptic: boolean; timing: boolean }
+export type BoolSetting = "notify" | "sound" | "ambient" | "music" | "haptic" | "timing";
 const KEY = "gelisim-ayarlar";
-const DEF: Settings = { anim: "normal", text: "normal", notify: true, sound: true, ambient: true, haptic: true, timing: true };
+const DEF: Settings = { anim: "normal", text: "normal", notify: true, sound: true, ambient: true, music: true, haptic: true, timing: true };
 let cache: Settings | null = null;
 
 export function settings(): Settings {
