@@ -79,3 +79,16 @@ test("kötü çizilen büyü dağılır, iyi çizilen daha çok yakar; iyi itme 
   }
   expect(ok).toBeGreaterThan(ok2); expect(base).toBeGreaterThan(0);
 });
+
+test("12 işaret (6 element, 6 biçim) birbirine karışmaz: her şablon kendini tanır, ikinci aday belirgin geride", async () => {
+  const { RUNES, recognize, ELEMENT_RUNES, FORM_RUNES } = await import("../src/engine/gesture");
+  const ids = [...ELEMENT_RUNES, ...FORM_RUNES];
+  for (const id of ids) {
+    // şablonu 200 piksellik kutuya ölçekle, biraz titret (elle çizim)
+    const pts = RUNES[id].pts.flatMap(([x, y], k, a) => { const out = [{ x: 20 + x * 200, y: 20 + y * 200 }];
+      if (k < a.length - 1) { const [x2, y2] = a[k + 1]; for (let j = 1; j < 6; j++) out.push({ x: 20 + (x + (x2 - x) * j / 6) * 200 + Math.sin(k * 7 + j) * 3, y: 20 + (y + (y2 - y) * j / 6) * 200 + Math.cos(k * 5 + j) * 3 }); }
+      return out; });
+    const best = recognize(pts, ids); expect(best.id, id).toBe(id); expect(best.q, id).toBeGreaterThan(0.6);
+    const second = recognize(pts, ids.filter(x => x !== id)); expect(second.q, `${id} ~ ${second.id}`).toBeLessThan(best.q - 0.15);
+  }
+});

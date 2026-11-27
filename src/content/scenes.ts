@@ -169,6 +169,7 @@ export const SCENES: Record<string, Scene> = {
     m("Avucumda bir an için gerçek bir alev durdu."),
     m("Nefesim titredi; alev de titredi. Söndüğünde avucum hâlâ sıcaktı."),
     m("Sönen ateş bir yere gider. Bu sefer benim avucuma geldi."),
+    anne("Önce alev, sonra hilal: ateş top olur. Biçimi değiştir, ateş başka bir şey olur."),
   ] },
 
   /** Ateş ve kurt: büyüyle kazanılan ilk savaş; Hasan gördü; köyde fısıltı. */
@@ -385,6 +386,8 @@ export const SCENES: Record<string, Scene> = {
     m("Annem yaşıyor. Kuzeyde, Ayazkale'de.", true),
     { t: "gorsel", art: "hikaye_k_derya" },
     soz("derya", "Geçit karla kapalı. Ama kar kurtlarından korkmuyorsan yol var."),
+    soz("derya", "Bir de geçidin ağzında Kayhan'ın gümrükçüsü var. Loncanın beratı olmadan geçeni geri çevirmez; donmaya bırakır."),
+    soz("derya", "Berat ucuz değil. Selim'e git; parayı nasıl çoğaltacağını o bilir."),
     { t: "gorsel", art: null },
     { t: "baslik", text: "Bölüm 2 sona erdi", sub: "Sırada: Ayazkale" },
   ] },
@@ -587,6 +590,7 @@ export const SCENES: Record<string, Scene> = {
     soz("yaren", "Bu ay gelmedi."),
     { t: "bekle", ms: 900 },
     soz("yaren", "Saray avlusundan dehlize bir kapı iner. Mutfağın yanından geçer. Yolu gösteririm."),
+    soz("yaren", "Ama muhafızların ne zaman değiştiğini bilmeden girme. Saray kâtibinin yeğeni çizelgeyi satar. Ucuz değil."),
     soz("yaren", "Kızımı bulursan…"),
     m("Cümlesini bitirmedi. Ben de sormadım."),
   ] },
@@ -657,6 +661,63 @@ export const SCENES: Record<string, Scene> = {
     m("\"Sönen her ateş, başka bir ocakta yanar. Ve bir gün evine döner.\"", true),
     { t: "gorsel", art: null },
     { t: "baslik", text: "Son", sub: "Defterin açık kalıyor" },
+  ] },
+
+  /* ================= Selim'in defteri: ticaretin yan hikâyesi ================= */
+
+  /** Selim'in dersi: ucuz al, pahalı sat; ilk araba. */
+  selim_ders: { id: "selim_ders", beats: [
+    { t: "ses", layers: [{ id: "carsi", vol: 0.6 }] },
+    { t: "gorsel", art: "hikaye_k_selim" },
+    soz("selim", "Annen sana ısıyı öğretmiş. Ben de sana parayı öğreteyim; ikisi aynı kurala bakar."),
+    soz("selim", "Bir yerde bol olan şey ucuzdur. Az olduğu yere götürürsen değerlenir."),
+    m("Peynir Taşpınar'da ucuz, Karaçam'da pahalı. Kumaş tam tersi."),
+    soz("selim", "Al şu arabayı. Tekeri gıcırdar ama yolu bilir."),
+    m("Bir araba. Benim arabam.", true),
+    soz("selim", "Bir şey daha: yükü tek başına yollama. Haydudun gözü korumasız arabadadır."),
+  ] },
+
+  /** İlk yük: kârla dönen ilk kervan; izci öğüdü. */
+  selim_ilk_yuk: { id: "selim_ilk_yuk", beats: [
+    { t: "ses", layers: [{ id: "carsi", vol: 0.7 }] },
+    { t: "gorsel", art: "yer_karacam" },
+    m("İlk kervanım kârla döndü. Avucumda bakırlar; sayıyorum, yeniden sayıyorum."),
+    soz("selim", "Gördün mü? Isı gibi: bir yerde birikir, bir yerde eksilir."),
+    soz("selim", "Ama yol her zaman sakin geçmez. Bir izci bul. Gözü olmayan kervan kördür."),
+  ] },
+
+  /** Kayıp kervan: Selim'in izcisiz kervanı soyulur; tekerlekte yine tebeşir. */
+  kayip_kervan: { id: "kayip_kervan", beats: [
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.4 }, { id: "carsi", vol: 0.2 }] },
+    { t: "gorsel", art: "yer_karacam_han" },
+    m("Selim'in kendi kervanı dönmedi. İki gün sonra arabalar boş geldi."),
+    { t: "incele", prompt: "Boş arabalar hanın avlusunda.", spots: [
+      { x: 0.88, y: 0.86, label: "Tekerlek", text: "Tekerleğin iç yüzünde tebeşirle çizilmiş küçük bir çarpı. Yine." },
+      { x: 0.4, y: 0.62, label: "Sürücü", text: "Sürücü kapının dibinde oturmuş. İzci tutmamışlar; ucuz olsun diye." },
+    ] },
+    soz("selim", "Tek başına tüccar haydudun lokmasıdır."),
+    soz("selim", "Loncaya gir. Lonca kervanına kimse kolay dokunmaz; loncadan mal alan da ucuza alır."),
+    soz("selim", "Aidat yüz bakır. Kâtip deponun başında oturur."),
+  ] },
+
+  /** Lonca kapısı: annenin adının yazıldığı deftere adın yazılır. */
+  lonca_kapisi: { id: "lonca_kapisi", beats: [
+    { t: "ses", layers: [{ id: "carsi", vol: 0.3 }] },
+    { t: "gorsel", art: "yer_karacam_lonca" },
+    m("Isı Loncası'nın defterine adımı yazdılar."),
+    m("Annemin adının yazıldığı deftere."),
+    m("Kâtip mührü bastı. Kar tanesi değil; terazi.", true),
+    soz("selim", "Artık pazarlık senin lehine. Bir de… kendi hanını düşün. Kervanların bir yerde dinlenmeli."),
+  ] },
+
+  /** Kendi kervansarayın: ticaret hikâyesinin sonu. */
+  kervansaray: { id: "kervansaray", beats: [
+    { t: "ses", layers: [{ id: "carsi", vol: 0.5 }] },
+    { t: "gorsel", art: "yer_karacam_han" },
+    m("Karaçam'ın doğu kapısında eski bir kervansaray. Artık benim."),
+    m("Arabalarım avluda dinleniyor. Korumalarım sıcak çorba içiyor."),
+    soz("selim", "Annen ısının bir yere toplandığını söylerdi. Para da öyle."),
+    soz("selim", "Ama sen onu tutmadın; yola çıkardın. Haydutlar artık bu kapının kimin olduğunu biliyor."),
   ] },
 };
 

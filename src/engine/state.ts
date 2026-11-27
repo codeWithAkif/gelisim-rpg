@@ -66,6 +66,9 @@ export interface GameState {
   partners?: Record<string, { amount: number; since: number; earned: number; acc?: number }>; // acc: henüz bütün bakıra varmamış pay // ortaklıklar
   yapi?: Record<string, { n: number; lv: number }>; // mühendislik: kalıcı yapılar (engine/engineering.ts)
   ledger?: { day: number; text: string; amount: number }[];         // hesap defteri
+  trade?: import("./trade").TradeState;           // kervan ticareti: arabalar, yoldaki kervanlar (engine/trade.ts)
+  feast?: number;
+  spellbook?: string[];                           // keşfedilen büyüler (sentez; engine/synthesis.ts)                                 // zengin sofranın kurulduğu gün: o gece uykuda gelişim fazla
   log: LogEntry[];
 }
 

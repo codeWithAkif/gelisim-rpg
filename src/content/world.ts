@@ -137,6 +137,7 @@ export interface QuestDef {
   night?: boolean;       // gece yapılır: gündüz başlanırsa akşam beklenir (saat ilerler)
   scene?: string;        // bitince ödül penceresi yerine bu sahne oynar (content/scenes.ts)
   before?: string;       // savaştan önce bir kez oynanan sahne (ör. Hasan pusuyu öğretir)
+  needPaper?: string;    // bu iş için parayla alınan bir belge gerekir (content/trade.ts PAPERS)
 }
 export const QUESTS: QuestDef[] = [
   {

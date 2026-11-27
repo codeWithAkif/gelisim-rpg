@@ -8,19 +8,22 @@ import {
   previewAttack, knownWeakPoints, dist, visible, sightRange, threatMap, unitById, playerPush, pushChance, pushTarget,
   playerDefend, canThrowTorch, throwTorch, key, WIND_NAMES, incomingAttack, hasBow, previewShot, playerShoot,
 } from "../engine/combat";
-import { slashPrompt, dodgePrompt, runePrompt, pushPrompt, bowPrompt } from "./gesture-view";
+import { slashPrompt, dodgePrompt, runePrompt, pushPrompt, bowPrompt, castDrawPrompt } from "./gesture-view";
+import { synthesize, discover } from "../engine/synthesis";
+import { ELEMENT_RUNES, FORM_RUNES } from "../engine/gesture";
+import type { FormId } from "../content/synthesis";
 import { skillEase } from "../engine/timing";
 import { spellRunes } from "../engine/gesture";
 import { settings } from "./settings";
 import { sfx, buzz } from "./feel";
 import { TERRAIN, ENEMIES, MAPS } from "../content/world";
 import { esc, wolfSketch, humanSketch } from "./sketch";
-import { spellOptions, previewSpell, castSpell, hexRange, areaHexes, SPELL_FX } from "../engine/magic";
+import { spellOptions, previewSpell, castSpell, hexRange, areaHexes, SPELL_FX, failedCast } from "../engine/magic";
 import { MapRenderer } from "./battle-render";
 import { type CoachStep, type CoachEvent, coachLine, coachNext, coachLearned } from "../engine/coach";
 import { artUrl } from "./art";
 
-type Mode = { k: "normal" } | { k: "spell"; id: string; target?: XY } | { k: "torch" };
+type Mode = { k: "normal" } | { k: "spell"; id: string; target?: XY; q?: number } | { k: "torch" };
 
 export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, questId: string | undefined,
   onEnd: (o: BattleOutcome, b: Battle) => void, persist: () => void) {
@@ -204,11 +207,15 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
       body = `<p class="muted tiny" style="margin:0">Mavi taralı altıgenlere dokunarak yürü, düşmana dokunarak incele. Kırmızı gölge: düşmanın bir sonraki turda saldırabileceği yer.${b.night || b.weather === "sis" ? " Görüşün kısıtlı." : ""}</p>`;
     }
     const spells = spellOptions(cfg, s);
+    // zamanlama oyunları açıksa büyü aklından çizilir (dizi gösterilmez); kapalıysa listeden seçilir
+    const drawMode = settings().timing && s.knownElements.length > 0;
+    const known = spells.filter(o => o.ok).map(o => o.spell.name);
     const tools = mode.k === "normal" ? `<div class="actions">
-      ${spells.map(o => `<button class="btn small blue" data-spell="${esc(o.spell.id)}" ${!o.ok || !can ? "disabled" : ""} title="${esc(o.reason ?? "")}">${esc(o.spell.name)} · ${o.spell.manaCost ?? 0}</button>`).join("")}
+      ${drawMode ? `<button class="btn small blue" data-b="draw" ${!can ? "disabled" : ""}>Büyü çiz · mana ${Math.floor(s.mana)}</button>`
+        : spells.map(o => `<button class="btn small blue" data-spell="${esc(o.spell.id)}" ${!o.ok || !can ? "disabled" : ""} title="${esc(o.reason ?? "")}">${esc(o.spell.name)} · ${o.spell.manaCost ?? 0}</button>`).join("")}
       ${b.torch.has && !b.torch.thrown ? `<button class="btn small" data-b="torch" ${!can ? "disabled" : ""}>Meşale at</button>` : ""}
       <button class="btn small" data-b="defend" ${!can ? "disabled" : ""}>Savun</button>
-    </div>` : "";
+    </div>${drawMode && known.length ? `<p class="muted tiny" style="margin:0">Bildiklerin: ${esc(known.slice(0, 8).join(", "))}${known.length > 8 ? ` ve ${known.length - 8} büyü daha` : ""}. Dizileri defterinde.</p>` : ""}` : "";
     panel.innerHTML = `${log}${body}${tools}
       <div class="row" style="justify-content:space-between"><span class="muted tiny">${esc(terr.name)} · hareket ${p.moveLeft}${b.wind.strength ? ` · rüzgâr ${WIND_NAMES[b.wind.dir]}` : ""}</span>
       <span class="row"><button class="btn small" data-b="end" ${busy || b.phase !== "player" ? "disabled" : ""}>Turu bitir</button>${atEdge ? `<button class="btn small red" data-b="flee" ${busy ? "disabled" : ""}>Geri çekil</button>` : ""}</span></div>`;
@@ -302,12 +309,32 @@ export function openBattle(cfg: Config, s: GameState, sc: Scenario, plan: Plan, 
         playerShoot(cfg, s, b, tgt, q); after();
       })(); break;
       case "observe": if (tgt) { observe(cfg, s, b, tgt); after(); } break;
+      case "draw": void (async () => {
+        busy = true; renderPanel();
+        const allowed = [...ELEMENT_RUNES.filter(r => s.knownElements.includes(r)), ...FORM_RUNES];
+        const lv = Math.max(...s.knownElements.map(e => s.attrs[{ el_ates: "ates" }[e] ?? e.replace("el_", "") + "_buyu"]?.level ?? 0), 0);
+        const res = await castDrawPrompt(stage(), { allowed, ease: skillEase(s, "odak"), limitMs: 9000 + Math.min(6000, lv * 150) });
+        busy = false;
+        if (!res) { renderPanel(); return; }
+        const form = res.runes[res.runes.length - 1]?.startsWith("f_") ? res.runes[res.runes.length - 1].slice(2) as FormId : undefined;
+        const els = res.runes.filter(r => !r.startsWith("f_"));
+        if (!form) { failedCast(s, b, res.timeout ? "Zaman doldu; biçimi çizemedin." : "Biçimsiz büyü dağıldı."); sfx("bad"); after(); return; }
+        const r = synthesize(s, els, form);
+        if (!r.ok) { failedCast(s, b, r.reason ?? ""); sfx("bad"); after(); return; }
+        const sp = cfg.spell.get(r.spellId!)!;
+        if (r.spellId!.startsWith("sy_") && discover(s, r.spellId!)) { sfx("perfect"); buzz("heavy"); b.log.unshift(`Yeni büyü: ${sp.name}! Deftere yazdın.`); persist(); }
+        const opt = spellOptions(cfg, s).find(o => o.spell.id === r.spellId);
+        if (!opt?.ok) { failedCast(s, b, `${sp.name}: ${opt?.reason ?? "yapamadın"}.`); sfx("bad"); after(); return; }
+        const p = player(b); const tg = selected ? unitById(b, selected) : undefined;
+        mode = { k: "spell", id: sp.id, q: res.q, target: tg && tg.hp > 0 && !tg.fled && dist(p.x, p.y, tg.x, tg.y) <= hexRange(sp) ? [tg.x, tg.y] : undefined };
+        renderPanel();
+      })(); break;
       case "defend": playerDefend(b); after(); break;
       case "torch": mode = { k: "torch" }; renderPanel(); break;
       case "cast": if (mode.k === "spell" && mode.target) void (async () => {
-        const m = mode as { k: "spell"; id: string; target: XY }; const sp = cfg.spell.get(m.id)!;
-        let q: number | undefined; const runes = spellRunes(cfg, sp.sources.map(x => x.id));
-        if (settings().timing && runes.length) {
+        const m = mode as { k: "spell"; id: string; target: XY; q?: number }; const sp = cfg.spell.get(m.id)!;
+        let q: number | undefined = m.q; const runes = spellRunes(cfg, sp.sources.map(x => x.id));
+        if (q === undefined && settings().timing && runes.length) {
           busy = true; const lv = sp.mastery ? s.attrs[sp.mastery]?.level ?? 0 : 0;
           q = await runePrompt(stage(), { runes, spellName: sp.name, ease: skillEase(s, sp.mastery ?? "odak") * 0.6 + skillEase(s, "odak") * 0.4, guide: Math.max(0.15, Math.min(0.8, 0.8 - (lv - 5) / 40)) });
           busy = false;

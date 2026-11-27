@@ -15,11 +15,17 @@ export function advanceStory(s: GameState): Milestone[] {
       if (e?.learnElement && !s.knownElements.includes(e.learnElement)) s.knownElements.push(e.learnElement);
       if (e?.items) for (const [k, n] of Object.entries(e.items)) s.inventory[k] = (s.inventory[k] ?? 0) + n;
       if (e?.flag) s.story.flags[e.flag] = s.day;
+      if (e?.cart) { s.trade ??= { carts: 0, caravans: [], seq: 1 }; s.trade.carts += e.cart; }
       log(s, `Yeni sayfa: ${m.title}`, "quest");
       out.push(m); changed = true;
     }
   }
   return out;
+}
+
+/** Görünür yan hikâyeler: bölümler boyu süren (after ile açılan) ve henüz bitmemiş olanlar. */
+export function openSideStories(s: GameState): Milestone[] {
+  return CHAPTERS.flatMap(c => c.milestones).filter(m => m.side && m.after && s.story.reached.includes(m.after) && !s.story.reached.includes(m.id));
 }
 
 export function currentChapter(s: GameState): Chapter {

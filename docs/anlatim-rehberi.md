@@ -88,6 +88,13 @@ satırı → "Son · Defterin açık kalıyor".
 Bölüm 2'de açılan iz burada kapanır: arabaları Hancı Yaren işaretledi; kızı yedi yaşından beri Sungur'un elindeydi.
 Her ay bir tutam saç; o ay gelmemişti. Kötü değil, çaresiz: oyuncu onu cezalandırmaz, kızını kurtarır.
 
+## Yan hikâyeler
+
+- Bölümler boyu süren yan hikâye: kilometre taşına `side: true` ve `after: "<sayfa>"` ver; Hikâye sekmesinde "Yan hikâyeler"
+  altında görünür, "Sıradaki adım" kartı altta anar. Örnek: Selim'in defteri (`f_ders` … `f_kervansaray`).
+- Annenin deney sayfaları (`src/content/mother-pages.ts`): annenin sesiyle bir bilmece; cevabı bir büyü. Bilmece cevabı
+  açıkça söylemez, işaretlerin adlarını ima eder ("yere yatır, sıra sıra diz" = yatay çizgi).
+
 ## Kontrol listesi
 
 - [ ] Her satır telefonda en çok iki satır.

@@ -5,7 +5,7 @@ import { questList, npc, questKind, KIND_ORDER } from "./quests";
 import { minutesLeft } from "./state";
 import { canSearch, dailyRequests } from "./explore";
 import { activityPlace, place } from "./travel";
-import { nextMilestone } from "./story";
+import { nextMilestone, openSideStories } from "./story";
 import { NPC_PLACE } from "../content/map";
 import { FINDS, SEARCH_MINUTES } from "../content/explore";
 import { MARKETS } from "../content/world";
@@ -14,10 +14,13 @@ import { lodgingAt } from "./rest";
 import { sitesAt, TIER_NAMES } from "./scavenge";
 import { olcerOpen, nextLevel, solvedLevels, OLCER_PLACE, OLCER_LEVELS, canStartOlcer } from "./olcer";
 import { PET_TYPES, canAdopt } from "./pet";
+import { pagesAt } from "./synthesis";
+import { tradeOpen, postAt, tradeOf, cartsFree, papersAt, hasPaper, feastHere } from "./trade";
+import { REGION_NAMES, paper } from "../content/trade";
 import { homeBed, candidatesAt, canHire, canBuyHouse, HOUSES, HOME_PLACES, ROLE_NAMES } from "./estate";
 
 export interface PlaceAction {
-  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "study" | "market" | "show-place" | "partner" | "sleep" | "scav" | "pet-adopt" | "hire" | "house" | "olcer";
+  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "study" | "market" | "show-place" | "partner" | "sleep" | "scav" | "pet-adopt" | "hire" | "house" | "olcer" | "caravan" | "paper" | "feast" | "mpage";
   id: string; label: string; sub?: string; disabled?: string; primary?: boolean;
 }
 /** Bulunduğun yerde yapılabilecekler, önem sırasıyla. */
@@ -32,6 +35,12 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
     out.push({ act: "deliver", id: r.def.id, label: `${r.npcName}'in isteği`, sub: r.def.text, disabled: r.have ? undefined : "Çantanda yeterince yok" });
   if (FINDS[placeId]) { const c = placeId === s.location ? canSearch(s) : { ok: true }; out.push({ act: "search", id: "", label: `Etrafı ara (${SEARCH_MINUTES} dk)`, disabled: c.ok ? undefined : c.reason }); }
   if (MARKETS[placeId]) out.push({ act: "market", id: placeId, label: MARKETS[placeId].name, sub: "Al, sat" });
+  // kervan ticareti: ticaret yerinde yük alıp kervan yollarsın
+  const post = postAt(placeId);
+  if (post && tradeOpen(s)) { const t = tradeOf(s); out.push({ act: "caravan", id: placeId, label: `Kervan kur: ${REGION_NAMES[post]}`, sub: t.carts ? `${cartsFree(s)}/${t.carts} araba boşta · ${t.caravans.length} kervan yolda` : "Önce bir araba al", disabled: placeId === s.location ? undefined : "Oraya git" }); }
+  for (const p of pagesAt(s, placeId)) out.push({ act: "mpage", id: p.id, label: "Annenin bir sayfası", sub: `${p.giver} · bir bilmece`, disabled: placeId === s.location ? undefined : "Oraya git", primary: true });
+  for (const p of papersAt(s, placeId)) out.push({ act: "paper", id: p.id, label: `Satın al: ${p.name}`, sub: `${p.seller} · ${p.cost} bakır`, disabled: placeId === s.location ? (s.money >= p.cost ? undefined : `${p.cost} bakır gerekir; cebinde ${s.money} var`) : "Oraya git", primary: true });
+  if (placeId === s.location) { const f = feastHere(s); if (f) out.push({ act: "feast", id: "", label: `Zengin sofra (${f.cost} bakır)`, sub: "Bu gece uykuda kasların %25 daha çok gelişir", disabled: s.feast === s.day ? "Bu akşam zaten doydun" : s.money < f.cost ? `${f.cost} bakır gerekir` : undefined }); }
   for (const p of partnerAt(placeId)) { const lock = partnerLock(s, p); const st = stake(s, p.id);
     if (!lock || st) out.push({ act: "partner", id: p.id, label: `Ortaklık: ${p.name}`, sub: st ? `Payın: ${st} bakır` : `En az ${p.min} bakır` }); }
   for (const pt of Object.values(PET_TYPES)) if (pt.shop === placeId) { const c = canAdopt(s, pt.id, placeId); out.push({ act: "pet-adopt", id: pt.id, label: `Yavru al: ${pt.species}`, sub: `${pt.price} bakır · ${pt.role}`, disabled: c.ok ? undefined : c.reason }); }
@@ -75,6 +84,7 @@ export function nextStep(s: GameState): NextStep | null {
   if (r && r.kind === "ana" && !r.also) {
     const side = questList(s).find(v => (v.status === "aktif" || v.status === "yeni") && questKind(v.def) === "hikaye" && v.def.title !== r.title);
     if (side) r.also = { title: side.def.title, kind: "hikaye" };
+    else { const ss = openSideStories(s)[0]; if (ss) r.also = { title: ss.title, kind: "hikaye" }; }
   }
   return r;
 }
@@ -97,6 +107,11 @@ function stepCore(s: GameState): NextStep | null {
     if (q.status === "yeni") return giverAt === s.location
       ? { title: q.def.title, text: `${g.name} burada. İşi üstlen.`, act: "accept", id: q.def.id, button: "Üstlen", kind }
       : { title: q.def.title, text: `${g.name} ile konuş: ${place(giverAt)?.name ?? ""}.`, act: "show-place", id: giverAt, button: "Haritada göster", kind };
+    // parayla alınan belge gerekiyorsa önce o
+    if (q.def.needPaper && !hasPaper(s, q.def.needPaper)) { const pp = paper(q.def.needPaper)!;
+      return s.money >= pp.cost
+        ? { title: `Önce: ${pp.name}`, text: `${pp.seller} satıyor (${pp.cost} bakır): ${place(pp.place)?.name ?? ""}.`, act: s.location === pp.place ? "paper" : "show-place", id: s.location === pp.place ? pp.id : pp.place, button: s.location === pp.place ? "Satın al" : "Haritada göster", kind }
+        : { title: `Önce: ${pp.name}`, text: `${pp.cost} bakır gerekir; cebinde ${s.money} var. Kervanla ticaret yap, adamlarını işe yolla.`, act: "show-place", id: pp.place, button: "Kâtibi göster", kind }; }
     if (q.def.at !== s.location) return { title: q.def.title, text: `${place(q.def.at)?.name ?? ""} tarafına git.`, act: "show-place", id: q.def.at, button: "Haritada göster", kind };
     const fight = !!(q.def.battle || q.def.siege);
     return { title: q.def.title, text: fight ? (q.def.siege ? "Buradasın. Savunmaya hazırlan." : "Buradasın. Savaşa hazırlan.") : `Buradasın. ${q.def.doneText ?? "İşi yap"} (${q.def.minutes} dk).`,

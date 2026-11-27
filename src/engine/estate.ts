@@ -10,7 +10,14 @@ import { QUESTS } from "../content/world";
 import { RANKS, HOUSES, HOME_PLACES, VENTURES, HEROES, JOBS, heroDef, jobDef, ROLE_NAMES, type RankDef, type HeroRole, type VentureDef, type JobDef } from "../content/estate";
 
 export { RANKS, HOUSES, HOME_PLACES, VENTURES, HEROES, JOBS, heroDef, jobDef, ROLE_NAMES };
-export interface Hero { id: string; lv: number; xp: number; loyalty: number; hp: number; status: "evde" | "yolda" | "gorevde" | "yarali"; until?: number }
+export interface Hero { id: string; lv: number; xp: number; loyalty: number; hp: number; status: "evde" | "yolda" | "gorevde" | "yarali"; until?: number;
+  /** Ustalık: yaptığı işin sayısı (kervan seferi, işletmede gece, savaş). */
+  skill?: Partial<Record<HeroSkill, number>> }
+export type HeroSkill = "kervan" | "isletme" | "savas";
+export const SKILL_NAMES: Record<HeroSkill, string> = { kervan: "Kervan", isletme: "İşletme", savas: "Savaş" };
+/** Ustalık basamağı (0–5): kervan ve savaşta 2, 8, 18…; işletmede gece sayısı üç kat ister. */
+export function heroSkill(h: Hero, k: HeroSkill): number { const n = h.skill?.[k] ?? 0; return Math.min(5, Math.floor(Math.sqrt(n / (k === "isletme" ? 6 : 2)))); }
+export function practice(h: Hero, k: HeroSkill) { (h.skill ??= {})[k] = (h.skill[k] ?? 0) + 1; }
 export interface Mission { job: string; hero: string; end: number }
 export interface Venture { lv: number; worker?: string; stock: number; acc: number }
 export interface Estate { house?: number; homePlace?: string; ventures?: Record<string, Venture>; heroes?: Hero[]; party?: string[]; missions?: Mission[]; reports?: string[] }
@@ -68,7 +75,7 @@ export function homeBed(s: GameState): { name: string; quality: number } | null 
 /* ---------- adamlar ---------- */
 export function heroLimit(s: GameState): number { const h = houseOf(s); return h ? Math.min(rankNo(s), h.rooms) : 0; }
 export function heroStats(h: Hero) {
-  const d = heroDef(h.id)!; const power = d.power + (h.lv - 1) * 1.5;
+  const d = heroDef(h.id)!; const power = d.power + (h.lv - 1) * 1.5 + heroSkill(h, "savas") * 0.5;
   return { power, maxHp: Math.round(20 + power * 3 + h.lv * 4), dmg: [2 + Math.floor(power / 2), 4 + Math.round(power)] as [number, number], accuracy: 55 + power * 2, range: d.role === "okcu" ? 3 : 1 };
 }
 export const heroOf = (s: GameState, id: string) => est(s).heroes!.find(h => h.id === id);
@@ -147,7 +154,7 @@ export function afterBattle(s: GameState, ids: string[], result: "won" | "lost" 
   for (const id of ids) {
     const h = heroOf(s, id); if (!h) continue;
     if (hp?.[id] !== undefined) h.hp = Math.max(1, Math.min(heroStats(h).maxHp, Math.round(hp[id])));   // savaştan kalan can
-    const up = gainXp(s, h, result === "won" ? 6 : 2); if (up) out.push(up);
+    const up = gainXp(s, h, result === "won" ? 6 : 2); if (up) out.push(up); practice(h, "savas");
     if (result !== "won" && rng.chance(result === "lost" ? 55 : 20)) { h.status = "yarali"; h.until = s.day + 2; h.hp = Math.max(1, Math.round(heroStats(h).maxHp * 0.3)); est(s).party = est(s).party!.filter(x => x !== id); out.push(`${heroDef(id)!.name} yaralandı.`); }
     else h.loyalty = Math.min(100, h.loyalty + (result === "won" ? 2 : 0));
   }
@@ -231,8 +238,8 @@ export function nightly(cfg: Config, s: GameState): string[] {
     const v = e.ventures![d.id]; if (!v) continue; const w = v.worker ? heroOf(s, v.worker) : undefined;
     if (!w || w.status !== "evde") continue; const up = d.upkeep * v.lv;
     if (s.money < up) { out.push(`${d.name}: bakım parası yok, iş durdu.`); continue; }
-    s.money -= up; const hd = heroDef(w.id)!; const fit = hd.role === d.need ? 1 : 0.55;
-    v.acc += d.per * v.lv * fit * (0.7 + heroStats(w).power / 14) * (s.pet?.id === "kedi" && (s.pet.bond ?? 0) >= 50 ? 1.1 : 1); const k = Math.floor(v.acc); v.acc -= k; v.stock = Math.min(10 * v.lv, v.stock + k);
+    s.money -= up; const hd = heroDef(w.id)!; const fit = hd.role === d.need ? 1 : 0.55; practice(w, "isletme");
+    v.acc += d.per * v.lv * fit * (0.7 + heroStats(w).power / 14) * (1 + 0.08 * heroSkill(w, "isletme")) * (s.pet?.id === "kedi" && (s.pet.bond ?? 0) >= 50 ? 1.1 : 1); const k = Math.floor(v.acc); v.acc -= k; v.stock = Math.min(10 * v.lv, v.stock + k);
     if (k) out.push(`${d.name}: +${k} ${d.makes}.`);
   }
   // sadakat bitmiş olanlar gider
