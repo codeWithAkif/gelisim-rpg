@@ -48,7 +48,10 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
     type(stage.querySelector<HTMLElement>(".sc-text")!, text);
     if (!speed) tapHint.classList.add("on");
   };
+  let ended = false;
   const finish = () => {
+    // sahne bir kez biter: kapanırken gelen dokunuşlar sonrakini iki kez başlatmasın
+    if (ended) return; ended = true;
     el.classList.remove("on"); el.classList.add("off"); sceneAmbience(null);
     setTimeout(() => { el.remove(); onDone(); }, 700 * Math.max(0.3, speed || 0.3));
   };
@@ -121,7 +124,7 @@ export function playScene(scene: Scene, opts: SceneOpts, onDone: () => void) {
   };
 
   function next() {
-    if (busy) return;
+    if (busy || ended) return;
     if (typing) { clearInterval(typing.timer); typing.node.textContent = typing.full; typing = null; tapHint.classList.add("on"); return; }
     if (waiting) return;
     el.classList.remove("titlecard");

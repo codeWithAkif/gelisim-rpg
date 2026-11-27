@@ -61,6 +61,7 @@ test("bölüm 2 → 3 → 4: yerler açılır, elementler öğrenilir, hikâye b
 
   arrive(s, "ardic"); advanceStory(s);
   arrive(s, "ardic_kul"); finish(s, "kul_ana"); expect(s.knownElements).toContain("el_simsek");
+  expect(isOpen(place("ardic_saray")!, s)).toBe(false); finish(s, "saz_sesi"); expect(isOpen(place("ardic_saray")!, s)).toBe(true);
   finish(s, "saray_yolu"); expect(isOpen(place("ardic_dehliz")!, s)).toBe(true);
   finish(s, "buyuk_ocak");
   expect(s.story.reached).toContain("d_bahar");

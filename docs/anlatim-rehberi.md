@@ -76,12 +76,17 @@ formülleri, çentikler) → **Kuledeki kadın** (önce `kule_once`: yukarıdan 
 defteri görür; AYAZ → **Soğuk Ocak** (önce `ocak_once`: Kayhan ocağın başında) → buzlar damlar, Kayhan Sungur'u söyler,
 annem kalır, TOPRAK → "Bölüm 3 sona erdi" kartı.
 
-## Açık bırakılan iz (Bölüm 4 için)
+## Bölüm 4 örneği (final)
 
-Arabaları kim işaretliyor? Bölüm 2'de işaretleyen hanın içinden çıktı, balkondaki mum söndü. Bölüm 3'te geçitteki
-donmuş kervanda aynı çarpı, mutfakta "Karaçam hanından" mektubun altında bir saz çizimi; annem de "Karaçam hanındaki
-kadına sırtını dönme" dedi. Her şey Hancı Yaren'i gösteriyor. Bölüm 4 bunu çözmeli: Yaren gerçekten Sungur'un adamı mı,
-yoksa birisi onun sazını kullanıp onu mu suçlatıyor? Cevap oyuncuya bir yüzleşme sahnesiyle verilmeli.
+"Bölüm 4 · Ardıç" kartı → varış (inceleme: sarayın üstünde titreyen hava, asılan Ölçerlerin adları, ılık küller) →
+**Kül mahallesi** (Kül Ana o geceyi anlatır; geçmişe bakış incelemesi: ardıç kökünden yanıyor, Ölçerler yangına koşuyor;
+ŞİMŞEK) → **Sazın sesi** (gece) → Yaren'le yüzleşme → **Saray yolu** (önce `saray_once`: damlardan; sonra savaş) →
+Yaren'in kızı mutfakta; dehlizin ağzı (inceleme: kırağı ama sıcak hava, içe eğilen meşale) → **Büyük Ocak** (önce
+`buyuk_once`: Sungur mottoyu kendine çevirir, "Benimkinde.") → bahar: ısı dağılır, herkesin evine döner; defterin son
+satırı → "Son · Defterin açık kalıyor".
+
+Bölüm 2'de açılan iz burada kapanır: arabaları Hancı Yaren işaretledi; kızı yedi yaşından beri Sungur'un elindeydi.
+Her ay bir tutam saç; o ay gelmemişti. Kötü değil, çaresiz: oyuncu onu cezalandırmaz, kızını kurtarır.
 
 ## Kontrol listesi
 
