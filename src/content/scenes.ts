@@ -524,6 +524,140 @@ export const SCENES: Record<string, Scene> = {
     { t: "gorsel", art: null },
     { t: "baslik", text: "Bölüm 3 sona erdi", sub: "Sırada: Ardıç" },
   ] },
+
+  /* ================= Bölüm 4: Ardıç ================= */
+
+  /** Varış: is kokan başkent, yanık duvardaki adlar, sarayın üstünde titreyen hava. */
+  d_varis: { id: "d_varis", beats: [
+    { t: "gorsel", art: null },
+    { t: "baslik", text: "Bölüm 4", sub: "Ardıç" },
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.4 }, { id: "carsi", vol: 0.25 }] },
+    { t: "gorsel", art: "yer_ardic" },
+    m("Ardıç'ın kapısında iki muhafız. Yüzüme baktılar, yüküme baktılar, geçirdiler."),
+    { t: "gorsel", art: "hikaye_d_varis" },
+    m("Şehir is kokuyor. On iki yıl geçmiş; koku gitmemiş."),
+    { t: "incele", prompt: "Yanık şehrin üstüne yenisi kurulmuş.", spots: [
+      { x: 0.62, y: 0.22, label: "Saray", text: "Sarayın kubbeleri. Bacalarından duman çıkmıyor; ama üstünde hava titriyor, sıcak gibi." },
+      { x: 0.16, y: 0.6, label: "Duvar", text: "Yanık bir duvara kazınmış adlar. Asılan Ölçerler. Her adın yanında küçük bir terazi." },
+      { x: 0.5, y: 0.78, label: "Kül", text: "Çocuklar küllerin arasında oynuyor. Küller hâlâ ılık." },
+    ] },
+    m("Kral yıllardır görülmemiş. Şehri Vezir Sungur yönetiyor."),
+    m("Kül mahallesinde yaşlı bir kadın, Ölçerlerin çocuklarını soruyormuş."),
+  ] },
+
+  /** Kül Ana: o gecenin anlatısı (geçmişe bakış, inceleme); ŞİMŞEK sayfası; gece bir saz. */
+  d_kul: { id: "d_kul", beats: [
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.3 }] },
+    { t: "gorsel", art: "yer_ardic_kul" },
+    m("Yıkıntıların arasında yaşlı bir kadın ateş yakmış."),
+    soz("kulana", "Ölçer çocuğu. Gözlerin annene benziyor. Gel, otur."),
+    soz("kulana", "Sana o geceyi anlatayım."),
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.55 }] },
+    { t: "gorsel", art: "hikaye_d_kul" },
+    soz("kulana", "O gece gökten şimşek inmedi."),
+    soz("kulana", "Toprak yarıldı. Sarayın altından mavi bir ışık çıktı. Sonra her şey tutuştu."),
+    { t: "incele", prompt: "Kül Ana anlatırken o geceyi görür gibi oldum.", spots: [
+      { x: 0.3, y: 0.42, label: "Ağaç", text: "Şehre adını veren ardıç. Kökünden yanıyor; ateş yukarıdan değil, aşağıdan gelmiş." },
+      { x: 0.62, y: 0.62, label: "Koşanlar", text: "Ellerinde kovalar, yangına doğru koşanlar. Ölçerler. Kaçmıyorlar; söndürmeye gidiyorlar." },
+    ] },
+    soz("kulana", "Ölçerler yangını söndürmeye koştu. Sungur onları kundakçı diye astırdı."),
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.3 }] },
+    { t: "gorsel", art: "yer_ardic_kul" },
+    soz("kulana", "Annen bu sayfayı bana bıraktı. \"Çocuğum gelirse ver,\" dedi."),
+    anne("Şimşek en kolay yolu seçer: suyu, metali, ıslak teni."),
+    m("Defterime yeni bir sayfa eklendi: ŞİMŞEK."),
+    { t: "bekle", ms: 900 },
+    m("O gece Kül mahallesinde bir saz çaldı."),
+    m("Bu ezgiyi Karaçam'da, bir han kapısında duymuştum.", true),
+  ] },
+
+  /** Yüzleşme: arabaları Yaren işaretledi; kızı Sungur'un elinde. Avlunun yolunu gösterir. */
+  yaren: { id: "yaren", beats: [
+    { t: "ses", layers: [{ id: "gece", vol: 0.45 }, { id: "ruzgar", vol: 0.2 }] },
+    { t: "gorsel", art: "yer_ardic_kul", gece: true },
+    m("Sesi takip ettim. Yıkık bir evin eşiğinde bir kadın oturuyor."),
+    m("Saz kucağında. Parmaklarında tebeşir tozu."),
+    soz("sen", "Yaren."),
+    soz("yaren", "Karaçam'dan buraya kadar geldin demek."),
+    soz("sen", "Arabaları sen işaretledin. Mektupları sen yazdın."),
+    m("Uzun süre sustu. Bir tel titredi, sustu."),
+    soz("yaren", "Kızım saray mutfağında. Sungur'un elinde. Yedi yaşındaydı aldıklarında."),
+    soz("yaren", "Her ay üç araba, bir mektup. Karşılığında bir tutam saç; yaşadığını bileyim diye."),
+    m("Avucunu açtı. İçinde saç telleri, iple bağlanmış. Ay ay."),
+    soz("yaren", "Bu ay gelmedi."),
+    { t: "bekle", ms: 900 },
+    soz("yaren", "Saray avlusundan dehlize bir kapı iner. Mutfağın yanından geçer. Yolu gösteririm."),
+    soz("yaren", "Kızımı bulursan…"),
+    m("Cümlesini bitirmedi. Ben de sormadım."),
+  ] },
+
+  /** Saray avlusu, savaştan önce (bir kez): damlardan; mutfağın ışığı yanık. */
+  saray_once: { id: "saray_once", beats: [
+    { t: "ses", layers: [{ id: "gece", vol: 0.35 }, { id: "ruzgar", vol: 0.3 }] },
+    { t: "gorsel", art: "yer_ardic_saray", gece: true },
+    m("Kül Ana'nın torunları damlarda önümden koştu. Ayakları kiremitlere hiç ses etmiyor."),
+    m("Avlunun ortasında muhafızlar. Sağda mutfağın kapısı; ışığı yanık."),
+    soz("sen", "Önce muhafızlar."),
+  ] },
+
+  /** Avlu: mutfakta Yaren'in kızı; dehlizin ağzı (inceleme): kırağı ama sıcak hava, içe eğilen alevler. */
+  d_saray: { id: "d_saray", beats: [
+    { t: "ses", layers: [{ id: "gece", vol: 0.3 }] },
+    { t: "gorsel", art: "yer_ardic_saray", gece: true },
+    m("Muhafızlar düştü. Mutfağın kapısını açtım."),
+    m("Kazanların arasında bir kız çocuğu. Elleri una bulanmış, parmakları mor."),
+    soz("sen", "Annen seni bekliyor. Saz çalan bir kadın."),
+    m("Cevap vermedi. Saçının ucundan bir tutam kesilmişti."),
+    m("Onu Kül Ana'nın torunlarına verdim. Damlardan, annesine."),
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.45 }] },
+    { t: "gorsel", art: "hikaye_d_saray" },
+    m("Avlunun dibinde, nöbetçilerin bile bakmadığı bir kapı."),
+    { t: "incele", prompt: "Dehlizin ağzı.", spots: [
+      { x: 0.24, y: 0.45, label: "Kırağı", text: "Taşlarda kırağı var. Ama yüzüme vuran hava sıcak." },
+      { x: 0.88, y: 0.55, label: "Meşale", text: "Meşalenin alevi içeri doğru eğiliyor. Selim'in mumu gibi." },
+      { x: 0.5, y: 0.5, label: "Karanlık", text: "İçeriden derin bir uğultu. Bütün ülkenin ısısı buraya akıyor." },
+    ] },
+    m("Taşpınar'ın kırağısı, Karaçam'ın karı, Ayazkale'nin buzu.", true),
+    m("Hepsinin ısısı buraya gelmiş."),
+  ] },
+
+  /** Büyük Ocak, savaştan önce (bir kez): Sungur mottoyu kendine çevirir. */
+  buyuk_once: { id: "buyuk_once", beats: [
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.5 }, { id: "kar", vol: 0.2 }] },
+    { t: "gorsel", art: "yer_ardic_dehliz" },
+    m("Dehlizin dibinde Büyük Ocak. Mavi bir girdap; ortası kor gibi yanıyor."),
+    m("Başında uzun kaftanlı bir adam. Avuçları ocağa uzanmış, buz mavisi."),
+    soz("sungur", "Ölçerin çocuğu. Annen de bir zamanlar buraya kadar gelmişti."),
+    soz("sungur", "Bilir misin? Sönen her ateş, başka bir ocakta yanar."),
+    soz("sungur", "Benimkinde."),
+    soz("sen", "O ısı senin değil."),
+    soz("sungur", "Isı kimin ki? Toplayanın olur."),
+    { t: "bekle", ms: 800 },
+  ] },
+
+  /** Bahar: ocak dağılır; ılık yağmur; herkesin evine dönen ısı; defterin son satırı. Son. */
+  d_bahar: { id: "d_bahar", beats: [
+    { t: "ses", layers: [{ id: "ruzgar", vol: 0.35 }] },
+    { t: "gorsel", art: "yer_ardic_dehliz" },
+    m("Ocak çatladı."),
+    m("Isı patlamadı. Dağıldı. Bir nefes gibi, dehlizden yukarı.", true),
+    { t: "ses", layers: [] },
+    { t: "gorsel", art: null },
+    { t: "bekle", ms: 1200 },
+    { t: "ses", layers: [{ id: "dere", vol: 0.45 }, { id: "koyun", vol: 0.25 }] },
+    { t: "gorsel", art: "hikaye_d_bahar" },
+    m("Dışarı çıktığımda Ardıç'ın üstüne ılık bir yağmur yağıyordu."),
+    m("Kuzeyde Ayazkale'nin buzları akıyor. Annem pencereyi açmıştır."),
+    m("Karaçam'da, bir han kapısında, bir kız annesinin sazını akort ediyor."),
+    m("Taşpınar'da kayısılar çiçek açtı. Hasan sürüyü yaylaya çıkardı; kuzu eksilmedi."),
+    { t: "incele", prompt: "Yolun kenarında.", spots: [
+      { x: 0.82, y: 0.45, label: "Çiçek", text: "Kayaların arasında bir çiçek. Karın içinden çıkmış." },
+    ] },
+    m("Annemin defterinin son boş sayfasına ben yazdım:"),
+    m("\"Sönen her ateş, başka bir ocakta yanar. Ve bir gün evine döner.\"", true),
+    { t: "gorsel", art: null },
+    { t: "baslik", text: "Son", sub: "Defterin açık kalıyor" },
+  ] },
 };
 
 /** Konuşanın görünen adı ve portresi: "sen" oyuncudur. */
@@ -537,7 +671,9 @@ export const SPEAKERS: Record<string, { name: string; portrait?: string }> = {
   derya: { name: "Usta Derya", portrait: "portre_derya" },
   gulizar: { name: "Aşçı Gülizar", portrait: "portre_gulizar" },
   anne: { name: "Annem", portrait: "portre_anne" },
-  kayhan: { name: "Kayhan Bey", portrait: "dusman_kayhan" },
+  kayhan: { name: "Kayhan Bey" },
+  kulana: { name: "Kül Ana", portrait: "portre_kulana" },
+  sungur: { name: "Vezir Sungur" },
 };
 
 /** Sis oyunu: çan sesi hangi yandan gelir (0 sol, 1 sağ). Tohumdan, art arda aynı yan en çok iki kez. */

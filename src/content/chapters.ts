@@ -22,7 +22,7 @@ export const CHAPTER_PLACES: Place[] = [
 
   { id: "ardic", name: "Ardıç kapısı", x: 370, y: 1099, region: "ardic", hub: true, unlock: "a_ocak", icon: "sehir", chapter: "Bölüm 4", desc: "Yanık surların yerine yenileri örülmüş. Başkent küllerinin üstüne kurulmuş, ama sokaklar hâlâ is kokuyor." },
   { id: "ardic_kul", name: "Kül mahallesi", x: 340, y: 1078, region: "ardic", unlock: "a_ocak", icon: "ev", desc: "Yangından kalan yıkıntıların arasında yaşayanlar. Burada Ölçer adı fısıltıyla anılır." },
-  { id: "ardic_saray", name: "Saray avlusu", x: 400, y: 1080, region: "ardic", unlock: "a_ocak", icon: "kale", desc: "Vezir Sungur'un muhafızları her köşede. Kral yıllardır görülmedi." },
+  { id: "ardic_saray", name: "Saray avlusu", x: 400, y: 1080, region: "ardic", unlock: "d_yaren", icon: "kale", desc: "Vezir Sungur'un muhafızları her köşede. Kral yıllardır görülmedi." },
   { id: "ardic_dehliz", name: "Ocak dehlizi", x: 384, y: 1124, region: "ardic", unlock: "d_saray", icon: "ocak", desc: "Sarayın altına inen dehliz. Taşları buz gibi, ama derinden bir uğultu geliyor." },
 ];
 
@@ -187,16 +187,19 @@ export const CHAPTER_QUESTS: QuestDef[] = [
     afterText: "Kayhan dizlerinin üstüne çöktü; Soğuk Ocak çatlayarak sustu. Kalenin buzları ilk kez damladı. Kayhan'ın son sözleri: \"Ben sadece taşıyıcıyım. Taşları Vezir Sungur alır. On iki yıl önce Ardıç'ı yakan da onun ocağıydı.\"" },
 
   // Bölüm 4: Ardıç
-  { id: "kul_ana", after: "a_ocak", title: "Kül mahallesi", giverNpc: "kulana", importance: "onemli", minutes: 60, at: "ardic_kul", doneText: "Kül Ana'yı dinle",
+  { id: "kul_ana", after: "d_varis", title: "Kül mahallesi", giverNpc: "kulana", importance: "onemli", story: true, minutes: 60, at: "ardic_kul", doneText: "Kül Ana'yı dinle",
     text: "Yıkıntıların arasında yaşlı bir kadın ateş yakmış. \"Ölçer çocuğu,\" dedi seni görünce. \"Gel otur. Sana o geceyi anlatayım.\"",
     rewards: { money: 2, gains: { hafiza: 1, insan_okuma: 1 }, note: "Kül Ana'nın anlattıklarını defterine yazdın." },
     afterText: "\"O gece gökten şimşek inmedi,\" dedi Kül Ana. \"Toprak yarıldı, sarayın altından mavi bir ışık çıktı, sonra her şey tutuştu. Ölçerler yangını söndürmeye koştu; Sungur onları kundakçı diye astırdı.\" Elini defterine koydu: \"Annenin bana bıraktığı son sayfa bu.\" ŞİMŞEK." },
-  { id: "saray_yolu", after: "d_kul", title: "Saray yolu", giverNpc: "kulana", importance: "hayati", minutes: 90, at: "ardic_saray",
-    text: "\"Dehlize inmek için saray avlusunu geçmelisin,\" diyor Kül Ana. \"Torunlarım seni damlardan götürür; ama muhafızlarla karşılaşmadan olmaz.\"",
+  { id: "saz_sesi", after: "d_kul", title: "Sazın sesi", giverNpc: "kulana", importance: "onemli", story: true, night: true, minutes: 45, at: "ardic_kul", doneText: "Sesi izle",
+    text: "Gece Kül mahallesinde bir saz çalıyor. Bu ezgiyi Karaçam'da, bir han kapısında duymuştun.",
+    rewards: { gains: { isitme: 0.5, insan_okuma: 0.6 }, note: "Karanlıkta bir ezginin peşinden gittin." } },
+  { id: "saray_yolu", after: "d_yaren", title: "Saray yolu", giverNpc: "kulana", importance: "hayati", story: true, before: "saray_once", minutes: 90, at: "ardic_saray",
+    text: "Yaren avludan dehlize inen yolu gösterdi; Kül Ana'nın torunları seni damlardan götürecek. Avluda muhafızlar var; mutfağın ışığı yanık.",
     battle: { enemies: ["muhafiz", "muhafiz", "muhafiz"], map: "sokak" },
     rewards: { money: 12, relics: ["kul_ana_muskasi"], note: "Kül Ana'nın torunları muhafızların anahtarını getirdi; Kül Ana boynuna bir muska taktı." },
     afterText: "Avlunun dibinde, nöbetçilerin bile bakmadığı bir kapı: dehlizin ağzı. İçeriden uğultu geliyor; duvarlarda kırağı, ama hava sıcak. Isı buraya akıyor." },
-  { id: "buyuk_ocak", after: "d_saray", title: "Büyük Ocak", giverNpc: "kulana", importance: "hayati", minutes: 120, at: "ardic_dehliz",
+  { id: "buyuk_ocak", after: "d_saray", title: "Büyük Ocak", giverNpc: "kulana", importance: "hayati", story: true, before: "buyuk_once", minutes: 120, at: "ardic_dehliz",
     text: "Dehlizin dibinde Büyük Ocak: bütün ülkenin ısısını içine çeken mavi bir girdap. Başında Vezir Sungur. \"Sönen her ateş,\" diyor gülümseyerek, \"başka bir ocakta yanar. Benimkinde.\"",
     battle: { enemies: ["sungur", "muhafiz", "muhafiz"], map: "dehliz" },
     rewards: { money: 40, relics: ["buyuk_kor"], note: "Büyük Ocak kırıldı. Elinde, onun kalbinden kalan son kor." },
