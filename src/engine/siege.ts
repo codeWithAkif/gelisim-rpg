@@ -26,8 +26,9 @@ export interface SiegeWave { foes: { def: string; count: number }[]; interval: n
 export interface SiegeDef { id: string; name: string; waves: SiegeWave[]; ground: "cayir" | "kar" | "tas" }
 
 export interface Barricade { id: number; x1: number; y1: number; x2: number; y2: number; hp: number; max: number; kind: "kazik" | "buz" }
-export interface Foe { id: number; def: string; x: number; y: number; hp: number; max: number; speed: number; dmg: [number, number]; atkCd: number; slowT: number; stunT: number; burnT: number; side: number; r: number; human: boolean; flee?: boolean }
-export interface Zone { x: number; y: number; r: number; kind: "ates" | "camur"; t: number }
+export interface Foe { id: number; def: string; x: number; y: number; hp: number; max: number; speed: number; dmg: [number, number]; atkCd: number; slowT: number; stunT: number; burnT: number; side: number; r: number; human: boolean; flee?: boolean;
+  burnDps?: number; burnAcc?: number }   // tutuşunca saniyede kaç can yanar; birikmiş kesir
+export interface Zone { x: number; y: number; r: number; kind: "ates" | "camur"; t: number; dps?: number }   // dps: alevin saniyelik yakması
 export interface Arrow { x: number; y: number; vx: number; vy: number; dmg: number; crit: boolean; life: number }
 export type SiegeFx =
   | { k: "hit"; x: number; y: number; dmg: number; crit?: boolean; by: "ok" | "kilic" | "buyu" | "kopek" | "ates" }
@@ -176,8 +177,9 @@ export function castWall(cfg: Config, s: GameState, sg: Siege, id: string, x1: n
   if (fx.ignite) {
     // yanan şerit: boyunca alev alanları; şeridin üstündeki düşman hemen tutuşur
     const n = Math.max(2, Math.round(L / 3));
-    for (let i = 0; i <= n; i++) sg.zones.push({ x: x1 + (x2 - x1) * i / n, y: y1 + (y2 - y1) * i / n, r: 3.2, kind: "ates", t: 7 });
-    for (const f of sg.foes) if (f.hp > 0 && segDist(f.x, f.y, { x1, y1, x2, y2 }) < f.r + 2) { damage(sg, f, Math.round(sp.dmg * 0.6), "buyu"); f.burnT = 3; if (!f.human) f.flee = true; }
+    const dps = Math.max(3, Math.round(sp.dmg * 0.3));
+    for (let i = 0; i <= n; i++) sg.zones.push({ x: x1 + (x2 - x1) * i / n, y: y1 + (y2 - y1) * i / n, r: 3.2, kind: "ates", t: 7, dps });
+    for (const f of sg.foes) if (f.hp > 0 && segDist(f.x, f.y, { x1, y1, x2, y2 }) < f.r + 2) { damage(sg, f, Math.round(sp.dmg * 0.6), "buyu"); ignite(f, dps); }
     return { ok: true };
   }
   sg.barricades.push({ id: sg.nextId++, x1, y1, x2, y2, hp: 30 + (fx.wall ?? 3) * 6, max: 30 + (fx.wall ?? 3) * 6, kind: "buz" });
@@ -202,14 +204,18 @@ export function cast(cfg: Config, s: GameState, sg: Siege, id: string, x: number
     if (fx.blind) f.stunT = Math.max(f.stunT, fx.blind * 0.8);
     if (fx.root) f.stunT = Math.max(f.stunT, fx.root * 1.4);   // sarmaşık: yerinden kıpırdayamaz
     if (fx.stun) f.stunT = Math.max(f.stunT, fx.stun * 1.2);
-    if (fx.ignite) f.burnT = 3;
-    if (fx.ignite && !f.human) f.flee = f.hp < f.max * 0.5;   // hayvanlar ateşten kaçar
+    if (fx.ignite) ignite(f, Math.max(2, Math.round(sp.dmg * 0.15)));   // hayvanlar yarı canla ateşten kaçar
   }
   const cf = sg.fx.find(e => e.k === "cast" && e.spell === id && e.x === x && e.y === y) as Extract<SiegeFx, { k: "cast" }> | undefined;
   if (cf) { cf.fire = !!fx.ignite; if (fx.chain || id.includes("simsek") || id.includes("yildirim")) cf.chain = hits.map(f => [f.x, f.y] as [number, number]); }
-  if (fx.ignite) sg.zones.push({ x, y, r: sp.r * 0.8, kind: "ates", t: 4 });
+  if (fx.ignite) sg.zones.push({ x, y, r: sp.r * 0.8, kind: "ates", t: 4, dps: Math.max(2, Math.round(sp.dmg * 0.12)) });
   if (fx.mud) sg.zones.push({ x, y, r: sp.r, kind: "camur", t: 6 });
   return true;
+}
+/** Tutuştur: birkaç saniye yanar, saniyede dps kadar can gider (yenilenir, güçlüsü geçer). Hayvan yarı canla kaçar. */
+export function ignite(f: Foe, dps: number, secs = 3.5) {
+  f.burnT = Math.max(f.burnT, secs); f.burnDps = Math.max(f.burnT > 0 ? f.burnDps ?? 0 : 0, dps);
+  if (!f.human && f.hp < f.max * 0.5) f.flee = true;
 }
 function damage(sg: Siege, f: Foe, dmg: number, by: "ok" | "kilic" | "buyu" | "kopek" | "ates", crit = false) {
   f.hp -= dmg; sg.fx.push({ k: "hit", x: f.x, y: f.y, dmg, crit, by });
@@ -238,14 +244,17 @@ export function step(cfg: Config, s: GameState, sg: Siege, dt: number) {
   for (const z of sg.zones) {
     z.t -= dt;
     for (const f of sg.foes) if (f.hp > 0 && Math.hypot(f.x - z.x, f.y - z.y) < z.r) {
-      if (z.kind === "ates") { f.burnT = Math.max(f.burnT, 1); } else f.slowT = Math.max(f.slowT, 0.4);
+      if (z.kind === "ates") ignite(f, z.dps ?? 2); else f.slowT = Math.max(f.slowT, 0.4);
     }
   }
   sg.zones = sg.zones.filter(z => z.t > 0);
   // düşmanlar
   for (const f of sg.foes) {
     if (f.hp <= 0) continue;
-    if (f.burnT > 0) { f.burnT -= dt; if (rng.chance(dt * 100 * 2)) damage(sg, f, 1, "ates"); }
+    // yanma: belirli, şansa bağlı değil; can ikişer üçer gider ki görünsün
+    if (f.burnT > 0) { f.burnT -= dt; f.burnAcc = (f.burnAcc ?? 0) + dt * (f.burnDps ?? 2);
+      if (f.burnAcc >= 2) { const d = Math.floor(f.burnAcc); f.burnAcc -= d; damage(sg, f, d, "ates"); }
+      if (f.burnT <= 0) { f.burnDps = 0; f.burnAcc = 0; } }
     if (f.stunT > 0) { f.stunT -= dt; continue; }
     f.slowT = Math.max(0, f.slowT - dt); f.atkCd = Math.max(0, f.atkCd - dt);
     const sp = f.speed * (f.slowT > 0 ? 0.45 : 1);

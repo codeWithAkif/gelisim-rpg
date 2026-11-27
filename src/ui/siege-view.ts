@@ -179,11 +179,36 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
     g.save(); g.globalAlpha = alpha; g.translate(X(x), Y(y)); if (faceRight) g.scale(-1, 1); g.filter = filter;
     g.drawImage(im, -w * scale / 2, -h * scale * 0.85, w * scale, h * scale); g.restore(); return true;
   }
+  /** Mürekkep ve sulu boya alev: sıcak hale, kavrulmuş toprak, 4 titreşen dil, sarı öz, ara ara kıvılcım ve duman. */
+  const embers: { x: number; y: number; vx: number; vy: number; t0: number; smoke: boolean }[] = [];
+  function flames(cx: number, cy: number, sz: number, seed: number, now: number, alpha: number) {
+    const t = now / 110; g.save(); g.globalAlpha = alpha;
+    g.fillStyle = "rgba(70,45,25,.25)"; g.beginPath(); g.ellipse(cx, cy, sz * 0.9, sz * 0.35, 0, 0, 7); g.fill();
+    const glow = g.createRadialGradient(cx, cy - sz * 0.3, 1, cx, cy - sz * 0.3, sz * 1.5);
+    glow.addColorStop(0, "rgba(255,170,60,.4)"); glow.addColorStop(1, "rgba(255,170,60,0)"); g.fillStyle = glow; g.beginPath(); g.arc(cx, cy - sz * 0.3, sz * 1.5, 0, 7); g.fill();
+    for (let i = 0; i < 4; i++) {
+      const j = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; const r = j - Math.floor(j);
+      const fx = cx + (i - 1.5) * sz * 0.3, fy = cy + (r - 0.5) * sz * 0.2, h = sz * (0.75 + 0.35 * Math.sin(t + i * 1.7 + seed)) * (i % 2 ? 0.8 : 1.1);
+      const sway = Math.sin(t * 1.3 + i + seed) * sz * 0.12;
+      g.beginPath(); g.moveTo(fx - sz * 0.17, fy); g.quadraticCurveTo(fx - sz * 0.26, fy - h * 0.5, fx + sway, fy - h); g.quadraticCurveTo(fx + sz * 0.26, fy - h * 0.5, fx + sz * 0.17, fy); g.closePath();
+      g.fillStyle = "rgba(214,98,32,.88)"; g.fill(); g.strokeStyle = "#9E3423"; g.lineWidth = 1.1; g.stroke();
+      g.beginPath(); g.moveTo(fx - sz * 0.08, fy); g.quadraticCurveTo(fx + sway * 0.5, fy - h * 0.6, fx + sz * 0.08, fy); g.fillStyle = "#FFD27A"; g.fill();
+    }
+    g.restore();
+    if (Math.random() < 0.05 * alpha) embers.push({ x: cx + (Math.random() - 0.5) * sz, y: cy - sz * 0.7, vx: (Math.random() - 0.5) * 0.25, vy: -0.5 - Math.random() * 0.3, t0: now, smoke: Math.random() < 0.4 });
+  }
+  function drawEmbers(now: number) {
+    for (let i = embers.length - 1; i >= 0; i--) { const e = embers[i]; const k = (now - e.t0) / (e.smoke ? 1100 : 600); if (k > 1) { embers.splice(i, 1); continue; }
+      const x = e.x + e.vx * (now - e.t0) * 0.06, y = e.y + e.vy * (now - e.t0) * 0.06;
+      g.fillStyle = e.smoke ? `rgba(90,85,80,${0.35 * (1 - k)})` : `rgba(255,190,90,${1 - k})`; g.beginPath(); g.arc(x, y, e.smoke ? 2 + k * 5 : 1.4, 0, 7); g.fill(); }
+  }
   function draw(now: number) {
     const r = stage.getBoundingClientRect(); g.save();
     if (shake > 0) g.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     drawGround(r.width, r.height);
-    for (const z of sg.zones) { const gr = g.createRadialGradient(X(z.x), Y(z.y), 0, X(z.x), Y(z.y), z.r * scale); if (z.kind === "ates") { gr.addColorStop(0, `rgba(255,170,60,${0.55 * Math.min(1, z.t)})`); gr.addColorStop(1, "rgba(200,60,20,0)"); } else { gr.addColorStop(0, "rgba(110,85,50,.55)"); gr.addColorStop(1, "rgba(110,85,50,0)"); } g.fillStyle = gr; g.beginPath(); g.arc(X(z.x), Y(z.y), z.r * scale, 0, 7); g.fill(); }
+    // çamur lekesi; alev: kavrulmuş toprak, sıcak hale, titreşen alev dilleri (altıgen savaştaki mürekkep alevlerin kardeşi)
+    for (const z of sg.zones) if (z.kind !== "ates") { const gr = g.createRadialGradient(X(z.x), Y(z.y), 0, X(z.x), Y(z.y), z.r * scale); gr.addColorStop(0, "rgba(110,85,50,.55)"); gr.addColorStop(1, "rgba(110,85,50,0)"); g.fillStyle = gr; g.beginPath(); g.arc(X(z.x), Y(z.y), z.r * scale, 0, 7); g.fill(); }
+    sg.zones.forEach((z, i) => { if (z.kind === "ates") flames(X(z.x), Y(z.y), z.r * scale * 1.05, i * 13 + Math.round(z.x * 7), now, Math.min(1, z.t)); });
     for (const b of sg.barricades) {
       const L = Math.hypot(b.x2 - b.x1, b.y2 - b.y1); const n = Math.max(2, Math.round(L / 2.2)); const f = b.hp / b.max;
       g.strokeStyle = b.kind === "buz" ? "#9FD3E8" : "#6B4A2E"; g.lineWidth = scale * 1.1; g.lineCap = "round";
@@ -220,6 +245,8 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
     const pw = drag?.bow ? Math.min(1, Math.hypot(drag.cx - CX, drag.cy - CY) / 20) : 0; const bq = bowSwing > now ? quad("anim_kahraman_yay", 3) : drag?.bow ? quad("anim_kahraman_yay", pw < 0.3 ? 0 : pw < 0.75 ? 1 : 2) : null;
     if (bq) drawQuad(g, bq, X(CX), Y(CY), 17 * scale, drag?.bow ? drag.cx < CX : lastShotRight);
     else if (!figure(swing > now ? "poz_kahraman_vurus" : "poz_kahraman_durus", CX, CY, 17, false)) { g.fillStyle = C("--blue"); g.beginPath(); g.arc(X(CX), Y(CY), PLAYER_R * scale, 0, 7); g.fill(); }
+    // tutuşan düşmanın sırtında alev
+    for (const f of sg.foes) if (f.hp > 0 && f.burnT > 0) flames(X(f.x), Y(f.y) - f.r * scale * 0.9, f.r * scale * 0.9, f.id * 7, now, Math.min(1, f.burnT));
     // ok
     g.strokeStyle = "#5B4630"; g.lineWidth = 2; for (const a of sg.arrows) { const L = Math.hypot(a.vx, a.vy) || 1; g.beginPath(); g.moveTo(X(a.x), Y(a.y)); g.lineTo(X(a.x - a.vx / L * 4), Y(a.y - a.vy / L * 4)); g.stroke(); }
     if (drag?.bow) {
@@ -246,6 +273,7 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
     // atılan büyünün izi
     for (let i = streaks.length - 1; i >= 0; i--) { const t = (now - streaks[i].t) / 260; if (t > 1) { streaks.splice(i, 1); continue; } const st = streaks[i];
       g.strokeStyle = `rgba(240,140,50,${1 - t})`; g.lineWidth = scale * 1.4 * (1 - t * 0.5); g.beginPath(); g.moveTo(X(st.x1), Y(st.y1)); g.lineTo(X(st.x1 + (st.x2 - st.x1) * Math.min(1, t * 2)), Y(st.y1 + (st.y2 - st.y1) * Math.min(1, t * 2))); g.stroke(); }
+    drawEmbers(now);
     for (let i = pops.length - 1; i >= 0; i--) { const p = pops[i]; const k = (now - p.t) / 800; if (k > 1) { pops.splice(i, 1); continue; } g.globalAlpha = 1 - k; g.fillStyle = p.color; g.font = `700 ${p.big ? 24 : 18}px Caveat, cursive`; g.textAlign = "center"; g.fillText(p.text, X(p.x), Y(p.y) - k * 26); g.globalAlpha = 1; }
     g.restore();
     if (flash > 0) { g.fillStyle = `rgba(158,52,35,${flash * 0.3})`; g.fillRect(0, 0, r.width, r.height); }
@@ -262,7 +290,7 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
     const dt = (now - last) / 1000; last = now;
     const before = sg.phase; if (!frozen) step(cfg, s, sg, dt);
     for (const f of sg.fx.splice(0)) {
-      if (f.k === "hit") { pops.push({ x: f.x, y: f.y - 6, t: now, text: `${f.crit ? "Kritik! " : ""}−${f.dmg}`, color: f.by === "kopek" ? C("--green") : f.crit ? C("--red") : C("--ink"), big: f.crit }); if (f.by === "kilic") { swing = now + 180; sfx(f.crit ? "crit" : "hit"); } else if (f.by === "ok") sfx("hit"); }
+      if (f.k === "hit") { pops.push({ x: f.x, y: f.y - 6, t: now, text: `${f.crit ? "Kritik! " : ""}−${f.dmg}`, color: f.by === "kopek" ? C("--green") : f.by === "ates" ? "#C2571E" : f.crit ? C("--red") : C("--ink"), big: f.crit }); if (f.by === "kilic") { swing = now + 180; sfx(f.crit ? "crit" : "hit"); } else if (f.by === "ok") sfx("hit"); }
       if (f.k === "hurt") { shake = 8; flash = 1; sfx("hurt"); buzz("medium"); }
       if (f.k === "die") sfx("thunk");
       if (f.k === "bar" && f.broken) { sfx("clang"); buzz("light"); }
