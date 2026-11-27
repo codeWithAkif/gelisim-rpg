@@ -6,7 +6,7 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Siege, type SiegeDef, ARENA, PLAYER_R, BARRICADE_MAX_LEN, createSiege, placeBarricade, removeBarricade, placePet,
-  startWave, step, shoot, canShoot, siegeSpells, cast, restBetween, finishSiege,
+  startWave, step, shoot, canShoot, siegeSpells, cast, restBetween, finishSiege, spellAim, castThrow, castWall, THROW_RANGE, wallLen,
 } from "../engine/siege";
 import { ENEMIES } from "../content/world";
 import type { GainReport } from "../engine/progression";
@@ -16,6 +16,7 @@ import { sfx, buzz } from "./feel";
 import { quad, drawQuad, walkFrame, gait } from "./anim";
 import { chain, drawBolt, drawImpact, impact, type BoltFx, type Impact, type Pt } from "./lightning";
 import { castDrawPrompt } from "./gesture-view";
+import { SPELL_FX } from "../engine/magic";
 import { settings } from "./settings";
 import { skillEase } from "../engine/timing";
 import { synthesize, discover } from "../engine/synthesis";
@@ -46,7 +47,11 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
 
   const lbolts: BoltFx[] = []; const limpacts: Impact[] = []; let wflash = 0;
   let bowSwing = 0; let lastShotRight = false;
-  let armed: string | null = null; let petMode = false; let drag: { x: number; y: number; cx: number; cy: number; bow: boolean } | null = null;
+  const streaks: { x1: number; y1: number; x2: number; y2: number; t: number }[] = [];
+  let armed: string | null = null; let petMode = false;
+  // büyü avuçtayken zaman durur: uygulayana ya da vazgeçene kadar kurtlar kıpırdamaz
+  let aimDrag: { x: number; y: number; cx: number; cy: number } | null = null;
+  const arm = (id: string | null) => { armed = id; aimDrag = null; frozen = !!id; if (!id) last = performance.now(); }; let drag: { x: number; y: number; cx: number; cy: number; bow: boolean } | null = null;
   const pops: { x: number; y: number; t: number; text: string; color: string; big?: boolean }[] = []; let shake = 0, flash = 0, swing = 0;
   const cs = getComputedStyle(document.documentElement); const C = (n: string) => cs.getPropertyValue(n).trim();
 
@@ -67,13 +72,14 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
       const drawMode = settings().timing && s.knownElements.length > 0;
       const armedName = armed ? sp.find(x => x.id === armed)?.name ?? "" : "";
       if (drawMode) {
-        panel.innerHTML = `<div class="row"><button class="btn small blue" data-s="draw" ${sg.mana >= 3 ? "" : "disabled"}>Büyü çiz · mana ${Math.floor(sg.mana)}</button>${armed ? `<span class="hand">${esc(armedName)}: hedefe dokun</span>` : ""}</div>
+        panel.innerHTML = `<div class="row"><button class="btn small blue" data-s="draw" ${sg.mana >= 3 ? "" : "disabled"}>Büyü çiz · mana ${Math.floor(sg.mana)}</button>${armed ? `<span class="hand">${esc(armedName)}</span><button class="btn small" data-s="disarm">Vazgeç</button>` : ""}</div>
+          ${armed ? `<p class="tiny" style="margin:0"><b>${spellAim(armed) === "wall" ? "Duvarı haritaya çiz: parmağını sürükle, bırak." : spellAim(armed) === "throw" ? "Kahramandan gitmesini istediğin yere doğru ileri sürükle, bırak." : "Hedefe dokun."}</b> Zaman durdu.</p>` : ""}
           <div class="siege-spells">${sp.map(x => `<span class="spell-btn off ${armed === x.id ? "on" : ""}" data-spell-cd="${x.id}"><span class="cdf" data-cd="${x.id}" style="height:${x.left > 0 ? (x.left / x.cd) * 100 : 0}%"></span><b>${esc(x.name)}</b><small>${x.left > 0 ? "doluyor" : `${x.mana} mana`}</small></span>`).join("")}</div>
           <p class="tiny" style="margin:0">${bow === "Yayın yok" ? "Yanına gelene kılıcınla kendin vurursun." : `Ok: kendinden geriye doğru çek, bırak (${s.inventory.ok ?? 0} ok).`} Büyü çizerken zaman durur.</p>`;
         return;
       }
       panel.innerHTML = `<div class="siege-spells">${sp.map(x => `<button class="spell-btn ${armed === x.id ? "on" : ""}" data-spell="${x.id}" ${x.ok ? "" : "disabled"}><span class="cdf" data-cd="${x.id}" style="height:${x.left > 0 ? (x.left / x.cd) * 100 : 0}%"></span><b>${esc(x.name)}</b><small>${x.mana} mana</small></button>`).join("") || `<span class="muted tiny">Büyün yok.</span>`}</div>
-        <p class="tiny" style="margin:0">${armed ? "Hedefe dokun." : bow === "Yayın yok" ? "Yanına gelene kılıcınla kendin vurursun. (Yay pazarda satılır.)" : `Ok: kendinden geriye doğru çek, bırak (${s.inventory.ok ?? 0} ok). Yanına geleni kılıçla kendin vurursun.`}</p>`;
+        <p class="tiny" style="margin:0">${armed ? (spellAim(armed) === "wall" ? "Duvarı haritaya çiz. Zaman durdu." : spellAim(armed) === "throw" ? "Kahramandan ileri sürükle, bırak. Zaman durdu." : "Hedefe dokun. Zaman durdu.") : bow === "Yayın yok" ? "Yanına gelene kılıcınla kendin vurursun. (Yay pazarda satılır.)" : `Ok: kendinden geriye doğru çek, bırak (${s.inventory.ok ?? 0} ok). Yanına geleni kılıçla kendin vurursun.`}</p>`;
       return;
     }
   }
@@ -89,13 +95,14 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b || b.disabled) return;
     if (b.dataset.s === "pet") { petMode = !petMode; renderPanel(); return; }
     if (b.dataset.s === "go") { if (sg.phase === "rest") restBetween(s, sg); petMode = false; startWave(sg); sfx("beat"); buzz("medium"); renderPanel(); return; }
-    if (b.dataset.spell) { armed = armed === b.dataset.spell ? null : b.dataset.spell; sfx("tap"); renderPanel(); }
+    if (b.dataset.spell) { arm(armed === b.dataset.spell ? null : b.dataset.spell); sfx("tap"); renderPanel(); }
+    if (b.dataset.s === "disarm") { arm(null); sfx("tap"); renderPanel(); }
     if (b.dataset.s === "draw") void drawSpell();
   });
   /** Büyüyü çiz: zaman durur; dizi bir büyü ederse ve dolmuşsa hedefe dokunulur. Uymazsa söner, biraz mana yanar. */
   async function drawSpell() {
     if (sg.phase !== "fight" || frozen) return;
-    frozen = true; armed = null;
+    frozen = true; armed = null; aimDrag = null;
     const allowed = [...ELEMENT_RUNES.filter(r => s.knownElements.includes(r)), ...FORM_RUNES];
     const res = await castDrawPrompt(stage, { allowed, ease: skillEase(s, "odak"), limitMs: 9000 });
     frozen = false; last = performance.now();
@@ -108,14 +115,17 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
     const x = siegeSpells(cfg, s, sg).find(q => q.id === r.spellId);
     if (!x) { say("Ustalığın yetmiyor"); sfx("bad"); renderPanel(); return; }
     if (!x.ok) { say(x.reason ?? "Olmadı"); sfx("bad"); renderPanel(); return; }
-    armed = x.id; sfx("spark"); renderPanel();
+    arm(x.id); sfx("spark"); renderPanel();
   }
 
   /* ---------- dokunma ---------- */
   cv.addEventListener("pointerdown", e => {
     const p = toArena(e); cv.setPointerCapture(e.pointerId);
     if (sg.phase === "fight") {
-      if (armed) { if (cast(cfg, s, sg, armed, p.x, p.y)) { sfx("fire"); buzz("medium"); } armed = null; renderPanel(); return; }
+      if (armed) {
+        if (spellAim(armed) === "at") { if (cast(cfg, s, sg, armed, p.x, p.y)) { sfx("fire"); buzz("medium"); } arm(null); renderPanel(); return; }
+        aimDrag = { x: p.x, y: p.y, cx: p.x, cy: p.y }; return;
+      }
       if (Math.hypot(p.x - CX, p.y - CY) < 18) drag = { x: p.x, y: p.y, cx: p.x, cy: p.y, bow: true };
       return;
     }
@@ -126,8 +136,19 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
       drag = { x: p.x, y: p.y, cx: p.x, cy: p.y, bow: false };
     }
   });
-  cv.addEventListener("pointermove", e => { if (!drag) return; const p = toArena(e); drag.cx = p.x; drag.cy = p.y; });
+  cv.addEventListener("pointermove", e => { const p = toArena(e); if (aimDrag) { aimDrag.cx = p.x; aimDrag.cy = p.y; return; } if (!drag) return; drag.cx = p.x; drag.cy = p.y; });
   const up = () => {
+    if (aimDrag && armed) {
+      const a = aimDrag; aimDrag = null; const id = armed;
+      if (spellAim(id) === "wall") {
+        const r = castWall(cfg, s, sg, id, a.x, a.y, a.cx, a.cy);
+        if (r.ok) { sfx("fire"); buzz("medium"); arm(null); } else pops.push({ x: a.cx, y: a.cy, t: performance.now(), text: r.reason ?? "", color: C("--red") });
+      } else {
+        if (Math.hypot(a.cx - CX, a.cy - CY) < 4) { pops.push({ x: CX, y: CY - 8, t: performance.now(), text: "İleri doğru sürükle", color: C("--ink-soft") }); return; }
+        if (castThrow(cfg, s, sg, id, a.cx, a.cy)) { sfx("whoosh"); buzz("medium"); arm(null); }
+      }
+      renderPanel(); return;
+    }
     if (!drag) return; const d = drag; drag = null;
     if (d.bow) {
       const dx = d.cx - CX, dy = d.cy - CY, L = Math.hypot(dx, dy);
@@ -207,6 +228,24 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
       g.setLineDash([2, 6]); g.strokeStyle = C("--red"); g.globalAlpha = 0.5 + p * 0.5; g.beginPath(); g.moveTo(X(CX), Y(CY)); g.lineTo(X(CX - dx / (L || 1) * (25 + 45 * p)), Y(CY - dy / (L || 1) * (25 + 45 * p))); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
     }
     if (armed) { g.strokeStyle = C("--red"); g.setLineDash([4, 4]); g.lineWidth = 1.5; g.beginPath(); g.arc(X(CX), Y(CY), scale * 6, 0, 7); g.stroke(); g.setLineDash([]); }
+    // nişan önizlemesi: duvar çizgisi ya da kahramandan ileri ok ve düşeceği yer
+    if (armed && aimDrag) {
+      const aim = spellAim(armed); const fire = !!SPELL_FX[armed]?.ignite;
+      if (aim === "wall") {
+        const L = Math.hypot(aimDrag.cx - aimDrag.x, aimDrag.cy - aimDrag.y); const k = L > wallLen(armed) ? wallLen(armed) / L : 1;
+        g.strokeStyle = fire ? "rgba(230,110,40,.85)" : "rgba(120,180,220,.9)"; g.lineWidth = scale * 1.6; g.lineCap = "round"; g.setLineDash([6, 4]);
+        g.beginPath(); g.moveTo(X(aimDrag.x), Y(aimDrag.y)); g.lineTo(X(aimDrag.x + (aimDrag.cx - aimDrag.x) * k), Y(aimDrag.y + (aimDrag.cy - aimDrag.y) * k)); g.stroke(); g.setLineDash([]);
+      } else {
+        const dx = aimDrag.cx - CX, dy = aimDrag.cy - CY, L = Math.hypot(dx, dy) || 1; const k = Math.min(1, THROW_RANGE / L);
+        const tx = CX + dx * k, ty = CY + dy * k; const rr = siegeSpells(cfg, s, sg).find(q => q.id === armed)?.r ?? 6;
+        g.strokeStyle = C("--red"); g.lineWidth = 2.5; g.beginPath(); g.moveTo(X(CX), Y(CY)); g.lineTo(X(tx), Y(ty)); g.stroke();
+        const ang = Math.atan2(ty - CY, tx - CX); g.beginPath(); g.moveTo(X(tx), Y(ty)); g.lineTo(X(tx) - Math.cos(ang - 0.4) * 12, Y(ty) - Math.sin(ang - 0.4) * 12); g.moveTo(X(tx), Y(ty)); g.lineTo(X(tx) - Math.cos(ang + 0.4) * 12, Y(ty) - Math.sin(ang + 0.4) * 12); g.stroke();
+        g.setLineDash([4, 4]); g.globalAlpha = 0.7; g.beginPath(); g.arc(X(tx), Y(ty), rr * scale, 0, 7); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+      }
+    }
+    // atılan büyünün izi
+    for (let i = streaks.length - 1; i >= 0; i--) { const t = (now - streaks[i].t) / 260; if (t > 1) { streaks.splice(i, 1); continue; } const st = streaks[i];
+      g.strokeStyle = `rgba(240,140,50,${1 - t})`; g.lineWidth = scale * 1.4 * (1 - t * 0.5); g.beginPath(); g.moveTo(X(st.x1), Y(st.y1)); g.lineTo(X(st.x1 + (st.x2 - st.x1) * Math.min(1, t * 2)), Y(st.y1 + (st.y2 - st.y1) * Math.min(1, t * 2))); g.stroke(); }
     for (let i = pops.length - 1; i >= 0; i--) { const p = pops[i]; const k = (now - p.t) / 800; if (k > 1) { pops.splice(i, 1); continue; } g.globalAlpha = 1 - k; g.fillStyle = p.color; g.font = `700 ${p.big ? 24 : 18}px Caveat, cursive`; g.textAlign = "center"; g.fillText(p.text, X(p.x), Y(p.y) - k * 26); g.globalAlpha = 1; }
     g.restore();
     if (flash > 0) { g.fillStyle = `rgba(158,52,35,${flash * 0.3})`; g.fillRect(0, 0, r.width, r.height); }
@@ -227,6 +266,7 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
       if (f.k === "hurt") { shake = 8; flash = 1; sfx("hurt"); buzz("medium"); }
       if (f.k === "die") sfx("thunk");
       if (f.k === "bar" && f.broken) { sfx("clang"); buzz("light"); }
+      if (f.k === "cast" && f.from) streaks.push({ x1: f.from[0], y1: f.from[1], x2: f.x, y2: f.y, t: now });
       if (f.k === "cast") {
         if (f.chain) { const pts: Pt[] = [[X(CX), Y(CY) - scale * 8], ...f.chain.map(([x, y]) => [X(x), Y(y) - scale * 4] as Pt)]; const seed = (now | 0) % 9973;
           if (pts.length < 2) pts.push([X(f.x), Y(f.y)]);

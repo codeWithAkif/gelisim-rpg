@@ -9,6 +9,7 @@ import { applyGain, realUse, type GainReport } from "./progression";
 import { maxHp } from "./combat";
 import { maxMana } from "./derived";
 import { spellOptions, SPELL_FX } from "./magic";
+import { spellSequence } from "./synthesis";
 import { Rng } from "./rng";
 import { ENEMIES, GAME_ITEMS, CONFIG_WEAPON_DAMAGE } from "../content/world";
 import { weaponSet, totalArmor, hasBow } from "./gear";
@@ -31,7 +32,7 @@ export interface Arrow { x: number; y: number; vx: number; vy: number; dmg: numb
 export type SiegeFx =
   | { k: "hit"; x: number; y: number; dmg: number; crit?: boolean; by: "ok" | "kilic" | "buyu" | "kopek" | "ates" }
   | { k: "hurt"; dmg: number } | { k: "die"; x: number; y: number } | { k: "bar"; id: number; broken: boolean }
-  | { k: "cast"; spell: string; x: number; y: number; r: number; chain?: [number, number][]; fire?: boolean } | { k: "shoot" } | { k: "wave"; n: number };
+  | { k: "cast"; spell: string; x: number; y: number; r: number; chain?: [number, number][]; fire?: boolean; from?: [number, number]; line?: [number, number, number, number] } | { k: "shoot" } | { k: "wave"; n: number };
 
 export interface Siege {
   def: SiegeDef; phase: "build" | "fight" | "rest" | "won" | "lost"; time: number; wave: number;
@@ -137,12 +138,56 @@ export function siegeSpells(cfg: Config, s: GameState, sg: Siege): SiegeSpell[] 
     return { id: sp.id, name: sp.name, cd, mana, r: 6 + (sp.area ?? 0) * 4, dmg: Math.round((sp.damage ?? 10) * (0.45 + m / 60)), ok: !reason && sg.phase === "fight", reason, left };
   });
 }
-export function cast(cfg: Config, s: GameState, sg: Siege, id: string, x: number, y: number): boolean {
-  const sp = siegeSpells(cfg, s, sg).find(q => q.id === id); if (!sp?.ok) return false;
-  const def = cfg.spell.get(id)!; const fx = SPELL_FX[id] ?? {};
+/** Büyü nasıl uygulanır: duvar haritaya çizilir; top, fırlatma ve zincir kahramandan ileri atılır; gerisi noktaya. */
+export type SiegeAim = "wall" | "throw" | "at";
+export function spellAim(id: string): SiegeAim {
+  if (SPELL_FX[id]?.wall) return "wall";
+  const f = spellSequence(id)?.form;
+  return f === "top" || f === "firlat" || f === "zincir" ? "throw" : "at";
+}
+/** Atılan büyünün en uzak varacağı yer (arena birimi). */
+export const THROW_RANGE = 62;
+/** Duvar büyüsünün en uzun boyu: duvar gücüyle uzar. */
+export const wallLen = (id: string) => 14 + (SPELL_FX[id]?.wall ?? 3) * 3;
+
+/** Bedeli öde (mana, dolma süresi); büyü hazır değilse null. */
+function pay(cfg: Config, s: GameState, sg: Siege, id: string): SiegeSpell | null {
+  const sp = siegeSpells(cfg, s, sg).find(q => q.id === id); if (!sp?.ok) return null;
+  const def = cfg.spell.get(id)!;
   sg.mana -= sp.mana; sg.spellCd[id] = sp.cd; sg.stats.casts++;
   if (def.mastery) sg.stats.castMastery[def.mastery] = (sg.stats.castMastery[def.mastery] ?? 0) + 1;
-  sg.fx.push({ k: "cast", spell: id, x, y, r: sp.r });
+  return sp;
+}
+/** Kahramandan ileri atılan büyü: parmağın gösterdiği yere (menzil kadar) düşer. */
+export function castThrow(cfg: Config, s: GameState, sg: Siege, id: string, tx: number, ty: number): boolean {
+  const dx = tx - CX, dy = ty - CY, L = Math.hypot(dx, dy); if (L < 3) return false;
+  const k = Math.min(1, THROW_RANGE / L);
+  return cast(cfg, s, sg, id, CX + dx * k, CY + dy * k, true);
+}
+/** Haritaya çizilen duvar: ateş duvarı yanan bir şerittir (geçen tutuşur, hayvan kaçar); buz ve taş engel kurar. */
+export function castWall(cfg: Config, s: GameState, sg: Siege, id: string, x1: number, y1: number, x2: number, y2: number): { ok: boolean; reason?: string } {
+  let L = Math.hypot(x2 - x1, y2 - y1); if (L < 4) return { ok: false, reason: "Daha uzun çiz" };
+  const max = wallLen(id); if (L > max) { const k = max / L; x2 = x1 + (x2 - x1) * k; y2 = y1 + (y2 - y1) * k; L = max; }
+  if (segDist(CX, CY, { x1, y1, x2, y2 }) < PLAYER_R + 2) return { ok: false, reason: "Kendi üstüne kuramazsın" };
+  const fx = SPELL_FX[id] ?? {};
+  const sp = pay(cfg, s, sg, id); if (!sp) return { ok: false, reason: "Büyü hazır değil" };
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  sg.fx.push({ k: "cast", spell: id, x: mx, y: my, r: L / 2, fire: !!fx.ignite, line: [x1, y1, x2, y2] });
+  if (fx.ignite) {
+    // yanan şerit: boyunca alev alanları; şeridin üstündeki düşman hemen tutuşur
+    const n = Math.max(2, Math.round(L / 3));
+    for (let i = 0; i <= n; i++) sg.zones.push({ x: x1 + (x2 - x1) * i / n, y: y1 + (y2 - y1) * i / n, r: 3.2, kind: "ates", t: 7 });
+    for (const f of sg.foes) if (f.hp > 0 && segDist(f.x, f.y, { x1, y1, x2, y2 }) < f.r + 2) { damage(sg, f, Math.round(sp.dmg * 0.6), "buyu"); f.burnT = 3; if (!f.human) f.flee = true; }
+    return { ok: true };
+  }
+  sg.barricades.push({ id: sg.nextId++, x1, y1, x2, y2, hp: 30 + (fx.wall ?? 3) * 6, max: 30 + (fx.wall ?? 3) * 6, kind: "buz" });
+  return { ok: true };
+}
+
+export function cast(cfg: Config, s: GameState, sg: Siege, id: string, x: number, y: number, thrown = false): boolean {
+  const sp = pay(cfg, s, sg, id); if (!sp) return false;
+  const fx = SPELL_FX[id] ?? {};
+  sg.fx.push({ k: "cast", spell: id, x, y, r: sp.r, ...(thrown ? { from: [CX, CY] as [number, number] } : {}) });
   if (fx.wall) {
     // buz duvarı: hedef noktada, merkeze dik bir duvar
     const a = Math.atan2(y - CY, x - CX) + Math.PI / 2; const L = 9;
