@@ -7,7 +7,7 @@
 // Saf simülasyon: stepNobet(dt) zamanı ilerletir; çizim ve dokunma arayüzdedir (DOM yok).
 import type { Config } from "./config";
 import type { GameState } from "./state";
-import { DAY_MINUTES } from "./state";
+import { DAY_MINUTES, addRep } from "./state";
 import { applyGain, realUse, type GainReport } from "./progression";
 import { maxHp } from "./combat";
 import { Rng } from "./rng";
@@ -36,7 +36,8 @@ export const NOBET_SITES: NobetSite[] = [
 export const nobetSite = (place: string) => NOBET_SITES.find(x => x.place === place);
 
 /* ---------- rekor: kalıcı olan yalnız bu ---------- */
-export interface NobetSave { best: Record<string, number>; runs: number }
+export interface NobetSave { best: Record<string, number>; runs: number; fame?: Record<string, number> }   // fame: ün getirmiş en yüksek eşik
+const NOBET_REGION: Record<string, string> = { yayla: "taspinar", karacam_han: "karacam", ayaz_mutfak: "ayazkale", ardic_kul: "ardic" };
 export function nobetSave(s: GameState): NobetSave { const n = (s.nobet ??= { best: {}, runs: 0 }); n.best ??= {}; n.runs ??= 0; return n; }
 
 /* ---------- nöbet içi yükseltmeler (kırıntı ile) ---------- */
@@ -85,7 +86,7 @@ export interface Nobet {
   helpers: { id: string; name: string; role: string; cd: number; dmg: number; a: number }[];
   pet?: { x: number; y: number; hx: number; hy: number; cd: number; lv: number; wx: number; wy: number; wt: number }; // wx/wy: boşta gezindiği nokta
   loot: Loot; rewarded: number; foes: NFoe[]; shots: Shot[]; fx: NFx[]; nextId: number; seed: number; rng: Rng;
-  stats: { kills: number; shots: number; bosses: number; dmgTaken: number; coins: number; cards: number; skills: number };
+  stats: { kills: number; shots: number; bosses: number; dmgTaken: number; coins: number; cards: number; skills: number; bossDefs?: string[] };
 }
 
 export interface Bar { id: number; x: number; y: number; a: number; len: number; hp: number; max: number }
@@ -292,7 +293,8 @@ export function milestoneReward(site: NobetSite, w: number, rng: Rng): Loot {
   const tier = Math.floor(w / 5);
   const items: Record<string, number> = {}; const it = site.purse.items[Math.floor(rng.next() * site.purse.items.length)];
   items[it] = it === "ok" ? 3 + tier : 1 + Math.floor((tier - 1) / 2);
-  return { money: site.purse.money + Math.floor((tier - 1) * site.purse.money * 0.4), items };
+  // kese dalgayla belirgin büyür: nöbet uzun dayanana bir para kaynağıdır
+  return { money: Math.round(site.purse.money * tier * (1 + tier * 0.15)), items };
 }
 export function waveSize(w: number) { return isBossWave(w) ? 3 + Math.floor(w / 2) : 4 + Math.floor(w * 1.3); }
 function spawn(n: Nobet) {
@@ -314,7 +316,7 @@ function hurt(n: Nobet, f: NFoe, dmg: number, crit: boolean, quiet = false) {
   f.hp -= dmg; if (!quiet) n.fx.push({ k: "hit", x: f.x, y: f.y, dmg: Math.round(dmg), crit });
   if (f.hp > 0) return;
   const coins = Math.round(f.reward * (1 + (n.cards.kese ?? 0) * 0.3));
-  n.coins += coins; n.stats.coins += coins; n.stats.kills++; if (f.boss) n.stats.bosses++;
+  n.coins += coins; n.stats.coins += coins; n.stats.kills++; if (f.boss) { n.stats.bosses++; (n.stats.bossDefs ??= []).push(f.def); }
   n.fx.push({ k: "die", x: f.x, y: f.y, coins, boss: f.boss });
   if (n.cards.kan) n.hp = Math.min(n.maxHp, n.hp + n.cards.kan * 0.6 + (f.boss ? 10 : 0));
   n.foes = n.foes.filter(g => g !== f);
@@ -441,7 +443,7 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
 }
 
 /** Nöbet bitince: rekor, kese, gerçek kullanım gelişimi, zaman ve yorgunluk. */
-export interface NobetResult { gains: GainReport; wave: number; best: boolean; prev: number; minutes: number; loot: Loot; dropped: Record<string, number> }
+export interface NobetResult { gains: GainReport; wave: number; best: boolean; prev: number; minutes: number; loot: Loot; dropped: Record<string, number>; notes: string[] }
 export function finishNobet(cfg: Config, s: GameState, n: Nobet): NobetResult {
   const save = nobetSave(s);
   const wave = Math.max(0, n.wave - (n.waveLeft > 0 || n.foes.length ? 1 : 0)); // tamamlanan dalga
@@ -449,13 +451,28 @@ export function finishNobet(cfg: Config, s: GameState, n: Nobet): NobetResult {
   s.money += n.loot.money; const dropped: Record<string, number> = {};
   for (const [k, v] of Object.entries(n.loot.items)) { const d = addItem(cfg, s, k, v); if (d) dropped[k] = d; }
   const prev = save.best[n.site.place] ?? 0; const best = wave > prev; if (best) save.best[n.site.place] = wave;
-  const gains = realUse(cfg, s, "okculuk_idman", Math.min(60, n.stats.shots), 0.05);
+  // uzun dayanan daha çok gelişir ama giderek azalan bir hızla (5. dalgada 60 atış karşılığı, 20.de 120, 30.da ~147)
+  const gains = realUse(cfg, s, "okculuk_idman", Math.min(n.stats.shots, Math.round(60 * Math.sqrt(Math.max(1, wave) / 5))), 0.05);
   applyGain(cfg, s, "odak", 0.1 + wave * 0.04, gains); applyGain(cfg, s, "taktik", 0.05 + n.stats.cards * 0.05, gains);
   applyGain(cfg, s, "stres", 0.2 + wave * 0.03, gains); if (n.stats.skills) applyGain(cfg, s, "simsek_buyu", n.stats.skills * 0.03, gains);
+  const notes: string[] = [];
+  // liderler: öldürdüğün her lider, o düşmanın zayıf noktalarından birini Gözlemler'e yazdırır (güç bilgiden gelir)
+  s.journal ??= {};
+  for (const def of n.stats.bossDefs ?? []) {
+    const d = ENEMIES[def]; if (!d) continue; const key = d.anatomyOf ?? def; const seen = (s.journal[key] ??= []);
+    const wp = d.weakPoints.find(w => !seen.includes(w.id)); if (!wp) continue;
+    seen.push(wp.id); notes.push(`${d.name} düşerken bir yeri açık kaldı: ${wp.name}. Gözlemler'e yazdın.`);
+  }
+  // rekor eşikleri: bir kulede ilk kez 10, 20, 30. dalgayı geçmek ün getirir (güç değil, tanınırlık ve güven)
+  const region = NOBET_REGION[n.site.place] ?? "taspinar"; const fame = (save.fame ??= {}); const had = fame[n.site.place] ?? 0;
+  for (const t of [10, 20, 30]) if (wave >= t && had < t) {
+    addRep(s, region, "taninirlik", t / 5); addRep(s, region, "guven", t / 10); fame[n.site.place] = t;
+    notes.push(`"${n.site.name} ${t} dalga tuttu" diye anlatıyorlar: tanınırlık +${t / 5}, güven +${t / 10}.`);
+  }
   const minutes = 30 + wave * 6;
   s.minute = Math.min(DAY_MINUTES, s.minute + minutes);
   s.energy = Math.max(0, s.energy - 10 - Math.min(20, wave)); s.satiety = Math.max(0, s.satiety - 6);
-  return { gains, wave, best, prev, minutes, loot: n.loot, dropped };
+  return { gains, wave, best, prev, minutes, loot: n.loot, dropped, notes };
 }
 export const NOBET_ENERGY = 20;
 export function canStartNobet(s: GameState, place: string): { ok: boolean; reason?: string } {

@@ -400,6 +400,7 @@ export function startApp(root: HTMLElement) {
         <div class="odds"><span>Geçen süre <b>${r.minutes} dk</b></span></div>
         ${r.loot.money || Object.keys(r.loot.items).length ? `<p class="hand blue" style="margin:0">Kese: ${esc(lootText(r.loot))}</p>` : `<p class="tiny muted" style="margin:0">Kese beşinci dalgadan sonra gelir.</p>`}
         ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
+        ${r.notes.map(t => `<p class="story-after" style="margin:0">${esc(t)}</p>`).join("")}
         <h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
     });
   }

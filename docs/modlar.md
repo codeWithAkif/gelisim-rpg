@@ -69,6 +69,12 @@ defter sayfası dolunca üç karttan biri seçilir. **Bunların hepsi o nöbetle
 ve kalıcı güçlenme ağacının gelişim sistemiyle yarışması) böylece ortadan kalktı. Büyü burada da çizilir; çizerken ve
 hedefe dokunana kadar zaman durur.
 
+Uzun dayanmanın karşılığı (güç değil, gelişim, bilgi, ün ve para):
+- Gelişim dalgayla azalan hızla büyür (atış karşılığı 5. dalgada 60, 20.de 120, 30.da ~147); okçuluk 5/20/30 dalgada ≈ +2,8 / +5,5 / +6,7.
+- Her beşinci dalganın lideri, o düşmanın açılmamış bir zayıf noktasını Gözlemler'e yazdırır.
+- Bir kulede ilk kez 10, 20, 30. dalgayı geçmek o bölgede tanınırlık ve güven verir (bir kez).
+- Kese dalgayla belirgin büyür (yaylada 30 dalga ≈ 100 bakır; handa iki katı).
+
 ## Harabe: hangi özellik neyi değiştirir
 
 `src/engine/scavenge.ts` içindeki `scavTraits`. 10 başlangıç seviyesidir, her 30 puan bir basamaktır (en çok 3).
