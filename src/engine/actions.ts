@@ -66,13 +66,30 @@ export function nextHint(s: GameState): PlaceAction | null {
 }
 
 /** Defter'in üstündeki "Sıradaki adım": tek cümle ve tek düğme. */
-export interface NextStep { title: string; text: string; act?: PlaceAction["act"]; id?: string; button?: string; kind?: "ana" | "hikaye" | "yan" | "uyku" }
+export interface NextStep { title: string; text: string; act?: PlaceAction["act"]; id?: string; button?: string; kind?: "ana" | "hikaye" | "yan" | "uyku";
+  /** Aynı anda süren ikinci iplik (ör. ana hedefin yanında yan hikâye): kafa karışmasın diye adıyla gösterilir. */
+  also?: { title: string; kind: "ana" | "hikaye" | "yan" } }
 export function nextStep(s: GameState): NextStep | null {
+  const r = stepCore(s);
+  // ana iş gösterilirken süren bir yan hikâye varsa kartın altında adıyla anılır
+  if (r && r.kind === "ana" && !r.also) {
+    const side = questList(s).find(v => (v.status === "aktif" || v.status === "yeni") && questKind(v.def) === "hikaye" && v.def.title !== r.title);
+    if (side) r.also = { title: side.def.title, kind: "hikaye" };
+  }
+  return r;
+}
+function stepCore(s: GameState): NextStep | null {
   if (!s.journey && (minutesLeft(s) <= 0 || s.energy < 15))
     return { title: minutesLeft(s) <= 0 ? "Gün bitti" : "Bitkinsin", text: "Uyu ya da dinlen; kasların uykuda gelişir.", act: "sleep", id: "", button: "Uyu", kind: "uyku" };
   const local = (at: string) => (place(at)?.region ?? "taspinar") === (s.region ?? "taspinar") ? 0 : 1;
   const open = questList(s).filter(q => q.status === "aktif" || q.status === "yeni")
     .sort((a, b) => (a.status === "aktif" ? 0 : 1) - (b.status === "aktif" ? 0 : 1) || KIND_ORDER[questKind(a.def)] - KIND_ORDER[questKind(b.def)] || local(a.def.at) - local(b.def.at));
+  // ana hikâyenin sıradaki sayfası bir göreve bağlı değilse (ör. Ateş çalış) ve önde ana görev yoksa, önce o gösterilir
+  const m0 = nextMilestone(s);
+  const side = open.find(v => questKind(v.def) !== "ana");
+  if (m0?.go && !s.journey && !open.some(v => questKind(v.def) === "ana"))
+    return { title: m0.title, text: m0.hint, act: m0.go.act, id: m0.go.id, button: m0.go.button, kind: "ana",
+      also: side ? { title: side.def.title, kind: questKind(side.def) } : undefined };
   const q = open[0];
   if (q) {
     const kind = questKind(q.def); const giverAt = NPC_PLACE[q.def.giverNpc]; const g = npc(q.def.giverNpc);
@@ -85,6 +102,7 @@ export function nextStep(s: GameState): NextStep | null {
     return { title: q.def.title, text: fight ? (q.def.siege ? "Buradasın. Savunmaya hazırlan." : "Buradasın. Savaşa hazırlan.") : `Buradasın. ${q.def.doneText ?? "İşi yap"} (${q.def.minutes} dk).`,
       act: fight ? "fight" : "walk", id: q.def.id, button: fight ? "Hazırlan" : (q.def.doneText ?? "Yap"), kind };
   }
-  const m = nextMilestone(s);
+  const m = m0;
+  if (m?.go && !s.journey) return { title: m.title, text: m.hint, act: m.go.act, id: m.go.id, button: m.go.button, kind: "ana" };
   return m ? { title: m.title, text: m.hint ?? "Defterin bir sonraki sayfası seni bekliyor." } : null;
 }

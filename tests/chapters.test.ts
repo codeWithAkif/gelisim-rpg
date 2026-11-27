@@ -10,6 +10,7 @@ import { QUESTS, NPCS, ENEMIES, MAPS, GAME_ITEMS } from "../src/content/world";
 import { PLACES, NPC_PLACE } from "../src/content/map";
 import { CHAPTERS } from "../src/content/story";
 import { RELICS } from "../src/content/relics";
+import { nextStep } from "../src/engine/actions";
 
 test("içerik tutarlı: görev yerleri, verenler, haritalar, düşmanlar, ödüller", () => {
   const ids = new Set(PLACES.map(p => p.id));
@@ -96,4 +97,17 @@ test("bölüm sonu savaşları: hazırlıksıza çok zor, bölüme göre gelişm
   expect(winRate("kule", ["kayhan", "muhafiz"], grow(25, { weapon: "dede_kilici", armor: "deri_zirh" }))).toBeGreaterThan(0.35);
   expect(winRate("dehliz", ["sungur", "muhafiz", "muhafiz"], novice)).toBeLessThan(0.05);
   expect(winRate("dehliz", ["sungur", "muhafiz", "muhafiz"], grow(35, { weapon: "dede_kilici", armor: "zincir_zirh" }))).toBeGreaterThan(0.3);
+});
+
+test("sıradaki adım: Ateş çalışması bir göreve bağlı değil ama ana hikâye o; yan hikâye altta adıyla anılır", () => {
+  const s = newGame(cfg, 5); s.introDone = true;
+  for (const q of ["mesaj", "agil_nobet", "kurt", "annenin_izi"]) s.quests[q] = { status: "bitti", count: 1 };
+  s.story.reached = ["varis", "ilk_is", "donmus_kuzu", "suru", "iz"]; s.knownElements = ["el_ates"];
+  s.minute = 120; s.energy = 100;
+  const n = nextStep(s)!;
+  expect(n.title).toBe("İlk kıvılcım");
+  expect(n.kind).toBe("ana");
+  expect(n).toMatchObject({ act: "session-pick", id: "calisma_ates", button: "Ateş çalış" });
+  expect(n.also?.title).toBe("Kurtlar nereden geliyor?");
+  expect(cfg.act.get("calisma_ates")).toBeTruthy();
 });
