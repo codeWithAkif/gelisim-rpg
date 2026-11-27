@@ -771,3 +771,11 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 
 /* Seçili eşyanın açıklaması ve düğmeleri (Ye, Giy…) liste uzasa da ekranın altında görünür kalır */
 .inv-detail { position: sticky; bottom: 0; z-index: 5; background: var(--paper); border-top: 1.5px solid var(--ink); box-shadow: 0 -6px 10px -6px rgba(42,39,34,.25); padding-top: 8px; padding-bottom: 8px; max-height: 42vh; overflow-y: auto; }
+
+/* Harabe çantası/mola penceresi: içerik sığmazsa kayar; sığarsa ortada durur */
+.nb-card { justify-content: flex-start; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.nb-card > :first-child { margin-top: auto; }
+.nb-card > :last-child { margin-bottom: auto; }
+.nb-card > * { flex: none; }
+.nb-card .choice.bagrow { flex-direction: row; align-items: center; padding: 4px 10px; }
+.nb-card .bagrow b { font-size: 18px; }
