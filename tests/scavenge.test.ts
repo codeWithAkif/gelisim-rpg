@@ -273,3 +273,32 @@ test("büyü taktiği (harabe): buz ıslatır, ıslak hedefe şimşek ×1,7; ate
   n.proj = []; const p1 = mk(60), p2 = mk(70); p2.id = 11; n.foes = [p1, p2]; fire("ates", 40, 100);
   expect(p1.hp).toBeLessThan(1000); expect(p2.hp).toBeLessThan(1000);
 });
+
+import { siteRule, SITE_RULES, nextRaidCount } from "../src/engine/scavenge";
+test("harabe kuralları: çamur yavaşlatır, bekçibaşı var, tuzaklı kutu can alır, duman aramayı uzatır, karanlıkta bekçi geç uyanır; kolay harabede kural yok", () => {
+  expect(siteRule(scavSite("koru_kulube")!)).toBeUndefined();
+  for (const id of ["koru_agil", "koru_kule", "koru_kosk", "karacam_sarnic", "ardic_kul"]) expect(SITE_RULES[id]).toBeTruthy();
+  const s = fresh();
+  const mud = createScav(cfg, s, scavSite("koru_agil")!, 3, { kind: "yumruk" }); const plain = createScav(cfg, s, scavSite("koru_kulube")!, 3, { kind: "yumruk" });
+  expect(mud.floor).toBe(0); expect(plain.floor).toBe(0); expect(speedOfCheck(mud)).toBeLessThan(speedOfCheck(plain));
+  const kule = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); const boss = kule.foes.find(f => f.boss)!;
+  expect(boss).toBeTruthy(); expect(boss.floor).toBe(kule.site.floors - 1); expect(boss.hp).toBeGreaterThan(Math.max(...kule.foes.filter(f => !f.boss).map(f => f.max)) * 2);
+  expect(kule.guardCount).toBe(kule.site.guards + 1);
+  const kosk = createScav(cfg, s, scavSite("koru_kosk")!, 3, { kind: "yumruk" }); n0(kosk);
+  const tr = kosk.spots.find(q => q.trapped)!; expect(tr).toBeTruthy();
+  tr.stages = [{ kind: "empty", time: 0.4 }, { kind: "empty", time: 0.2 }, { kind: "empty", time: 0.2 }]; kosk.foes = []; kosk.raidT = 999;
+  walkTo(kosk, tr.x); const hp0 = kosk.hp; beginSearch(kosk); run(kosk, 1.5); expect(kosk.hp).toBeLessThan(hp0); expect(tr.trapped).toBe(false);
+  const smoke = createScav(cfg, s, scavSite("ardic_kul")!, 3, { kind: "yumruk" }); expect(smoke.tr.search * 1.3).toBeGreaterThan(smoke.tr.search);
+  expect(nextRaidCount(kule)).toBe(kule.site.raidSize);
+});
+function n0(n: Scav) { n.raidT = 999; }
+function speedOfCheck(n: Scav) { setInput(n, 1, 0); const x0 = n.px; for (let i = 0; i < 20; i++) stepScav(n, 0.05); return n.px - x0; }
+
+test("düşman saldırıyı önceden belli eder: vuruştan önce işaret çıkar, menzilden çıkarsan boşa gider", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); n.raidT = 999; n.hp = 100; n.maxHp = 100;
+  const f = foe(n.px + 4, { speed: 0, dmg: 10, cd: 0 }); n.foes = [f];
+  stepScav(n, 0.05); expect(f.wind).toBeGreaterThan(0); expect(n.hp).toBe(100);        // işaret var, henüz vurmadı
+  n.px += 12; stepScav(n, 0.05); expect(f.wind).toBe(0);                                  // menzilden çıktın: boşa gitti
+  expect(n.hp).toBe(100);
+  n.px = f.x - 3; run(n, 1); expect(n.hp).toBeLessThan(100);                              // yakında kalırsan vurur
+});

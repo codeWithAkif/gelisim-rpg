@@ -85,6 +85,19 @@ Uzun dayanmanın karşılığı (güç değil, gelişim, bilgi, ün ve para):
 - Bir kulede ilk kez 10, 20, 30. dalgayı geçmek o bölgede tanınırlık ve güven verir (bir kez).
 - Kese dalgayla belirgin büyür (yaylada 30 dalga ≈ 100 bakır; handa iki katı).
 
+## Harabe: kurallar, saldırı işareti, baskın sayacı
+
+- **Her harabenin bir kuralı var** (en kolay olanda yok; giriş kartında ve girerken yazar): Ağıl **Çamur** (zemin katta sen ve düşmanlar %20 yavaş), Kule **Bekçibaşı** (üst katta 3 kat canlı dev kurt; ölünce bir kez bakır), Köşk **Tuzaklı kutular** (~%30 kutu tuzaklı; aramanın %60'ında "Tuzak var!" uyarısı çıkar, sürdürürsen can gider), Sarnıç **Karanlık** (görüş kısa, bekçiler yakından uyanır), Yanık evler **Duman** (arama %30 yavaş). Kod: `SITE_RULES`.
+- **Saldırı işareti:** düşman vurmadan önce 0,45 sn başında kırmızı "!" çıkar. Bu sürede menzilden çıkarsan vuruş boşa gider; yakında kalırsan yer.
+- **Baskın sayacı:** "BASKIN 24 · 3×" — kaç saniye sonra ve kaç düşmanla geleceği.
+
+## Büyü taktiği (dört sahnede aynı; kural `engine/spellfx.ts`)
+
+- **Islak:** buz ve çamur büyüsü hedefi 6 sn ıslatır (altıgen savaşta yağmur ve su/çamur zemini de ıslaktır).
+- **İletken:** ıslak hedefe şimşek ×1,7. **Buhar:** ıslak hedefe ateş ×0,6 ve alev söner (tutuşturmaz). **Çatlama:** yanan hedefe buz ×1,5.
+- **Sekme:** ateş ve buz topu çarptığı yerden bir kez sekip en yakın ikinci düşmana %60 güçle vurur (harabe/nöbet/barikat 16 birim, altıgen savaşta 2 altıgen). Harabede uçan top ayrıca duvara, kapalı kapıya, kilitli kapıya ve yapı kenarına çarpınca bir kez geri döner.
+- Yeni büyü ya da sahne eklerken bu fonksiyonları (`combo`, `wets`, `bounces`) çağır; sayıları yalnız orada değiştir.
+
 ## Harabe kapıları
 
 - Odalar arasında (her katta) kapı vardır. Başta açıktır; **sen geçince arkandan kapanır**. Kilitli oda kapısı ayrıdır (anahtarla açılır).

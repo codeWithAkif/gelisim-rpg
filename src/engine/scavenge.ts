@@ -97,6 +97,17 @@ export const SCAV_SITES: ScavSite[] = [
     unlock: s => done(s, "kul_ana") ? null : "Önce Kül Ana'yı dinle" },
 ];
 export const scavSite = (id: string) => SCAV_SITES.find(x => x.id === id);
+/** Her harabenin kendine özgü bir kuralı vardır (en kolay olanda yok): tekrar eden döngüyü değiştirir. */
+export interface SiteRule { id: "camur" | "boss" | "tuzak" | "karanlik" | "duman"; name: string; desc: string }
+export const SITE_RULES: Record<string, SiteRule> = {
+  koru_agil: { id: "camur", name: "Çamur", desc: "Zemin katı çamurlu: sen de kurtlar da %20 yavaşsın." },
+  koru_kule: { id: "boss", name: "Bekçibaşı", desc: "En üst katta kocaman bir kurt yatıyor: çok can, sert vuruş; ölünce bakır düşer (bir kez)." },
+  koru_kosk: { id: "tuzak", name: "Tuzaklı kutular", desc: "Bazı kutular tuzaklı: aramanın ortasında fark edersin; sürdürürsen can gider." },
+  karacam_sarnic: { id: "karanlik", name: "Karanlık", desc: "Görüş kısa; bekçiler de seni geç fark eder (yakından uyanırlar)." },
+  ardic_kul: { id: "duman", name: "Duman", desc: "Dumandan arama %30 yavaş." },
+};
+export const siteRule = (site: { id: string }): SiteRule | undefined => SITE_RULES[site.id];
+const ruleOf = (n: { site: { id: string } }) => SITE_RULES[n.site.id]?.id;
 /** Bir yerdeki harabeler, kolaydan zora. */
 export const sitesAt = (place: string) => SCAV_SITES.filter(x => x.place === place).sort((a, b) => a.tier - b.tier);
 
@@ -211,8 +222,8 @@ export function defaultLoadout(cfg: Config, s: GameState): Loadout {
 
 /* ---------- durum ---------- */
 export interface Stage { kind: "empty" | "item" | "money" | "weapon" | "key"; key?: number; item?: string; n?: number; money?: number; weapon?: string; time: number }
-export interface Spot { vault?: boolean; id: number; x: number; floor: number; name: string; stages: Stage[]; stage: number; prog: number; done: boolean }
-export interface SFoe { wet?: number; idle?: boolean; id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
+export interface Spot { trapped?: boolean; seen?: boolean; vault?: boolean; id: number; x: number; floor: number; name: string; stages: Stage[]; stage: number; prog: number; done: boolean }
+export interface SFoe { boss?: boolean; wind?: number; wet?: number; idle?: boolean; id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
 export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
   | { k: "hurt"; dmg: number } | { k: "raid"; n: number; last: boolean } | { k: "alarm"; human: boolean } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
@@ -262,7 +273,7 @@ export function pickGround(n: Scav, gid?: number): "ok" | "full" | "none" {
   const g = gid ? groundNear(n).find(q => q.id === gid) : nearGround(n); if (!g) return "none"; if (!canStore(n, g.item)) return "full";
   n.ground = n.ground.filter(q => q !== g); n.bag[g.item] = (n.bag[g.item] ?? 0) + 1; return "ok";
 }
-export const speedOf = (n: Scav) => 32 * n.tr.walk;
+export const speedOf = (n: Scav) => 32 * n.tr.walk * (ruleOf(n) === "camur" && n.floor === 0 && !n.climbing ? 0.8 : 1);
 export const CLIMB_SPEED = 0.5;      // kat/sn
 export const SPOT_STAGES = 3;
 /** Çıkacak şey basitse hızlı, değerliyse yavaş aranır. */
@@ -278,7 +289,7 @@ function rollStage(site: ScavSite, rng: Rng): Stage {
   if (pick.money) { const m = rng.int(pick.money[0], pick.money[1]); return { kind: "money", money: m, time: stageTime(pick, m) }; }
   return { kind: "item", item: pick.item, n: pick.n ? rng.int(pick.n[0], pick.n[1]) : 1, time: stageTime(pick) };
 }
-export const searchMul = (n: Scav) => n.tr.search;
+export const searchMul = (n: Scav) => n.tr.search * (ruleOf(n) === "duman" ? 1.3 : 1);
 export const stageSeconds = (n: Scav, sp: Spot) => sp.stages[sp.stage] ? sp.stages[sp.stage].time * searchMul(n) : 0;
 
 export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: number, load: Loadout = defaultLoadout(cfg, s)): Scav {
@@ -321,6 +332,14 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
     const def = site.foes[rng.int(0, site.foes.length - 1)]; const d = ENEMIES[def]; const sc = 1 + f * 0.12 + (vault ? 0.2 : 0) + (site.tier - 1) * 0.08;
     guards.push({ idle: true, id: gid2++, def, x, floor: f, hp: d.hp * sc * 1.35, max: d.hp * sc * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * sc * 0.7, cd: 1.2, human: d.species === "insan", climbT: 0, toFloor: f, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
+  // kuralı olan harabeler: bekçibaşı (üst kat, çok can) ve tuzaklı kutular (ayrı tohum: yerleşim değişmez)
+  const rid = SITE_RULES[site.id]?.id;
+  if (rid === "boss") {
+    const bf = site.floors - 1; const [, hi] = freeSpan(bf); const def = [...site.foes].sort((a, b) => ENEMIES[b].hp - ENEMIES[a].hp)[0]; const d = ENEMIES[def];
+    const sc = 1 + bf * 0.12 + (site.tier - 1) * 0.08;
+    guards.push({ boss: true, idle: true, id: gid2++, def, x: hi - 26, floor: bf, hp: d.hp * sc * 1.35 * 3.2, max: d.hp * sc * 1.35 * 3.2, speed: 11 + (d.move ?? 4) * 1.2, dmg: (d.damage[0] + d.damage[1]) / 2 * sc * 0.7 * 1.5, cd: 1.2, human: d.species === "insan", climbT: 0, toFloor: bf, hitT: 0, root: 0, slow: 0, burn: 0 });
+  }
+  if (rid === "tuzak") { const tr = new Rng(layoutSeed(s, site.id) ^ 0x5bd1e995); for (const sp of spots) if (!sp.vault && tr.chance(30)) sp.trapped = true; }
   // kayıtlı durum: boşaltılan sandık boş, açılan kapı açık, öldürülen bekçi yok, yerde bırakılanlar yerde
   const sv = harabeSave(s, site.id);
   for (const sp of spots) { const st = sv.stages[sp.id] ?? 0; sp.stage = Math.min(SPOT_STAGES, st); sp.done = st >= SPOT_STAGES; }
@@ -333,7 +352,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   const alive = guards.filter(g => !sv.killed.includes(g.id));
   const ground: GItem[] = sv.ground.map((g, i) => ({ id: i + 1, ...g }));
   return {
-    site, seed, rng: run, w: W, alerted: false, guardCount: site.guards, killed: [...sv.killed], time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4 * tr.hp)), maxHp: Math.round(mh * 1.4 * tr.hp),
+    site, seed, rng: run, w: W, alerted: false, guardCount: site.guards + (rid === "boss" ? 1 : 0), killed: [...sv.killed], time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4 * tr.hp)), maxHp: Math.round(mh * 1.4 * tr.hp),
     spots, searchId: 0, searchWait: 0, foes: alive, nextId: gid2, wave: 0, raidT: tr.firstRaid, raidHold: 0, spellQ: [], bag: {}, bagCap: tr.bagCap, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
     atkCd: 0, atkFx: 0, weaponName, dual, bowName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), tr, searched: 0, shots: 0, kills: 0, found: 0, fx: [],
     ground, gid: ground.length + 1, proj: [], locks, doors, fort: null, keys: [...sv.keys], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
@@ -467,6 +486,8 @@ function applyStage(n: Scav, sp: Spot, st: Stage) {
 export const danger = (n: Scav) => 5 + n.wave * 2;
 /** Kalan baskın sayısı. */
 export const raidsLeft = (n: Scav) => Math.max(0, n.site.raids - n.wave);
+/** Sıradaki baskında kaç düşman gelecek (sayaç yanında gösterilir). */
+export const nextRaidCount = (n: Scav) => Math.min(7, n.site.raidSize + n.wave);
 /** Bekçiler fark etti: kurtlar ulur (insanlar ıslık çalar), baskın sayacı başlar. */
 function alarm(n: Scav, f?: SFoe) {
   if (n.alerted) return; n.alerted = true; n.raidT = n.site.raids > 0 ? n.tr.firstRaid : Infinity;
@@ -485,7 +506,8 @@ function spawnRaid(n: Scav) {
 function hurtFoe(n: Scav, f: SFoe, dmg: number, crit: boolean, quiet = false) {
   if (f.idle) { f.idle = false; alarm(n, f); }
   f.hp -= dmg; f.hitT = 0.2; if (!quiet) n.fx.push({ k: "hit", x: f.x, floor: f.floor, dmg: Math.round(dmg), crit });
-  if (f.hp <= 0 && n.foes.includes(f)) { n.foes = n.foes.filter(q => q !== f); n.kills++; if (f.id <= n.guardCount && !n.killed.includes(f.id)) n.killed.push(f.id); n.fx.push({ k: "die", x: f.x, floor: f.floor }); }
+  if (f.hp <= 0 && n.foes.includes(f)) { n.foes = n.foes.filter(q => q !== f); n.kills++; if (f.id <= n.guardCount && !n.killed.includes(f.id)) n.killed.push(f.id); n.fx.push({ k: "die", x: f.x, floor: f.floor });
+    if (f.boss) { const bonus = 12 * n.site.tier; n.money += bonus; n.fx.push({ k: "loot", text: `+${bonus} bakır (bekçibaşı)`, x: f.x, floor: f.floor }); } }
 }
 
 /** Zamanı ilerlet. */
@@ -543,7 +565,9 @@ export function stepScav(n: Scav, dt: number) {
     if (!sp || sp.done || n.climbing) n.searchId = 0;
     else {
       sp.prog += dt / Math.max(0.3, stageSeconds(n, sp));
+      if (sp.trapped && !sp.seen && sp.prog >= 0.6) { sp.seen = true; n.fx.push({ k: "combo", tag: "Tuzak var!", x: sp.x, floor: sp.floor }); }
       if (sp.prog >= 1) {
+        if (sp.trapped) { sp.trapped = false; const dm = (3 + n.site.tier * 2) * Math.max(0.35, 1 - n.armor / 40); n.hp -= dm; n.fx.push({ k: "hurt", dmg: Math.round(dm) }); n.fx.push({ k: "combo", tag: "Tuzak!", x: sp.x, floor: sp.floor }); }
         const st = sp.stages[sp.stage]; sp.stage++; sp.prog = 0; n.searchId = 0; n.searchWait = 1.1; applyStage(n, sp, st); n.fx.push({ k: "spot", x: sp.x, floor: sp.floor });
         if (sp.stage >= SPOT_STAGES) { sp.done = true; n.searchId = 0; n.searched++; }
       }
@@ -576,10 +600,10 @@ export function stepScav(n: Scav, dt: number) {
   for (const f of [...n.foes]) {
     f.hitT = Math.max(0, f.hitT - dt); f.cd -= dt; if (f.wet) f.wet = Math.max(0, f.wet - dt); f.root = Math.max(0, f.root - dt); f.slow = Math.max(0, f.slow - dt);
     if (f.burn > 0) { f.burn -= dt; hurtFoe(n, f, n.dmg * 0.12 * dt, false, true); if (!n.foes.includes(f)) continue; }
-    if (f.idle) { if (f.floor === n.floor && Math.abs(f.x - n.px) <= 48 && !n.climbing) { f.idle = false; alarm(n, f); } else continue; }   // bekçi: yaklaşınca uyanır, ötekileri çağırır
+    if (f.idle) { if (f.floor === n.floor && Math.abs(f.x - n.px) <= (ruleOf(n) === "karanlik" ? 28 : 48) && !n.climbing) { f.idle = false; alarm(n, f); } else continue; }   // bekçi: yaklaşınca uyanır, ötekileri çağırır
     if (f.climbT > 0) { f.climbT -= dt; if (f.climbT <= 0) f.floor = f.toFloor; continue; }
     if (f.root > 0) continue;
-    const sp = f.speed * (f.slow > 0 ? 0.45 : 1);
+    const sp = f.speed * (f.slow > 0 ? 0.45 : 1) * (ruleOf(n) === "camur" && f.floor === 0 ? 0.8 : 1);
     if (f.floor !== pf) {
       const gap = pf > f.floor ? f.floor : f.floor - 1; const lx = ladderAt(n.w, gap); const d = lx - f.x;
       if (Math.abs(d) > 1) moveFoe(n, f, lx, Math.min(Math.abs(d), sp * dt), dt, [-Infinity, Infinity]);
@@ -587,8 +611,8 @@ export function stepScav(n: Scav, dt: number) {
       continue;
     }
     const d = n.px - f.x;
-    if (Math.abs(d) > 5.5) moveFoe(n, f, n.px, Math.min(Math.abs(d) - 5, sp * dt), dt, freeRange(n, f.floor));
-    else if (f.cd <= 0 && exposed) { f.cd = 1.5;
+    if (Math.abs(d) > 5.5) { f.wind = 0; moveFoe(n, f, n.px, Math.min(Math.abs(d) - 5, sp * dt), dt, freeRange(n, f.floor)); }
+    else if ((f.wind ?? 0) > 0 || (f.cd <= 0 && exposed)) { if ((f.wind ?? 0) <= 0) { f.wind = 0.45; continue; } f.wind! -= dt; if (f.wind! > 0) continue; f.wind = 0; f.cd = 1.5; if (!exposed) continue;
       if (n.moving && n.rng.chance(60)) { n.fx.push({ k: "dodge", x: n.px, floor: n.floor }); continue; }   // koşarken yanından sıyrılırsın
       const dm = f.dmg * Math.max(0.35, 1 - n.armor / 40); n.hp -= dm; n.fx.push({ k: "hurt", dmg: Math.round(dm) }); }
   }
