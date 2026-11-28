@@ -47,6 +47,12 @@ const NEW_ITEMS: GameItem[] = [
   { id: "odun_baltasi", name: "Odun baltası", slot: "Silah", damage: 9, price: 14, desc: "İki elle savrulur. Yavaş ama ağır." },
   { id: "mizrak", name: "Av mızrağı", slot: "Silah", damage: 8, critBonus: 4, price: 16, desc: "İki elle tutulur; uzun sapı kurdu uzakta tutar." },
   { id: "agac_kalkan", name: "Ağaç kalkan", slot: "Silah", price: 8, desc: "Deri kaplı yuvarlak kalkan. Sol ele takılır." },
+  // eşsizler: harabelerin 5. derinlik seviyesinde mühürlü sandıktan çıkar (engine/scavenge.ts SITE_REWARDS); satılmaz
+  { id: "cobanin_cizmesi", name: "Çobanın çizmesi", slot: "Zırh", armor: 2, price: 60, desc: "Çamurda yürümek için yağlanmış eski çizme. Harabede çamur seni yavaşlatmaz." },
+  { id: "bekcibasi_kilici", name: "Bekçibaşının kılıcı", slot: "Silah", damage: 11, critBonus: 4, price: 90, desc: "Hep nemli, hiç kurumayan bir kılıç. Harabede vurduğun düşman ıslanır; ıslağa şimşek ve buz daha çok işler." },
+  { id: "komurlesmis_yay", name: "Kömürleşmiş yay", slot: "Silah", damage: 7, price: 90, desc: "Köşkün yangınından sağ kalmış. Harabede attığın ok ikinci bir düşmana sekip vurur." },
+  { id: "sarnic_feneri", name: "Sarnıç feneri", slot: "Takı", price: 70, desc: "Kısık, hiç sönmeyen bir ışık. Harabede karanlık seni bunaltmaz, bekçiler yakından uyanır." },
+  { id: "kul_maskesi", name: "Kül maskesi", slot: "Zırh", armor: 2, price: 80, desc: "Kül Ana'nın torunlarının duman için taktığı bez maske. Harabede duman aramanı yavaşlatmaz." },
 ];
 for (const it of NEW_ITEMS) GAME_ITEMS[it.id] = it;
 Object.assign(GEAR, {
@@ -57,6 +63,8 @@ Object.assign(GEAR, {
   nazar_boncugu: { part: "taki", bonus: { stres: 1.5 } }, gumus_kupe: { part: "taki", bonus: { isitme: 2, gorus: 1 } },
   hancer: { hands: 1 }, odun_baltasi: { hands: 2 }, mizrak: { hands: 2 },
   agac_kalkan: { shield: true, armor: 2, dodge: 4 },
+  cobanin_cizmesi: { part: "alt", dodge: 3, bonus: { refleks: 1 } }, bekcibasi_kilici: { hands: 1 }, komurlesmis_yay: { bow: true },
+  sarnic_feneri: { part: "taki", bonus: { gorus: 2, cevresel: 1 } }, kul_maskesi: { part: "bas", bonus: { irade: 1, stres: 1 } },
 } satisfies Record<string, GearMeta>);
 
 /** Elle yapılanlar ve nerede satıldıkları content/world.ts içinde (CRAFTS, MARKETS). */
