@@ -303,29 +303,44 @@ test("düşman saldırıyı önceden belli eder: vuruştan önce işaret çıkar
   n.px = f.x - 3; run(n, 1); expect(n.hp).toBeLessThan(100);                              // yakında kalırsan vurur
 });
 
-test("açılı atış: yatay + dikey çekince top/ok yükselir ve üst kattaki düşmana ulaşır; yalnız yatay düz gider; tavana çarpan ateş topu sekip döner ve odadan çıkmaz", async () => {
-  const { aimShot, castSpell, shootArrow, FLOOR_X } = await import("../src/engine/scavenge");
-  const s = fresh(); s.equipped.bow = "av_yayi"; s.inventory.av_yayi = 1; s.inventory.ok = 10;
+test("açılı atış: yatay + dikey çekince atış yükselir/alçalır ama tavandan ve kattan geçmez; ateş/buz tavandan tabandan sekip odada kalır", async () => {
+  const { aimShot, castSpell, shootArrow, HAND_Y } = await import("../src/engine/scavenge");
+  const s = fresh(); s.equipped.bow = "av_yayi"; s.inventory.av_yayi = 1; s.inventory.ok = 20;
   const n = createScav(cfg, s, scavSite("koru_kule")!, 32, { kind: "bow" }); n.raidT = 999; n.foes = []; n.px = 20;   // merdivenden uzak
   expect(aimShot(n, { dx: 1, dy: 0 }).slope).toBe(0);
   const up = aimShot(n, { dx: 1, dy: -1 }); expect(up.slope).toBeGreaterThan(0); expect(up.dir).toBe(1); expect(aimShot(n, { dx: 1, dy: 1 }).slope).toBeLessThan(0);
   expect(aimShot(n, { dx: 1, dy: -1.7 }).slope).toBeGreaterThan(up.slope);                     // daha dik çekince daha dik
-  // ok: 45° çizgide FLOOR_X birim ileride bir üst kattaki düşmana ulaşır
-  const aim = { dx: 1, dy: -1 }; const dxFoe = FLOOR_X / Math.tan(Math.atan2(1, 1));            // 45°: bir kat için FLOOR_X birim
-  const f = foe(n.px + dxFoe, { floor: 1 }); n.foes = [f]; expect(shootArrow(n, aim)).toBe(true); expect(f.hp).toBeLessThan(500);
-  const g0 = foe(n.px + dxFoe, { floor: 0 }); f.hp = 500; n.foes = [g0]; n.atkCd = 0; shootArrow(n, aim); expect(g0.hp).toBe(500);   // aynı kattakine ok yükselip ıskalar
-  // büyü topu açılı uçar
-  n.foes = []; n.px = 20; n.atkCd = 0; n.spell = { id: "x", kind: "ates", name: "Ateş", cd: 0, max: 4, mul: 2, r: 4 } as any; n.tr.spellShots = 1;
-  expect(castSpell(n, aim)).toBe(true); run(n, 0.5); const pj = n.proj[0]; expect(pj?.y).toBeGreaterThan(0);
-  // ateş/buz topu odadan çıkmaz: açılı atınca tavana ve tabana çarpıp odanın içinde kalır
-  n.proj = []; n.spellQ = []; n.spell!.cd = 0; n.px = 20; n.foes = []; castSpell(n, aim); n.tr.spellShots = 1; run(n, 1.5);
+  // ok üst kata geçmez; yakındaki aynı kat düşmanına açıyla (gövde hizasında) vurur, uzağa giden ok tavana çarpıp düşer
+  const aim = { dx: 1, dy: -1 };
+  const upper = foe(n.px + 55, { floor: 1 }); n.foes = [upper]; shootArrow(n, aim); expect(upper.hp).toBe(500);           // tavandan kata geçmez
+  const near = foe(n.px + 10, { floor: 0 }); n.foes = [near]; n.atkCd = 0; shootArrow(n, aim); expect(near.hp).toBeLessThan(500);   // yakında gövde hizasında
+  const far = foe(n.px + 60, { floor: 0 }); n.foes = [far]; n.atkCd = 0; shootArrow(n, aim); expect(far.hp).toBe(500);       // uzakta ok tavana çarpıp düştü
+  void HAND_Y;
+  // büyü: kat atlamaz (çamur tavana çarpıp patlar), ateş/buz tavandan tabandan sekip odada kalır
+  n.spell = { id: "c", kind: "camur", name: "Çamur", cd: 0, max: 4, mul: 2, r: 4 } as any; n.tr.spellShots = 1; n.px = 20; n.atkCd = 0;
+  const up2 = foe(n.px + 55, { floor: 1 }); n.foes = [up2]; castSpell(n, aim); run(n, 2); expect(up2.hp).toBe(500);
+  n.proj = []; n.spellQ = []; n.foes = []; n.spell = { id: "x", kind: "ates", name: "Ateş", cd: 0, max: 4, mul: 2, r: 4 } as any; n.px = 20;
+  castSpell(n, aim); run(n, 1.5);
   const ball = n.proj[0]; if (ball) { expect(ball.y!).toBeGreaterThanOrEqual(-0.1); expect(ball.y!).toBeLessThanOrEqual(1); expect(ball.nb ?? 0).toBeGreaterThan(0); expect(Math.floor(ball.x / 100)).toBe(0); }
-  // ateş/buz dışındakiler (çamur) açılı atınca kat atlayıp üst kattaki düşmana ulaşır
-  n.proj = []; n.spellQ = []; n.spell = { id: "c", kind: "camur", name: "Çamur", cd: 0, max: 4, mul: 2, r: 4 } as any; n.px = 20;
-  const f2 = foe(n.px + dxFoe, { floor: 1 }); n.foes = [f2]; castSpell(n, aim); run(n, 2); expect(f2.hp).toBeLessThan(500);
   // tavan: son katın üstüne çıkan ateş topu bir kez sekip alçalır
   n.proj = []; n.foes = []; n.proj.push({ id: 99, kind: "ates", conf: true, x: 30, floor: n.site.floors - 1, y: n.site.floors - 1, slope: 0.05, dir: 1, left: 150, base: 10, r: 3 }); run(n, 0.2);
   expect(n.proj[0]?.slope).toBeLessThan(0);
+});
+
+test("gerçekçilik: kapalı kapı ok, büyü ve vuruşu durdurur; açık kapı geçirir (ateş/buz hariç, onlar odadan çıkmaz)", async () => {
+  const { shootArrow, wallBetween } = await import("../src/engine/scavenge");
+  const s = fresh(); s.equipped.bow = "av_yayi"; s.inventory.av_yayi = 1; s.inventory.ok = 30;
+  const n = createScav(cfg, s, scavSite("koru_kule")!, 32, { kind: "bow" }); n.raidT = 999; n.foes = [];
+  const d = n.doors.find(q => q.floor === 0)!; n.px = d.x - 20; n.atkCd = 0;
+  const f = foe(d.x + 15, { hp: 500, max: 500, speed: 0, dmg: 0, cd: 99 }); n.foes = [f];
+  d.state = "open"; expect(wallBetween(n, 0, n.px, f.x)).toBeUndefined(); shootArrow(n, { dx: 1, dy: 0 }); expect(f.hp).toBeLessThan(500);            // açık kapıdan ok geçer
+  f.hp = 500; d.state = "closed"; n.atkCd = 0; expect(wallBetween(n, 0, n.px, f.x)).toBe(d.x); shootArrow(n, { dx: 1, dy: 0 }); expect(f.hp).toBe(500);   // kapalı kapıdan geçmez
+  // yumruk/yakın vuruş da geçmez
+  n.px = d.x - 4; f.x = d.x + 4; run(n, 2); expect(f.hp).toBe(500);
+  // çamur büyüsü kapalı kapıda patlar, ötesine ulaşmaz
+  n.spell = { id: "c", kind: "camur", name: "Çamur", cd: 0, max: 4, mul: 2, r: 4 } as any; n.tr.spellShots = 1; n.px = d.x - 30; f.x = d.x + 10; n.atkCd = 5;
+  castSpell(n, { dx: 1, dy: 0 }); run(n, 2.5); expect(f.hp).toBe(500); expect(n.proj.length).toBe(0);
+  d.state = "open"; n.spell!.cd = 0; castSpell(n, { dx: 1, dy: 0 }); run(n, 2.5); expect(f.hp).toBeLessThan(500);                         // açıkken geçer
 });
 
 test("ateş topu odadan çıkmaz: oda duvarına (kapı açık olsa da) çarpıp döner; ölçülü sayıda sekince patlar", () => {

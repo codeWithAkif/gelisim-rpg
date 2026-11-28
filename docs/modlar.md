@@ -118,11 +118,14 @@ Altıgen savaş, barikat ve gizlenme eskiden yalnız görev ya da yol pususunda 
 
 15, 20… seviyelerde bol bakır (40 × zorluk × k). Kod: `SITE_REWARDS`, `rewardFor`, `siteLevel` (`engine/scavenge.ts`); eşyalar `content/gear.ts`.
 
-## Harabe: açılı atış
+## Harabe: açılı atış ve gerçekçilik
 
-- Büyü ve ok düğmesini hem yatay hem dikey çekince atış **açılı** gider: yukarı çekmek yükseltir, aşağı çekmek alçaltır. Çizgi bir kat çıkmak için 45°'de yatay ~55 birim gider (`FLOOR_X`); top üst/alt kattaki düşmana ulaşır, oku düşman hizasına denk gelirse vurur.
-- Yalnız yatay çekmek düz gider (eskisi gibi); merdiven açıklığında çapraz çekmek eskisi gibi bir üst/alt kata atar.
-- Ateş ve buz topu açılı atınca odanın tavanından ve tabanından sekerek odada kalır (bank atışı); çamur, sarmaşık gibi ötekiler açılı atınca kat atlayıp üst/alt kattaki düşmana ulaşır. Kural `engine/scavenge.ts` (`aimShot`).
+Harabe gerçekçi bir mekân: **kapalı kapıdan, tavandan ve katlar arasındaki döşemeden hiçbir şey geçmez.**
+
+- Büyü ve ok düğmesini hem yatay hem dikey çekince atış **açılı** gider (yukarı çekmek yükseltir, aşağı çekmek alçaltır). Atış elden başlar, kat atlayamaz: oda tavanına ya da zemine çarpınca ok düşer, top patlar. Yalnız yatay çekmek düz gider; **merdiven açıklığında** çapraz çekmek eskisi gibi bir üst/alt kata atar (açıklıktan geçer).
+- **Kapalı kapı ve kilitli kapı** ok, büyü ve yakın vuruşu durdurur; patlama da kapının ötesine ulaşmaz. Açık kapı geçirir. Sen geçince kapı kapanır; düşman kırmadan ötesine vuramazsın.
+- **Ateş ve buz topu** odadan hiç çıkmaz: oda duvarına (kapı açık da olsa), tavana, tabana ve kapıya çarpınca sekip kalır (%15 güç kaybı, en çok 4 sekme). Açılı atınca tavandan tabandan sektirerek köşedeki düşmana vurulur (bank atışı).
+- Okun yüksekliği: yakındaki düşman gövdesine denk gelirse vurur, uzağa giden açılı ok tavana çarpıp düşer. Kural `engine/scavenge.ts` (`wallBetween`, `aimShot`).
 
 ## Harabe kapıları
 
