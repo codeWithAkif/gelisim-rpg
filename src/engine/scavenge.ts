@@ -12,7 +12,7 @@ import { maxHp } from "./combat";
 import { Rng } from "./rng";
 import { ENEMIES } from "../content/world";
 import { addItem, removeItem, capacity } from "./inventory";
-import { weaponSet, hasBow, totalArmor, slotsFor } from "./gear";
+import { weaponSet, hasBow, totalArmor, slotsFor, gearOf } from "./gear";
 import { spellOptions, SPELL_FX } from "./magic";
 import { boltStyle, type BoltStyle } from "./spellfx";
 import { trapsOwned, trapEffect } from "./engineering";
@@ -185,14 +185,19 @@ export const FOUND_WEAPONS: FoundWeapon[] = [
 
 /* ---------- başlangıç seçimi: yalnız TEK şey götürürsün ---------- */
 export type LoadKind = "yumruk" | "melee" | "bow" | "dog" | "trap" | "spell";
-export interface Loadout { kind: LoadKind; id?: string; q?: number }   // q: büyünün girişte çizilen dizisinin kalitesi (0–1)
-export interface LoadOption { kind: LoadKind; id?: string; label: string; note: string }
+export interface Loadout { kind: LoadKind; id?: string; off?: string; q?: number }   // q: büyünün girişte çizilen dizisinin kalitesi (0–1)
+export interface LoadOption { kind: LoadKind; id?: string; off?: string; label: string; note: string }
 export const hasBowItem = (s: GameState) => !!s.equipped.bow || Object.keys(s.inventory).some(id => (s.inventory[id] ?? 0) > 0 && slotsFor(id).includes("bow"));
 export function loadoutOptions(cfg: Config, s: GameState): LoadOption[] {
   const out: LoadOption[] = [];
   const ids = new Set<string>(); if (s.equipped.weapon) ids.add(s.equipped.weapon);
   for (const id of Object.keys(s.inventory)) if ((s.inventory[id] ?? 0) > 0 && slotsFor(id).includes("weapon")) ids.add(id);
   for (const id of ids) { const d = weaponSet(cfg, { ...s, equipped: { weapon: id } } as GameState); out.push({ kind: "melee", id, label: d.name, note: `yakın dövüş · vuruş ${+d.dmg.toFixed(1)}${s.equipped.weapon === id ? " · elinde" : ""}` }); }
+  // çift elli: iki tek elli silahın varsa (aynı bıçaktan iki tane de olur) ikisini birden tutarsın
+  const one = [...new Set([...ids, ...(s.equipped.offhand ? [s.equipped.offhand] : [])])].filter(id => gearOf(id).hands === 1 && slotsFor(id).includes("offhand") && !gearOf(id).shield && ((s.inventory[id] ?? 0) > 0 || s.equipped.weapon === id || s.equipped.offhand === id))
+    .sort((a, b) => weaponSet(cfg, { ...s, equipped: { weapon: b } } as GameState).dmg - weaponSet(cfg, { ...s, equipped: { weapon: a } } as GameState).dmg);
+  if (one.length) { const a = one[0]; const b = one.length > 1 ? one[1] : (s.inventory[a] ?? 0) >= 2 ? a : undefined;
+    if (b) { const d = weaponSet(cfg, { ...s, equipped: { weapon: a, offhand: b } } as GameState); out.push({ kind: "melee", id: a, off: b, label: d.name, note: `çift elli · vuruş ${+d.dmg.toFixed(1)} · biraz daha yavaş` }); } }
   if (hasBowItem(s)) { const ok = Math.min(12, s.inventory.ok ?? 0); out.push({ kind: "bow", label: "Yay", note: ok ? `uzaktan · ${ok} ok` : "okun yok; kutulardan ok bulursan atarsın" }); }
   if (s.pet) out.push({ kind: "dog", label: s.pet.name, note: "arada koşup düşmanla dövüşür" });
   for (const tp of trapsOwned(s)) out.push({ kind: "trap", id: tp.id, label: `Tuzak: ${tp.id.replace(/_/g, " ")}`, note: `${Math.min(3, tp.n)} tane taşırsın; tetiklenince dolana kadar bekler` });
@@ -228,7 +233,7 @@ export interface Scav {
   w: number; alerted: boolean; guardCount: number; killed: number[];   // genişlik; bekçiler fark etti mi; ilk bekçi kimlikleri; öldürülen bekçiler
   px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
   spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number; raidHold: number; spellQ: { t: number; dir: 1 | -1; floor: number }[];
-  bag: Record<string, number>; bagCap: number; bowName: string; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
+  bag: Record<string, number>; bagCap: number; bowName: string; dual: boolean; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
   foundWeapons: string[]; weaponId: string; castT: number; foundT: number; armor: number; tr: ScavTraits; searched: number; shots: number; kills: number; found: number; fx: SFx[];
   ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; doors: Door[]; fort: { d: Door; prog: number } | null; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number; bolt?: BoltStyle | null };
 }
@@ -299,8 +304,8 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
     const kf = (f + 1) % site.floors; const cands = spots.filter(q => q.floor === kf && !q.vault); const sp = cands[rng.int(0, cands.length - 1)]; sp.stages[rng.int(0, SPOT_STAGES - 1)] = { kind: "key", key: f, time: 3.2 };
   }
   const tr = scavTraits(cfg, s); const mh = maxHp(cfg, s); const lv = (a: string) => s.attrs[a]?.level ?? 0; const fist = 2 + lv("ust_govde") / 10;
-  let melee = fist, weaponName = "Yumruk", bowName = "", bow = false, ammo = 0; const traps: TrapSlot[] = []; let dog: Dog | undefined; let spell: Scav["spell"];
-  if (load.kind === "melee" && load.id) { const d = weaponSet(cfg, { ...s, equipped: { weapon: load.id } } as GameState); melee = (d.dmg + lv("ust_govde") / 10) * tr.melee; weaponName = d.name; }
+  let melee = fist, weaponName = "Yumruk", bowName = "", bow = false, ammo = 0, dual = false; const traps: TrapSlot[] = []; let dog: Dog | undefined; let spell: Scav["spell"];
+  if (load.kind === "melee" && load.id) { const d = weaponSet(cfg, { ...s, equipped: { weapon: load.id, ...(load.off ? { offhand: load.off } : {}) } } as GameState); dual = !!load.off; melee = (d.dmg + lv("ust_govde") / 10) * tr.melee; weaponName = d.name; }
   if (load.kind === "bow") { bow = true; ammo = Math.min(tr.ammoCap, s.inventory.ok ?? 0); bowName = "Yay"; }
   if (load.kind === "dog" && s.pet) dog = { x: EXIT_X + 10, floor: 0, state: "yanda", t: 12, cd: 0, moving: false, face: 1, lag: 0 };
   if (load.kind === "trap" && load.id) { const own = trapsOwned(s).find(x => x.id === load.id); for (let i = 0; i < Math.min(3, own?.n ?? 0); i++) traps.push({ id: load.id, state: "hand", x: 0, floor: 0, t: 0 }); }
@@ -330,7 +335,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   return {
     site, seed, rng: run, w: W, alerted: false, guardCount: site.guards, killed: [...sv.killed], time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4 * tr.hp)), maxHp: Math.round(mh * 1.4 * tr.hp),
     spots, searchId: 0, searchWait: 0, foes: alive, nextId: gid2, wave: 0, raidT: tr.firstRaid, raidHold: 0, spellQ: [], bag: {}, bagCap: tr.bagCap, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
-    atkCd: 0, atkFx: 0, weaponName, bowName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), tr, searched: 0, shots: 0, kills: 0, found: 0, fx: [],
+    atkCd: 0, atkFx: 0, weaponName, dual, bowName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), tr, searched: 0, shots: 0, kills: 0, found: 0, fx: [],
     ground, gid: ground.length + 1, proj: [], locks, doors, fort: null, keys: [...sv.keys], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
 }
@@ -595,7 +600,7 @@ export function stepScav(n: Scav, dt: number) {
     if (t) {
       const dist = Math.abs(t.x - n.px); const crit = n.rng.chance(8);
       if (n.bow && n.ammo > 0 && dist <= 80) { n.ammo--; n.shots++; n.atkCd = 1 / n.rate; n.atkFx = 0.25; n.face = t.x > n.px ? 1 : -1; n.fx.push({ k: "shot", from: n.px, to: t.x, floor: n.floor }); hurtFoe(n, t, n.dmg * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); }
-      else if (dist <= 8) { n.atkCd = 0.85; n.atkFx = 0.25; n.face = t.x > n.px ? 1 : -1; hurtFoe(n, t, n.melee * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); }
+      else if (dist <= 8) { n.atkCd = n.dual ? 0.95 : 0.85; n.atkFx = 0.25; n.face = t.x > n.px ? 1 : -1; hurtFoe(n, t, n.melee * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); }
     }
   }
 }

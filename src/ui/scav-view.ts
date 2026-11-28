@@ -29,7 +29,7 @@ function openScavHubInner(cfg: Config, s: GameState, place: string, persist: () 
   const list = sitesAt(place); const bg = document.createElement("div"); bg.className = "modal-bg";
   const opts = loadoutOptions(cfg, s); let sel: Loadout = defaultLoadout(cfg, s);
   let pick: ScavSite | undefined = list.find(x => !x.unlock(s) && siteProgress(s, x).done < siteProgress(s, x).total) ?? list.find(x => !x.unlock(s));
-  const isSel = (o: { kind: string; id?: string }) => sel.kind === o.kind && sel.id === o.id;
+  const isSel = (o: { kind: string; id?: string; off?: string }) => sel.kind === o.kind && sel.id === o.id && sel.off === o.off;
   let note = "";   // büyü dizisi tutmadıysa
   const stars = (t: number) => Array.from({ length: 4 }, (_, i) => `<i class="${i < t ? "on" : ""}">◆</i>`).join("");
   const draw = () => {
@@ -58,7 +58,7 @@ function openScavHubInner(cfg: Config, s: GameState, place: string, persist: () 
     const t = e.target as HTMLElement;
     const st = t.closest<HTMLButtonElement>("[data-site]"); if (st && !st.disabled) { pick = list.find(x => x.id === st.dataset.site); sfx("tap"); draw(); return; }
     const o = t.closest<HTMLButtonElement>("[data-i]");
-    if (o) { const i = +o.dataset.i!; sel = i < 0 ? { kind: "yumruk" } : { kind: opts[i].kind, id: opts[i].id }; sfx("tap"); draw(); return; }
+    if (o) { const i = +o.dataset.i!; sel = i < 0 ? { kind: "yumruk" } : { kind: opts[i].kind, id: opts[i].id, off: opts[i].off }; sfx("tap"); draw(); return; }
     const b = t.closest<HTMLButtonElement>("button[data-x]"); if (!b || b.disabled) return;
     // büyü seçildiyse girişte avucunda hazırlarsın: dizisini aklından bir kez doğru çiz
     if (b.dataset.x === "go" && pick && sel.kind === "spell" && sel.id && settings().timing) {
