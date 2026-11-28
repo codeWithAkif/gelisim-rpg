@@ -472,16 +472,27 @@ export function castSpell(n: Scav, aim?: { dx: number; dy: number }): boolean {
 const spellMul = (n: Scav) => n.tr.spellPow;
 function launchSpell(n: Scav, q: { dir: 1 | -1; floor: number; slope?: number }) {
   const sp = n.spell; if (!sp) return; const wide = n.tr.spellShots >= 3 ? 1.3 : 1;
-  n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + q.dir * 5, floor: q.floor, dir: q.dir, ...(bounces(sp.kind) ? { conf: true, room: Math.floor((n.px + q.dir * 5) / ROOM_W), ...(q.slope ? { y: q.floor + 0.12, slope: q.slope } : {}) } : q.slope ? { y: q.floor, slope: q.slope } : {}), left: 150, base: n.dmg * sp.mul * 0.5 * spellMul(n), r: sp.r * 0.9 * spellMul(n) * wide, bolt: sp.bolt });
+  n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + q.dir * 5, floor: q.floor, dir: q.dir, ...(bounces(sp.kind) ? { conf: true, room: Math.floor((n.px + q.dir * 5) / ROOM_W) } : {}), ...(q.slope ? { y: q.floor + HAND_Y, slope: q.slope } : {}), left: 150, base: n.dmg * sp.mul * 0.5 * spellMul(n), r: sp.r * 0.9 * spellMul(n) * wide, bolt: sp.bolt });
 }
+/** Gerçekçilik: iki x arasında bu katta kapalı kapı ya da kilitli kapı varsa en yakınının x'i. Ok, büyü ve vuruş kapalı kapıdan geçmez. */
+export function wallBetween(n: Scav, floor: number, xa: number, xb: number): number | undefined {
+  const lo = Math.min(xa, xb), hi = Math.max(xa, xb);
+  const xs = [...n.doors.filter(d => d.floor === floor && d.state === "closed").map(d => d.x), ...n.locks.filter(l => l.floor === floor && !l.open).map(l => l.x)].filter(x => x > lo && x < hi);
+  if (!xs.length) return undefined; return xs.sort((a, b) => Math.abs(a - xa) - Math.abs(b - xa))[0];
+}
+/** Okun/topun yüksekliği: elden başlar (0,12 kat), oda tavanına (ROOM_CEIL) ya da zemine çarparsa durur; kat atlayamaz. */
+export const HAND_Y = 0.12;
+const inBand = (rel: number) => rel >= -0.1 && rel <= 0.5;   // düşman gövdesi: zeminden 0,5 kata kadar
 /** Elle ok atışı: nişan aldığın yönde/katta ilk düşmana vurur. */
 export function shootArrow(n: Scav, aim?: { dx: number; dy: number }): boolean {
   if (!n.bow || n.ammo <= 0 || n.atkCd > 0 || n.phase !== "play") return false;
   const { floor, dir, slope } = aimShot(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.5; n.ammo--; n.shots++; n.atkCd = 1 / n.rate; n.atkFx = 0.25;
-  // açılı okta hedef, okun yükseldiği çizgiye denk gelen ilk düşman; düzde aynı kattaki
-  const tgt = n.foes.filter(f => f.climbT <= 0 && (f.x - n.px) * dir > 0 && Math.abs(f.x - n.px) <= 90 && (slope ? Math.abs(f.floor - (n.floor + slope * Math.abs(f.x - n.px))) <= 0.3 : f.floor === floor)).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
-  const endX = tgt ? tgt.x : n.px + dir * 90;
-  n.fx.push({ k: "shot", from: n.px, to: endX, floor, ...(slope ? { toFloor: n.floor + slope * Math.abs(endX - n.px) } : {}) });
+  // ok kapalı kapıdan ve tavandan geçmez: kapıda ya da tavanda/zeminde düşer; açılı okta düşman gövdesine denk gelen ilk hedef
+  const wall = wallBetween(n, floor, n.px, n.px + dir * 90); let reach = wall !== undefined ? Math.abs(wall - n.px) : 90;
+  if (slope) { const dxEnd = slope > 0 ? (ROOM_CEIL - HAND_Y) / slope : (-0.05 - HAND_Y) / slope; reach = Math.min(reach, dxEnd); }
+  const tgt = n.foes.filter(f => f.climbT <= 0 && (f.x - n.px) * dir > 0 && Math.abs(f.x - n.px) <= reach && (slope ? f.floor === n.floor && inBand(HAND_Y + slope * Math.abs(f.x - n.px)) : f.floor === floor)).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
+  const endX = tgt ? tgt.x : n.px + dir * reach;
+  n.fx.push({ k: "shot", from: n.px, to: endX, floor, ...(slope ? { toFloor: n.floor + HAND_Y + slope * Math.abs(endX - n.px) } : {}) });
   if (tgt) { const crit = n.rng.chance(8); const dm = n.dmg * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2); hurtFoe(n, tgt, dm, crit);
     // Kömürleşmiş yay: ok ikinci bir düşmana sekip vurur
     if (n.perks.includes("yay_sek")) { const nx = n.foes.filter(f => f !== tgt && f.floor === tgt.floor && f.climbT <= 0 && Math.abs(f.x - tgt.x) <= BOUNCE_RANGE).sort((a, b) => Math.abs(a.x - tgt.x) - Math.abs(b.x - tgt.x))[0]; if (nx) { n.fx.push({ k: "combo", tag: "Sekti!", x: nx.x, floor: nx.floor }); hurtFoe(n, nx, dm * BOUNCE_MUL, false); } } }
@@ -502,10 +513,10 @@ function strike(n: Scav, f: SFoe, kind: SpellKind, base: number) {
 }
 /** Top bu düşmanla aynı hizada mı: düzde aynı kat, açılıda yükseklik farkı 0,3 kattan az. */
 const isConf = (pj: Proj) => pj.conf ?? bounces(pj.kind);
-const onFloor = (f: SFoe, pj: Proj) => isConf(pj) ? f.floor === pj.floor && (pj.y === undefined || (pj.y - f.floor >= -0.1 && pj.y - f.floor <= 0.5)) : pj.y === undefined ? f.floor === pj.floor : Math.abs(f.floor - pj.y) <= 0.3;
+const onFloor = (f: SFoe, pj: Proj) => f.floor === pj.floor && (pj.y === undefined || inBand(pj.y - f.floor));
 function explode(n: Scav, pj: Proj) {
-  const hits = n.foes.filter(f => onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4);
-  const rest = n.foes.filter(f => !hits.includes(f) && onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4 + BOUNCE_RANGE).sort((a, b) => Math.abs(a.x - pj.x) - Math.abs(b.x - pj.x));
+  const hits = n.foes.filter(f => onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4 && wallBetween(n, f.floor, pj.x, f.x) === undefined);
+  const rest = n.foes.filter(f => !hits.includes(f) && onFloor(f, pj) && f.climbT <= 0 && wallBetween(n, f.floor, pj.x, f.x) === undefined && Math.abs(f.x - pj.x) <= pj.r + 4 + BOUNCE_RANGE).sort((a, b) => Math.abs(a.x - pj.x) - Math.abs(b.x - pj.x));
   for (const f of hits) strike(n, f, pj.kind, pj.base);
   // sekme: çarpan top bir kez daha sekip en yakın ikinci düşmana vurur
   if (bounces(pj.kind) && hits.length && rest[0] && n.foes.includes(rest[0])) { n.fx.push({ k: "combo", tag: "Sekti!", x: rest[0].x, floor: rest[0].floor }); strike(n, rest[0], pj.kind, pj.base * BOUNCE_MUL); }
@@ -643,11 +654,11 @@ export function stepScav(n: Scav, dt: number) {
         if (pj.y > hi || pj.y < lo) { pj.y = pj.y > hi ? 2 * hi - pj.y : 2 * lo - pj.y; if (!wallBounce("y")) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); continue; } } }
       const hit0 = n.foes.some(f => onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= 5);
       if (!hit0 && Math.floor(pj.x / ROOM_W) !== (pj.room ?? Math.floor(x0 / ROOM_W))) { if (!wallBounce("x")) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); } continue; }
-    } else if (pj.y !== undefined) {
-      pj.y += pj.slope! * st; pj.floor = Math.round(pj.y);
-      if (pj.y < -0.25 || pj.y > n.site.floors - 1 + 0.25) {   // zemine ya da tavana çarptı: patlar
-        pj.y = Math.max(0, Math.min(n.site.floors - 1, pj.y)); pj.floor = Math.round(pj.y); n.proj = n.proj.filter(q => q !== pj); explode(n, pj); continue;
-      }
+    } else {
+      // ateş/buz dışındakiler kapalı kapıdan ve tavandan/zeminden geçemez: çarptığı yerde patlar
+      const w = wallBetween(n, pj.floor, x0, pj.x);
+      if (w !== undefined) { pj.x = w - pj.dir * 1; n.proj = n.proj.filter(q => q !== pj); explode(n, pj); continue; }
+      if (pj.y !== undefined) { pj.y += pj.slope! * st; if (pj.y > pj.floor + ROOM_CEIL || pj.y < pj.floor - 0.05) { pj.y = Math.max(pj.floor - 0.05, Math.min(pj.floor + ROOM_CEIL, pj.y)); n.proj = n.proj.filter(q => q !== pj); explode(n, pj); continue; } }
     }
     const hit = n.foes.some(f => onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= 5);
     if (hit || pj.left <= 0 || pj.x < 0 || pj.x > n.w) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); }
@@ -708,7 +719,7 @@ export function stepScav(n: Scav, dt: number) {
   // oyuncu saldırısı
   n.atkCd -= dt;
   if (n.atkCd <= 0 && !n.climbing && !n.searchId) {
-    const same = n.foes.filter(f => f.floor === n.floor && f.climbT <= 0).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px));
+    const same = n.foes.filter(f => f.floor === n.floor && f.climbT <= 0 && wallBetween(n, n.floor, n.px, f.x) === undefined).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px));
     const t = same[0];
     if (t) {
       const dist = Math.abs(t.x - n.px); const crit = n.rng.chance(8);
