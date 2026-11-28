@@ -226,7 +226,7 @@ export interface Spot { trapped?: boolean; seen?: boolean; vault?: boolean; id: 
 export interface SFoe { boss?: boolean; wind?: number; wet?: number; idle?: boolean; id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
 export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
-  | { k: "hurt"; dmg: number } | { k: "raid"; n: number; last: boolean } | { k: "alarm"; human: boolean } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
+  | { k: "hurt"; dmg: number } | { k: "raid"; n: number; last: boolean } | { k: "alarm"; human: boolean } | { k: "shot"; from: number; to: number; floor: number; toFloor?: number } | { k: "die"; x: number; floor: number }
   | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "dodge"; x: number; floor: number } | { k: "key"; x: number; floor: number } | { k: "unlock"; x: number; floor: number } | { k: "locked"; x: number; floor: number } | { k: "door"; x: number; floor: number } | { k: "combo"; tag: string; x: number; floor: number } | { k: "doorhit"; x: number; floor: number; dmg: number } | { k: "doorbreak"; x: number; floor: number } | { k: "fortify"; x: number; floor: number; level: number } | { k: "cast"; kind: SpellKind; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number; bolt?: BoltStyle | null } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
 /** Odalar arası kapı: sen geçince kapanır, gelenler kırmaya çalışır. Seviye 1–10: dayanıklılık 200–2000. */
 export interface Door { floor: number; x: number; level: number; hp: number; state: "open" | "closed" | "broken" }
@@ -236,14 +236,14 @@ export const doorMax = (d: Door) => d.level * DOOR_BASE;
 export const fortifySeconds = (d: Door) => d.state === "broken" ? 2.5 : 2 + d.level * 0.35;
 export interface Lock { floor: number; x: number; side: "R" | "L"; key: number; open: boolean }
 export interface GItem { id: number; item: string; x: number; floor: number }
-export interface Proj { id: number; kind: SpellKind; x: number; floor: number; dir: 1 | -1; left: number; base: number; r: number; bolt?: BoltStyle | null; bounced?: boolean }   // bolt: şimşek büyüsü zincir mi yıldırım mı (engine/spellfx.ts)
+export interface Proj { id: number; kind: SpellKind; x: number; floor: number; dir: 1 | -1; left: number; base: number; r: number; bolt?: BoltStyle | null; bounced?: boolean; y?: number; slope?: number }   // y: açılı atışta kat cinsinden yükseklik; slope: x birimi başına kat (yukarı +)   // bolt: şimşek büyüsü zincir mi yıldırım mı (engine/spellfx.ts)
 export interface TrapSlot { id: string; state: "hand" | "placed" | "cool"; x: number; floor: number; t: number }
 export interface Dog { x: number; floor: number; state: "yanda" | "av" | "don"; t: number; cd: number; moving: boolean; face: 1 | -1; lag: number }
 export interface Scav {
   site: ScavSite; seed: number; rng: Rng; time: number; phase: "play" | "over"; result?: "exit" | "dead"; load: Loadout;
   w: number; alerted: boolean; guardCount: number; killed: number[];   // genişlik; bekçiler fark etti mi; ilk bekçi kimlikleri; öldürülen bekçiler
   px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
-  spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number; raidHold: number; spellQ: { t: number; dir: 1 | -1; floor: number }[];
+  spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number; raidHold: number; spellQ: { t: number; dir: 1 | -1; floor: number; slope?: number }[];
   bag: Record<string, number>; bagCap: number; bowName: string; dual: boolean; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
   foundWeapons: string[]; weaponId: string; castT: number; foundT: number; armor: number; tr: ScavTraits; searched: number; shots: number; kills: number; found: number; fx: SFx[];
   ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; doors: Door[]; fort: { d: Door; prog: number } | null; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number; bolt?: BoltStyle | null };
@@ -418,26 +418,38 @@ export function aimTarget(n: Scav, aim?: { dx: number; dy: number }): { floor: n
   else { const near = n.foes.filter(f => f.floor === floor && f.climbT <= 0 && Math.abs(f.x - n.px) <= 140).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0]; if (near) dir = near.x > n.px ? 1 : -1; }
   return { floor, dir };
 }
-/** Büyü: nişan aldığın yöne (merdiven açıklığında alt/üst kata da) bir top fırlatır; çarpınca patlar. */
+/** Açılı atış: yatay ve dikey birlikte çekilince top (ya da ok) o açıyla yükselir/alçalır ve üst/alt kattaki düşmana ulaşır.
+ * Eğim, x birimi başına kat cinsindendir; 45° çizgi bir kat çıkmak için FLOOR_X birim yatay gider. Yalnız dikey çekmek eskisi gibi
+ * merdiven açıklığında bir üst/alt kata atar; yalnız yatay çekmek düz gider. */
+export const FLOOR_X = 55;
+export function aimShot(n: Scav, aim?: { dx: number; dy: number }): { floor: number; dir: 1 | -1; slope: number } {
+  const base = aimTarget(n, aim);
+  if (!aim || n.climbing || base.floor !== n.floor || Math.abs(aim.dx) <= 0.25 || Math.abs(aim.dy) <= 0.25) return { ...base, slope: 0 };   // merdiven açıklığında alt/üst kata nişan eskisi gibi
+  const ang = Math.max(-1.1, Math.min(1.1, Math.atan2(-aim.dy, Math.abs(aim.dx))));   // yukarı çekmek (dy<0) yükseltir
+  return { floor: n.floor, dir: aim.dx > 0 ? 1 : -1, slope: Math.tan(ang) / FLOOR_X };
+}
+/** Büyü: nişan aldığın yöne (açılı, ya da merdiven açıklığında alt/üst kata) bir top fırlatır; çarpınca patlar. */
 export function castSpell(n: Scav, aim?: { dx: number; dy: number }): boolean {
   const sp = n.spell; if (!sp || sp.cd > 0 || n.phase !== "play") return false;
-  const { floor, dir } = aimTarget(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.2;
+  const { floor, dir, slope } = aimShot(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.2;
   sp.cd = sp.max * n.tr.spellCd; n.castT = 0.6;
   // odaklı biri büyüyü üst üste 2-3 kez salar
-  for (let i = 0; i < n.tr.spellShots; i++) n.spellQ.push({ t: i * 0.32, dir, floor });
+  for (let i = 0; i < n.tr.spellShots; i++) n.spellQ.push({ t: i * 0.32, dir, floor, slope });
   n.fx.push({ k: "cast", kind: sp.kind, x: n.px, floor }); return true;
 }
 const spellMul = (n: Scav) => n.tr.spellPow;
-function launchSpell(n: Scav, q: { dir: 1 | -1; floor: number }) {
+function launchSpell(n: Scav, q: { dir: 1 | -1; floor: number; slope?: number }) {
   const sp = n.spell; if (!sp) return; const wide = n.tr.spellShots >= 3 ? 1.3 : 1;
-  n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + q.dir * 5, floor: q.floor, dir: q.dir, left: 150, base: n.dmg * sp.mul * 0.5 * spellMul(n), r: sp.r * 0.9 * spellMul(n) * wide, bolt: sp.bolt });
+  n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + q.dir * 5, floor: q.floor, dir: q.dir, ...(q.slope ? { y: q.floor, slope: q.slope } : {}), left: 150, base: n.dmg * sp.mul * 0.5 * spellMul(n), r: sp.r * 0.9 * spellMul(n) * wide, bolt: sp.bolt });
 }
 /** Elle ok atışı: nişan aldığın yönde/katta ilk düşmana vurur. */
 export function shootArrow(n: Scav, aim?: { dx: number; dy: number }): boolean {
   if (!n.bow || n.ammo <= 0 || n.atkCd > 0 || n.phase !== "play") return false;
-  const { floor, dir } = aimTarget(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.5; n.ammo--; n.shots++; n.atkCd = 1 / n.rate; n.atkFx = 0.25;
-  const tgt = n.foes.filter(f => f.floor === floor && f.climbT <= 0 && (f.x - n.px) * dir > 0 && Math.abs(f.x - n.px) <= 90).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
-  n.fx.push({ k: "shot", from: n.px, to: tgt ? tgt.x : n.px + dir * 90, floor });
+  const { floor, dir, slope } = aimShot(n, aim); n.face = dir; n.searchId = 0; n.searchWait = 1.5; n.ammo--; n.shots++; n.atkCd = 1 / n.rate; n.atkFx = 0.25;
+  // açılı okta hedef, okun yükseldiği çizgiye denk gelen ilk düşman; düzde aynı kattaki
+  const tgt = n.foes.filter(f => f.climbT <= 0 && (f.x - n.px) * dir > 0 && Math.abs(f.x - n.px) <= 90 && (slope ? Math.abs(f.floor - (n.floor + slope * Math.abs(f.x - n.px))) <= 0.3 : f.floor === floor)).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
+  const endX = tgt ? tgt.x : n.px + dir * 90;
+  n.fx.push({ k: "shot", from: n.px, to: endX, floor, ...(slope ? { toFloor: n.floor + slope * Math.abs(endX - n.px) } : {}) });
   if (tgt) { const crit = n.rng.chance(8); hurtFoe(n, tgt, n.dmg * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); }
   return true;
 }
@@ -454,9 +466,11 @@ function strike(n: Scav, f: SFoe, kind: SpellKind, base: number) {
   if (c) n.fx.push({ k: "combo", tag: c.tag, x: f.x, floor: f.floor });
   hurtFoe(n, f, base * (c?.mul ?? 1), false);
 }
+/** Top bu düşmanla aynı hizada mı: düzde aynı kat, açılıda yükseklik farkı 0,3 kattan az. */
+const onFloor = (f: SFoe, pj: Proj) => pj.y === undefined ? f.floor === pj.floor : Math.abs(f.floor - pj.y) <= 0.3;
 function explode(n: Scav, pj: Proj) {
-  const hits = n.foes.filter(f => f.floor === pj.floor && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4);
-  const rest = n.foes.filter(f => !hits.includes(f) && f.floor === pj.floor && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4 + BOUNCE_RANGE).sort((a, b) => Math.abs(a.x - pj.x) - Math.abs(b.x - pj.x));
+  const hits = n.foes.filter(f => onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4);
+  const rest = n.foes.filter(f => !hits.includes(f) && onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4 + BOUNCE_RANGE).sort((a, b) => Math.abs(a.x - pj.x) - Math.abs(b.x - pj.x));
   for (const f of hits) strike(n, f, pj.kind, pj.base);
   // sekme: çarpan top bir kez daha sekip en yakın ikinci düşmana vurur
   if (bounces(pj.kind) && hits.length && rest[0] && n.foes.includes(rest[0])) { n.fx.push({ k: "combo", tag: "Sekti!", x: rest[0].x, floor: rest[0].floor }); strike(n, rest[0], pj.kind, pj.base * BOUNCE_MUL); }
@@ -576,7 +590,14 @@ export function stepScav(n: Scav, dt: number) {
   // büyü topları
   for (const pj of [...n.proj]) {
     const st = 95 * dt; const x0 = pj.x; pj.x += pj.dir * st; pj.left -= st;
-    const hit = n.foes.some(f => f.floor === pj.floor && f.climbT <= 0 && Math.abs(f.x - pj.x) <= 5);
+    if (pj.y !== undefined) {
+      pj.y += pj.slope! * st; pj.floor = Math.round(pj.y);
+      if (pj.y < -0.25 || pj.y > n.site.floors - 1 + 0.25) {   // zemine ya da tavana çarptı: ateş/buz bir kez sekip döner, ötekiler patlar
+        if (bounces(pj.kind) && !pj.bounced) { pj.slope = -pj.slope!; pj.y = Math.max(0, Math.min(n.site.floors - 1, pj.y)); pj.bounced = true; pj.base *= BOUNCE_MUL; n.fx.push({ k: "combo", tag: "Sekti!", x: pj.x, floor: Math.round(pj.y) }); continue; }
+        pj.y = Math.max(0, Math.min(n.site.floors - 1, pj.y)); pj.floor = Math.round(pj.y); n.proj = n.proj.filter(q => q !== pj); explode(n, pj); continue;
+      }
+    }
+    const hit = n.foes.some(f => onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= 5);
     if (!hit && bounces(pj.kind) && !pj.bounced) {
       const wall = pj.x < 0 || pj.x > n.w || n.doors.some(d => d.floor === pj.floor && d.state === "closed" && (x0 - d.x) * (pj.x - d.x) <= 0) || n.locks.some(l => l.floor === pj.floor && !l.open && (x0 - l.x) * (pj.x - l.x) <= 0);
       if (wall) { pj.dir = (-pj.dir) as 1 | -1; pj.x = x0; pj.bounced = true; pj.base *= BOUNCE_MUL; pj.left = Math.max(pj.left, 70); n.fx.push({ k: "combo", tag: "Sekti!", x: pj.x, floor: pj.floor }); continue; }
