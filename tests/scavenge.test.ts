@@ -212,3 +212,33 @@ test("harabede kart yok: hız, arama, dayanma ve büyü özelliklerden gelir", (
   // harabeden çıkınca can, gerçek en çok canı aşmaz
   n1.raidT = 999; walkTo(n1, 6); leave(n1); finishScav(cfg, s2, n1); expect(s2.hp).toBeLessThanOrEqual(maxHp(cfg, s2));
 });
+
+import { beginFortify, doorNear, DOOR_BASE, DOOR_MAX_LEVEL, doorMax } from "../src/engine/scavenge";
+test("kapılar: geçince kapanır, düşman kırmaya çalışır; önünde durup 200'er güçlendirilir (en çok 2000)", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); n.raidT = 999;
+  const d = n.doors.find(q => q.floor === 0)!;
+  expect(d.state).toBe("open"); expect(d.hp).toBe(DOOR_BASE);
+  walkTo(n, d.x - 2);                                           // kapının önüne gel
+  expect(doorNear(n)).toBe(d);
+  // güçlendir: seviye 2 = 400
+  expect(beginFortify(n)).toBe("ok"); run(n, 5);
+  expect(d.level).toBe(2); expect(d.hp).toBe(400); expect(doorMax(d)).toBe(2 * DOOR_BASE);
+  // geçince kapanır
+  walkTo(n, d.x + 8); expect(d.state).toBe("closed");
+  // karşı taraftaki düşman kapıyı döver ama geçemez
+  n.foes = [foe(d.x - 30, { speed: 20, dmg: 10, cd: 0 })];
+  const hp0 = d.hp; run(n, 6); const f = n.foes[0];
+  expect(f.x).toBeLessThan(d.x); expect(d.hp).toBeLessThan(hp0); expect(d.state).toBe("closed");
+  // zayıf kapı kırılır, sonra düşman geçer
+  d.hp = 5; run(n, 4); expect(d.state).toBe("broken"); run(n, 4); expect(n.foes.length ? n.foes[0].x : 999).toBeGreaterThan(d.x - 6);
+});
+
+test("kapı seviyesi 10'da biter (2000) ve kayıtta kalır", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); n.raidT = 999;
+  const d = n.doors.find(q => q.floor === 0)!; walkTo(n, d.x - 2);
+  for (let i = 0; i < 12; i++) { if (beginFortify(n) === "ok") run(n, 8); }
+  expect(d.level).toBe(DOOR_MAX_LEVEL); expect(doorMax(d)).toBe(2000); expect(beginFortify(n)).toBe("max");
+  leave(n); n.px = 8; n.floor = 0; n.phase = "play"; n.result = undefined; leave(n); finishScav(cfg, s, n);
+  const n2 = createScav(cfg, s, scavSite("koru_kule")!, 4, { kind: "yumruk" });
+  expect(n2.doors.find(q => q.floor === 0 && q.x === d.x)!.level).toBe(DOOR_MAX_LEVEL);
+});

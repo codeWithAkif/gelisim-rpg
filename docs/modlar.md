@@ -85,6 +85,14 @@ Uzun dayanmanın karşılığı (güç değil, gelişim, bilgi, ün ve para):
 - Bir kulede ilk kez 10, 20, 30. dalgayı geçmek o bölgede tanınırlık ve güven verir (bir kez).
 - Kese dalgayla belirgin büyür (yaylada 30 dalga ≈ 100 bakır; handa iki katı).
 
+## Harabe kapıları
+
+- Odalar arasında (her katta) kapı vardır. Başta açıktır; **sen geçince arkandan kapanır**. Kilitli oda kapısı ayrıdır (anahtarla açılır).
+- Gelen düşmanlar kapalı kapıdan geçemez: önünde durup kapıyı döver (vuruş başına düşman hasarının 1,2 katı). Kapı kırılınca yolu açar.
+- Kapının önünde durup **Güçlendir**: her seferinde +200 dayanıklılık, en çok 2000 (10 seviye); seviye yükseldikçe süre uzar (2 sn + seviye × 0,35 sn). Hareket edersen yarıda kalır. Kırık kapı aynı düğmeyle onarılır.
+- Kapı seviyesi harabe kaydında kalır; hasar kalmaz, her girişte kapı tam dayanıklılıkla başlar.
+- Kod: `engine/scavenge.ts` (`Door`, `beginFortify`, `walls`/`moveFoe`), çizim `ui/scav-view.ts`.
+
 ## Harabe: hangi özellik neyi değiştirir
 
 `src/engine/scavenge.ts` içindeki `scavTraits`. 10 başlangıç seviyesidir, her 30 puan bir basamaktır (en çok 3).
