@@ -220,8 +220,10 @@ test("kapılar: geçince kapanır, düşman kırmaya çalışır; önünde durup
   expect(d.state).toBe("open"); expect(d.hp).toBe(DOOR_BASE);
   walkTo(n, d.x - 2);                                           // kapının önüne gel
   expect(doorNear(n)).toBe(d);
-  // güçlendir: seviye 2 = 400
-  expect(beginFortify(n)).toBe("ok"); run(n, 5);
+  expect(beginFortify(n)).toBe("cost");                         // malzeme yok: ip lazım
+  n.bag = { ip: 3 };
+  // güçlendir: seviye 2 = 400 (1 ip gider)
+  expect(beginFortify(n)).toBe("ok"); run(n, 5); expect(n.bag.ip).toBe(2);
   expect(d.level).toBe(2); expect(d.hp).toBe(400); expect(doorMax(d)).toBe(2 * DOOR_BASE);
   // geçince kapanır
   walkTo(n, d.x + 8); expect(d.state).toBe("closed");
@@ -235,9 +237,10 @@ test("kapılar: geçince kapanır, düşman kırmaya çalışır; önünde durup
 
 test("kapı seviyesi 10'da biter (2000) ve kayıtta kalır", () => {
   const s = fresh(); const n = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); n.raidT = 999;
-  const d = n.doors.find(q => q.floor === 0)!; walkTo(n, d.x - 2);
+  const d = n.doors.find(q => q.floor === 0)!; for (const sp of n.spots) sp.done = true; walkTo(n, d.x - 2); n.bag = { ip: 6, demir_parca: 6 };
   for (let i = 0; i < 12; i++) { if (beginFortify(n) === "ok") run(n, 8); }
-  expect(d.level).toBe(DOOR_MAX_LEVEL); expect(doorMax(d)).toBe(2000); expect(beginFortify(n)).toBe("max");
+  expect(d.level).toBe(DOOR_MAX_LEVEL); expect(doorMax(d)).toBe(2000); expect(n.bag.ip).toBe(2); expect(n.bag.demir_parca).toBe(1);   // 4 ip + 5 demir parça gitti
+  expect(beginFortify(n)).toBe("max");
   leave(n); n.px = 8; n.floor = 0; n.phase = "play"; n.result = undefined; leave(n); finishScav(cfg, s, n);
   const n2 = createScav(cfg, s, scavSite("koru_kule")!, 4, { kind: "yumruk" });
   expect(n2.doors.find(q => q.floor === 0 && q.x === d.x)!.level).toBe(DOOR_MAX_LEVEL);
