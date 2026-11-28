@@ -99,14 +99,14 @@ Altıgen savaş, barikat ve gizlenme eskiden yalnız görev ya da yol pususunda 
 
 - **Islak:** buz ve çamur büyüsü hedefi 6 sn ıslatır (altıgen savaşta yağmur ve su/çamur zemini de ıslaktır).
 - **İletken:** ıslak hedefe şimşek ×1,7. **Buhar:** ıslak hedefe ateş ×0,6 ve alev söner (tutuşturmaz). **Çatlama:** yanan hedefe buz ×1,5.
-- **Sekme:** ateş ve buz topu çarptığı yerden bir kez sekip en yakın ikinci düşmana %60 güçle vurur (harabe/nöbet/barikat 16 birim, altıgen savaşta 2 altıgen). Harabede uçan top ayrıca duvara, kapalı kapıya, kilitli kapıya ve yapı kenarına çarpınca bir kez geri döner.
+- **Sekme:** ateş ve buz topu çarptığı yerden bir kez sekip en yakın ikinci düşmana %60 güçle vurur (harabe/nöbet/barikat 16 birim, altıgen savaşta 2 altıgen). Harabede uçan ateş/buz topu **odadan çıkmaz**: oda duvarına (kapı açık da olsa), tavana, tabana ve kapıya çarpınca sekip odada kalır; her sekmede %15 güç kaybeder, en çok 4 sekme, sonra patlar. Açılı atınca tavandan tabandan sektirerek köşedeki düşmana vurabilirsin.
 - Yeni büyü ya da sahne eklerken bu fonksiyonları (`combo`, `wets`, `bounces`) çağır; sayıları yalnız orada değiştir.
 
 ## Harabe: açılı atış
 
 - Büyü ve ok düğmesini hem yatay hem dikey çekince atış **açılı** gider: yukarı çekmek yükseltir, aşağı çekmek alçaltır. Çizgi bir kat çıkmak için 45°'de yatay ~55 birim gider (`FLOOR_X`); top üst/alt kattaki düşmana ulaşır, oku düşman hizasına denk gelirse vurur.
 - Yalnız yatay çekmek düz gider (eskisi gibi); merdiven açıklığında çapraz çekmek eskisi gibi bir üst/alt kata atar.
-- Ateş ve buz topu, yapının tavanına ya da zeminine çarpınca bir kez sekip döner; ötekiler patlar. Kural `engine/scavenge.ts` (`aimShot`).
+- Ateş ve buz topu açılı atınca odanın tavanından ve tabanından sekerek odada kalır (bank atışı); çamur, sarmaşık gibi ötekiler açılı atınca kat atlayıp üst/alt kattaki düşmana ulaşır. Kural `engine/scavenge.ts` (`aimShot`).
 
 ## Harabe kapıları
 
