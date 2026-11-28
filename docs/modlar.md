@@ -102,6 +102,22 @@ Altıgen savaş, barikat ve gizlenme eskiden yalnız görev ya da yol pususunda 
 - **Sekme:** ateş ve buz topu çarptığı yerden bir kez sekip en yakın ikinci düşmana %60 güçle vurur (harabe/nöbet/barikat 16 birim, altıgen savaşta 2 altıgen). Harabede uçan ateş/buz topu **odadan çıkmaz**: oda duvarına (kapı açık da olsa), tavana, tabana ve kapıya çarpınca sekip odada kalır; her sekmede %15 güç kaybeder, en çok 4 sekme, sonra patlar. Açılı atınca tavandan tabandan sektirerek köşedeki düşmana vurabilirsin.
 - Yeni büyü ya da sahne eklerken bu fonksiyonları (`combo`, `wets`, `bounces`) çağır; sayıları yalnız orada değiştir.
 
+## Harabe: derinleşme seviyeleri ve eşsiz ödüller
+
+- **Seviye:** bir harabenin tüm kutuları (5. seviyede mühürlü sandık da) boşalınca, sağ salim çıkınca harabe **yeniden dolar ve seviyesi artar** (1, 2, 3…). Her seviyede +%12 düşman gücü, bekçi (2 seviyede bir +1, en çok +4), baskın (3 seviyede bir +1, en çok +3), baskın büyüklüğü (2 seviyede bir +1), bakır ödülü +%20. Yerleşim seviyeye göre yeniden dağılır. Kapı seviyeleri ve yerde bırakılan eşyalar kalır. Giriş kartında "seviye N" yazar. Yarım bırakırsan seviye atlamaz.
+- **Her 5. seviyede mühürlü sandık:** üst katta (kilitli odalı harabede kilitli odanın ortasında) üç aşamalı sandık; son aşama eşsiz ödül. Eşya çantaya girer, yer yoksa ya da ölürsen **yerde kalır** (kaybolmaz). Büyü parşömeni okunur okunmaz öğrenilir (ölsen de).
+
+| Harabe | 5. seviye (eşya) | 10. seviye (parşömen) | Etkisi (yalnız harabede) |
+|---|---|---|---|
+| Yıkık avcı kulübesi | — | Şimşek oku | — |
+| Terk edilmiş ağıl | Çobanın çizmesi | Kaya yağmuru | Çamur yavaşlatmaz |
+| Eski korucu kulesi | Bekçibaşının kılıcı | Dolu | Vurduğunu ıslatır (iletken, çatlama) |
+| Yanık beyler köşkü | Kömürleşmiş yay | Cam yağmuru | Ok ikinci düşmana sekip vurur |
+| Sarnıç mahzeni | Sarnıç feneri | Sağanak perdesi | Bekçiler %25 daha yakından uyanır |
+| Yanık evler | Kül maskesi | Akkor zincir | Duman aramayı yavaşlatmaz |
+
+15, 20… seviyelerde bol bakır (40 × zorluk × k). Kod: `SITE_REWARDS`, `rewardFor`, `siteLevel` (`engine/scavenge.ts`); eşyalar `content/gear.ts`.
+
 ## Harabe: açılı atış
 
 - Büyü ve ok düğmesini hem yatay hem dikey çekince atış **açılı** gider: yukarı çekmek yükseltir, aşağı çekmek alçaltır. Çizgi bir kat çıkmak için 45°'de yatay ~55 birim gider (`FLOOR_X`); top üst/alt kattaki düşmana ulaşır, oku düşman hizasına denk gelirse vurur.

@@ -335,3 +335,49 @@ test("ateş topu odadan çıkmaz: oda duvarına (kapı açık olsa da) çarpıp 
   expect(maxX).toBeLessThan(100); expect(minX).toBeGreaterThanOrEqual(0);       // 0. odanın içinde kaldı (açık kapıdan çıkmadı)
   expect(n.proj.length).toBe(0);                                                // sekmeler bitince patladı
 });
+
+import { siteLevel, SITE_REWARDS, rewardFor, CHEST_ID, harabeSave } from "../src/engine/scavenge";
+test("derinleşme: harabe tamamen boşalınca yeniden dolar, seviye artar, düşman ve ödül büyür; kapı seviyeleri ve yerdeki eşya kalır", () => {
+  const s = fresh(); const site = scavSite("koru_agil")!;
+  expect(siteLevel(s, site.id)).toBe(1);
+  const n = createScav(cfg, s, site, 3, { kind: "yumruk" }); n.raidT = 999; n.foes = [];
+  n.doors[0].level = 4; for (const sp of n.spots) { sp.stage = 3; sp.done = true; }
+  n.px = 8; leave(n); const r = finishScav(cfg, s, n);
+  expect(r.leveledUp).toBe(2); expect(siteLevel(s, site.id)).toBe(2); expect(Object.keys(harabeSave(s, site.id).stages).length).toBe(0);
+  const n2 = createScav(cfg, s, site, 4, { kind: "yumruk" });
+  expect(n2.level).toBe(2); expect(n2.site.guards).toBeGreaterThan(site.guards - 1 + 0); expect(n2.doors[0].level).toBe(4);
+  expect(n2.spots.every(sp => sp.stage === 0)).toBe(true);
+  // yarım bıraktıysan seviye atlamaz
+  const n3 = createScav(cfg, s, site, 5, { kind: "yumruk" }); n3.raidT = 999; n3.foes = []; n3.spots[0].stage = 3; n3.px = 8; leave(n3);
+  expect(finishScav(cfg, s, n3).leveledUp).toBeUndefined();
+});
+
+test("her 5. seviyede mühürlü sandık: eşsiz eşya sonda; ikinci 5'lide büyü parşömeni; eşyalar yerde kalır; ödül tablosundaki her eşya ve büyü gerçek", () => {
+  for (const [id, list] of Object.entries(SITE_REWARDS)) for (const rw of list) { if (rw.scroll) expect(cfg.spell.get(rw.scroll), `${id} ${rw.scroll}`).toBeTruthy(); if (rw.item) expect(itemInfoSafe(rw.item)).toBeTruthy(); }
+  expect(rewardFor("koru_agil", 4, 2)).toBeNull(); expect(rewardFor("koru_agil", 5, 2)).toEqual({ item: "cobanin_cizmesi" }); expect(rewardFor("koru_agil", 15, 2)!.money).toBeGreaterThan(0);
+  const s = fresh(); const site = scavSite("koru_agil")!; harabeSave(s, site.id).level = 5;
+  const n = createScav(cfg, s, site, 3, { kind: "yumruk" }); n.raidT = 999; n.foes = [];
+  const chest = n.spots.find(q => q.id === CHEST_ID)!; expect(chest).toBeTruthy(); expect(chest.stages[2].kind).toBe("unique");
+  for (const sp of n.spots) if (sp.id !== CHEST_ID) { sp.stage = 3; sp.done = true; }
+  n.py = n.floor = chest.floor; n.px = 20; walkTo(n, chest.x); beginSearch(n); run(n, 20); expect(chest.done).toBe(true); expect(n.bag.cobanin_cizmesi).toBe(1);
+  n.py = n.floor = 0; n.px = 8; leave(n); const r = finishScav(cfg, s, n); expect(r.leveledUp).toBe(6); expect(s.inventory.cobanin_cizmesi).toBe(1);
+  // 10. seviye: parşömen
+  harabeSave(s, site.id).level = 10; const m = createScav(cfg, s, site, 4, { kind: "yumruk" }); m.raidT = 999; m.foes = [];
+  const c2 = m.spots.find(q => q.id === CHEST_ID)!; for (const sp of m.spots) { sp.stage = 3; sp.done = true; } c2.stage = 2; c2.done = false; c2.prog = 0;
+  m.py = m.floor = c2.floor; m.px = 20; walkTo(m, c2.x); beginSearch(m); run(m, 8); expect(m.learned).toContain("sy_el_toprak_firlat");
+  m.py = m.floor = 0; m.px = 8; leave(m); finishScav(cfg, s, m); expect(s.spellbook).toContain("sy_el_toprak_firlat");
+  // ölürsen eşsiz eşya yerde kalır
+  harabeSave(s, site.id).level = 5; harabeSave(s, site.id).stages = {}; const d = createScav(cfg, s, site, 6, { kind: "yumruk" }); d.bag = { komurlesmis_yay: 1 }; d.result = "dead"; d.phase = "over"; finishScav(cfg, s, d);
+  expect(harabeSave(s, site.id).ground.some(g => g.item === "komurlesmis_yay")).toBe(true);
+});
+import { GAME_ITEMS } from "../src/content/world";
+const itemInfoSafe = (id: string) => GAME_ITEMS[id];
+
+test("eşsiz eşyaların harabe etkileri: çizme çamuru, kılıç ıslatır, yay ok sektirir, fener ve maske kuralı hafifletir", () => {
+  const s = fresh(); const wear = (slot: string, id: string) => { (s.equipped as Record<string, string>)[slot] = id; s.inventory[id] = 1; };
+  const mud = createScav(cfg, s, scavSite("koru_agil")!, 3, { kind: "yumruk" }); const base = (n: Scav) => { n.raidT = 999; setInput(n, 1, 0); const x0 = n.px; for (let i = 0; i < 20; i++) stepScav(n, 0.05); return n.px - x0; };
+  const slow = base(mud); wear("legs", "cobanin_cizmesi"); const boots = createScav(cfg, s, scavSite("koru_agil")!, 3, { kind: "yumruk" }); expect(boots.perks).toContain("camur"); expect(base(boots)).toBeGreaterThan(slow);
+  wear("weapon", "bekcibasi_kilici"); const sw = createScav(cfg, s, scavSite("koru_kulube")!, 3, { kind: "melee", id: "bekcibasi_kilici" }); sw.raidT = 999; const f = foe(sw.px + 4, { hp: 900, max: 900, speed: 0, dmg: 0, cd: 99 }); sw.foes = [f]; run(sw, 1.2);
+  expect(sw.perks).toContain("islatir"); expect(f.wet ?? 0).toBeGreaterThan(0);
+  wear("head", "kul_maskesi"); const ash = createScav(cfg, s, scavSite("ardic_kul")!, 3, { kind: "yumruk" }); expect(ash.perks).toContain("maske");
+});

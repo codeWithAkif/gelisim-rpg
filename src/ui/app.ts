@@ -442,6 +442,7 @@ export function startApp(root: HTMLElement) {
         <p style="margin:0">${r.result === "exit" ? "Bulduklarını çıkışa kadar getirdin." : "Baskın seni yere serdi. Çantan düştüğün yerde kaldı; geri dönüp alabilirsin."}</p>
         <div class="odds"><span>Bu sefer aranan <b>${r.searched}</b></span><span>Harabede boşaltılan <b>${r.progress.done}/${r.progress.total}</b></span><span>Baskın <b>${r.waves}</b></span><span>Süre <b>${r.minutes} dk</b></span></div>
         ${items.length || r.money ? `<p class="hand blue" style="margin:0">Getirdiklerin: ${esc([...(r.money ? [`${r.money} bakır`] : []), ...items].join(", "))}</p>` : `<p class="tiny muted" style="margin:0">Eli boş döndün.</p>`}
+        ${r.leveledUp ? `<p class="hand blue" style="margin:0">Harabe yeniden doldu: <b>Seviye ${r.leveledUp}</b>${r.leveledUp % 5 === 0 ? " · bu seviyede mühürlü sandık var" : ""}</p>` : ""}${r.learned.length ? `<p class="hand blue" style="margin:0">Büyü parşömenini okudun: ${esc(r.learned.map(id => cfg.spell.get(id)?.name ?? id).join(", "))}</p>` : ""}
         ${lost.length ? `<p class="tiny red" style="margin:0">Harabede kalan: ${esc(lost.join(", "))}</p>` : ""}
         ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
         <h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
