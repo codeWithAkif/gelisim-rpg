@@ -153,3 +153,13 @@ test("aldatma gizlenmede kuşkuyu azaltır", () => {
   b.attrs.aldatma.level = 60;
   expect(stealthSkill(b)).toBeLessThan(stealthSkill(a));
 });
+
+import { combo, wets, bounces, fxKind } from "../src/engine/spellfx";
+test("büyü taktiği: iletken, buhar, çatlama; ıslatan ve sekenler", () => {
+  expect(combo("simsek", { wet: true, burn: false })?.mul).toBeGreaterThan(1.5);
+  expect(combo("simsek", { wet: false, burn: false })).toBeNull();
+  expect(combo("ates", { wet: true, burn: false })).toMatchObject({ quench: true });
+  expect(combo("buz", { wet: false, burn: true })?.tag).toBe("Çatlama!");
+  expect(wets("buz")).toBe(true); expect(wets("ates")).toBe(false); expect(bounces("ates")).toBe(true); expect(bounces("simsek")).toBe(false);
+  expect(fxKind({ chain: true })).toBe("simsek"); expect(fxKind({ ignite: true })).toBe("ates"); expect(fxKind(undefined)).toBe("other");
+});

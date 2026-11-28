@@ -187,3 +187,18 @@ test("nöbette şimşek: zincir hedefe en yakından başlayıp en çok üç kom�
   expect(useSpell(n, "yildirim_firtinasi", cx, cy)).toBe(true);
   expect(ws.filter(w => w.hp < 200).length).toBe(5);                                      // yıldırım alandaki herkese
 });
+
+test("büyü taktiği (nöbet): ıslak hedefe şimşek daha çok vurur, ıslağa ateş buhar olur, ateş topu ikinci düşmana sekip vurur", async () => {
+  const { addNobetSpell, TOWER } = await import("../src/engine/nobet");
+  const s = fresh(); s.knownElements = ["el_simsek", "el_hava", "el_su", "el_ates"]; for (const a of ["simsek_buyu", "hava_buyu", "ates"]) if (s.attrs[a]) s.attrs[a].level = 60; s.mana = 99;
+  const n = createNobet(cfg, s, nobetSite("yayla")!, 7);
+  expect(addNobetSpell(cfg, s, n, "simsek_zinciri")).toBe(true); expect(addNobetSpell(cfg, s, n, "ates_topu")).toBe(true);
+  const cx = TOWER.x, cy = TOWER.y - 40;
+  const dry = wolf(n, cx, cy), wet = wolf(n, cx + 60, cy); wet.wet = 5;   // uzak ikisi: zincir ilkine atlar
+  n.spells.simsek_zinciri.cd = 0; useSpell(n, "simsek_zinciri", cx, cy); const dryHit = 200 - dry.hp;
+  dry.hp = 200; n.spells.simsek_zinciri.cd = 0; useSpell(n, "simsek_zinciri", cx + 60, cy); const wetHit = 200 - wet.hp;
+  expect(wetHit).toBeGreaterThan(dryHit * 1.5);
+  wet.hp = 200; wet.burn = 3; wet.wet = 4; n.spells.ates_topu.cd = 0; useSpell(n, "ates_topu", cx + 60, cy); expect(wet.burn).toBe(0);   // buhar
+  const a = wolf(n, cx, cy - 20), b2 = wolf(n, cx + 18, cy - 20); a.hp = b2.hp = 200; a.wet = b2.wet = 0; a.burn = b2.burn = 0;
+  n.spells.ates_topu.cd = 0; useSpell(n, "ates_topu", cx, cy - 20); expect(b2.hp).toBeLessThan(200);                                      // sekme
+});

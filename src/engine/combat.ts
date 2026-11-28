@@ -22,7 +22,7 @@ export interface Unit {
   uid: string; side: "player" | "enemy" | "ally"; def?: string; name: string;
   x: number; y: number; hp: number; maxHp: number;
   moveLeft: number; acted: boolean; slowed: number; fled?: boolean;
-  blind?: number; scared?: boolean; rooted?: number; stunned?: number; // rooted: sarmaşıkla yere bağlı; stunned: sersem, turunu kaçırır
+  wet?: number; blind?: number; scared?: boolean; rooted?: number; stunned?: number; // rooted: sarmaşıkla yere bağlı; stunned: sersem, turunu kaçırır
   alert?: boolean;      // düşman: seni fark etti mi
   defending?: boolean;  // oyuncu: savunmada
 }
@@ -639,6 +639,7 @@ export function enemyTurn(cfg: Config, s: GameState, b: Battle): string[] {
       detect(b, false);
     }
     if (e.slowed > 0) e.slowed--;
+    if ((e.wet ?? 0) > 0) e.wet!--;
     if ((e.rooted ?? 0) > 0) e.rooted!--;
     const blind = (e.blind ?? 0) > 0; if (blind) e.blind!--;
     if (e.alert && dist(e.x, e.y, p.x, p.y) === 1) {

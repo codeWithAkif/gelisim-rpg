@@ -255,3 +255,21 @@ test("çift elli: iki tek elli silahın (aynı bıçaktan iki de olur) varsa har
   const two = createScav(cfg, s, scavSite("koru_kule")!, 5, { kind: "melee", id: dual.id, off: dual.off });
   expect(two.melee).toBeGreaterThan(one.melee); expect(two.dual).toBe(true); expect(one.dual).toBe(false);
 });
+
+test("büyü taktiği (harabe): buz ıslatır, ıslak hedefe şimşek ×1,7; ateş ıslağı söndürür; top kapalı kapıdan sekip döner; çarpan top ikinci düşmana sekip vurur", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); n.raidT = 999; n.foes = [];
+  const mk = (x: number) => foe(x, { hp: 1000, max: 1000, speed: 0, dmg: 0, cd: 99 });
+  const fire = (kind: any, x0: number, base = 100) => { n.proj.push({ id: n.gid++, kind, x: x0, floor: 0, dir: 1, left: 100, base, r: 3 }); run(n, 1.2); };
+  const a = mk(60), dry = mk(160); dry.id = 10; n.foes = [a, dry]; n.px = 20;
+  fire("simsek", 40); const dryHit = 1000 - a.hp; a.hp = 1000;                 // kuru hedef: düz hasar
+  fire("buz", 40); expect(a.wet).toBeGreaterThan(0); a.hp = 1000;
+  fire("simsek", 40); expect(1000 - a.hp).toBeGreaterThan(dryHit * 1.5);     // ıslak: iletken
+  a.burn = 3; a.wet = 4; fire("ates", 40); expect(a.burn).toBe(0);           // buhar: alev söner
+  // sekme: kapalı kapı topu geri döndürür
+  n.foes = []; const d = n.doors.find(q => q.floor === 0)!; d.state = "closed";
+  n.proj.push({ id: n.gid++, kind: "ates", x: d.x - 5, floor: 0, dir: 1, left: 200, base: 50, r: 3 }); run(n, 0.2);
+  expect(n.proj[0]?.dir).toBe(-1); expect(n.proj[0]?.bounced).toBe(true);
+  // sekme: ilk düşmana çarpınca yanındaki ikinciye de vurur
+  n.proj = []; const p1 = mk(60), p2 = mk(70); p2.id = 11; n.foes = [p1, p2]; fire("ates", 40, 100);
+  expect(p1.hp).toBeLessThan(1000); expect(p2.hp).toBeLessThan(1000);
+});

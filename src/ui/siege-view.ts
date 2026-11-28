@@ -271,6 +271,7 @@ function openSiegeInner(cfg: Config, s: GameState, def: SiegeDef, seed: number, 
     for (const f of sg.fx.splice(0)) {
       if (f.k === "hit") { pops.push({ x: f.x, y: f.y - 6, t: now, text: `${f.crit ? "Kritik! " : ""}−${f.dmg}`, color: f.by === "kopek" ? C("--green") : f.by === "ates" ? "#C2571E" : f.crit ? C("--red") : C("--ink"), big: f.crit }); if (f.by === "kilic") { swing = now + 180; sfx(f.crit ? "crit" : "hit"); } else if (f.by === "ok") sfx("hit"); }
       if (f.k === "hurt") { shake = 8; flash = 1; sfx("hurt"); buzz("medium"); }
+      if (f.k === "combo") pops.push({ x: f.x, y: f.y - 10, t: now, text: f.tag, color: f.tag === "Buhar" ? "#7A8A94" : f.tag === "Sekti!" ? "#B07A1E" : C("--blue"), big: true });
       if (f.k === "die") sfx("thunk");
       if (f.k === "bar" && f.broken) { sfx("clang"); buzz("light"); }
       if (f.k === "cast" && f.from) streaks.push({ x1: f.from[0], y1: f.from[1], x2: f.x, y2: f.y, t: now });

@@ -121,3 +121,17 @@ test("ateşe giren kurt tutuşur ve birkaç saniye belirli hasar alır (şansa b
   for (let i = 0; i < 30; i++) step(cfg, s, sg, 0.1);
   expect(40 - f.hp).toBeGreaterThanOrEqual(8);        // ~3 saniye × ≥3/sn
 });
+
+test("büyü taktiği (barikat): ateş topu ikinci düşmana sekip vurur; ıslağa ateş buhar olur, alev yakmaz", () => {
+  const s = newGame(cfg, 2); s.inventory.av_yayi = 1; s.inventory.ok = 5; s.knownElements = ["el_ates"]; s.attrs.ates.level = 8;
+  const sg = createSiege(cfg, s, SIEGES.agil, 4); startWave(sg);
+  for (let t = 0; t < 30; t++) step(cfg, s, sg, 0.1);
+  const mk = (x: number, y: number) => ({ ...sg.foes[0], id: 900 + Math.round(x), x, y, hp: 500, max: 500, wetT: 0, burnT: 0, speed: 0 });
+  const r0 = siegeSpells(cfg, s, sg)[0].r; const a = mk(CX + 30, CY), b = mk(CX + 30 + r0 + 3 + 6, CY); sg.foes = [a, b];   // ikincisi çarpma alanının hemen dışında
+  expect(cast(cfg, s, sg, "ates_topu", a.x, a.y)).toBe(true);
+  expect(a.hp).toBeLessThan(500); expect(b.hp).toBeLessThan(500);            // sekme
+  expect(sg.fx.some(e => e.k === "combo" && e.tag === "Sekti!")).toBe(true);
+  for (const k of Object.keys(sg.spellCd)) sg.spellCd[k] = 0; sg.mana = 99; const w = mk(CX + 30, CY + 4); w.wetT = 5; w.burnT = 2; sg.foes = [w];
+  expect(cast(cfg, s, sg, "ates_topu", w.x, w.y)).toBe(true);
+  expect(w.burnT).toBe(0); expect(sg.fx.some(e => e.k === "combo" && e.tag === "Buhar")).toBe(true);
+});

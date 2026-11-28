@@ -310,6 +310,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       if (f.k === "locked") { if (now - lastLockedMsg > 1500) { lastLockedMsg = now; tip.hidden = false; tip.textContent = "Kilitli: başka bir odada anahtar var"; setTimeout(() => { tip.hidden = true; }, 1400); sfx("bad"); } }
       if (f.k === "door") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı kapandı", color: "#EFE6CC" }); sfx("thunk"); }
       if (f.k === "doorhit") { sfx("hit"); }
+      if (f.k === "combo") { pops.push({ x: f.x, floor: f.floor, t: now, text: f.tag, color: f.tag === "Buhar" ? "#CFD8DC" : f.tag === "Sekti!" ? "#F1C14A" : "#8FC4FF" }); sfx("crit"); }
       if (f.k === "doorbreak") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı kırıldı!", color: "#E0583A" }); sfx("bad"); buzz("heavy"); shake = 6; }
       if (f.k === "fortify") { pops.push({ x: f.x, floor: f.floor, t: now, text: `Kapı güçlendi · ${f.level * DOOR_BASE}`, color: "#9BD36B" }); sfx("good"); buzz("medium"); }
       if (f.k === "die") sfx("hit");

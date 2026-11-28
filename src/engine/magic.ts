@@ -10,6 +10,7 @@ import { ENEMIES, TERRAIN, type Terrain } from "../content/world";
 import { RELIC_SPELLS } from "../content/spells";
 import { synthSpells } from "../content/synthesis";
 import { hasRelic } from "./relics";
+import { combo, wets, bounces, fxKind, BOUNCE_MUL, BOUNCE_HEX } from "./spellfx";
 
 /** Büyülerin fiziksel sonuçları (config'deki "Fiziksel etki" metninin oyun karşılığı). */
 export const SPELL_FX: Record<string, { ignite?: boolean; wall?: number; slow?: number; blind?: number; chain?: boolean; mud?: boolean; root?: number; stun?: number }> = {
@@ -120,15 +121,26 @@ export function castSpell(cfg: Config, s: GameState, b: Battle, spellId: string,
     const parts: string[] = [];
     const single = hexArea(sp) === 0;
     b.events.push({ k: "cast", spell: sp.id, from, to: [tx, ty], fizzle: false, hits }); // hits aşağıda dolar
-    for (const e of pv.targets) {
+    // birleşik tepkiler ve sekme: kural engine/spellfx.ts'te, dört sahnede aynı
+    const kind = fxKind(fx); const rain = b.weather === "yagmur";
+    const wetTile = (e: Unit) => ["su", "camur"].includes(b.tiles[e.y][e.x]);
+    const cmb = (e: Unit) => combo(kind, { wet: (e.wet ?? 0) > 0 || wetTile(e) || (kind === "simsek" && rain), burn: !!b.fire[e.x + "," + e.y] });
+    const strikes = [...pv.targets];
+    if (bounces(kind) && pv.targets[0]) {
+      const nxt = enemies(b).filter(o => !pv.targets.includes(o) && dist(o.x, o.y, pv.targets[0].x, pv.targets[0].y) <= BOUNCE_HEX).sort((a, c) => dist(a.x, a.y, pv.targets[0].x, pv.targets[0].y) - dist(c.x, c.y, pv.targets[0].x, pv.targets[0].y))[0];
+      if (nxt) { const dm = Math.round(rng.int(pv.dmg[0], pv.dmg[1]) * power * BOUNCE_MUL); nxt.hp = Math.max(0, nxt.hp - dm); parts.push(`Sekti! ${nxt.name} ${dm} hasar aldı.`); hits.push({ uid: nxt.uid, dmg: dm }); if (fx.slow) nxt.slowed = Math.max(nxt.slowed, fx.slow); if (wets(kind)) nxt.wet = 3; }
+    }
+    for (const e of strikes) {
       if (single && !rng.chance(pv.hit)) { parts.push(`${e.name} son anda sıçradı.`); continue; }
-      const dmg = Math.round(rng.int(pv.dmg[0], pv.dmg[1]) * power);
+      const cb = cmb(e); if (cb) parts.push(`${cb.tag}`);
+      if (wets(kind)) e.wet = 3;
+      const dmg = Math.round(rng.int(pv.dmg[0], pv.dmg[1]) * power * (cb?.mul ?? 1));
       if (dmg > 0) { e.hp = Math.max(0, e.hp - dmg); parts.push(`${e.name} ${dmg} hasar aldı.`); hits.push({ uid: e.uid, dmg }); }
       if (fx.slow) e.slowed = Math.max(e.slowed, fx.slow);
       if (fx.blind) e.blind = Math.max(e.blind ?? 0, fx.blind);
       if (fx.root) { e.rooted = Math.max(e.rooted ?? 0, fx.root); parts.push(`${e.name} sarmaşıklara dolandı.`); }
       if (fx.stun && e.hp > 0) { e.stunned = Math.max(e.stunned ?? 0, fx.stun); parts.push(`${e.name} havaya savruldu, sersemledi.`); }
-      if (fx.ignite && b.weather !== "yagmur" && ENEMIES[e.def!]?.species === "hayvan") e.scared = true; // kurtlar ateşten korkar; yağmurda alev cılız
+      if (fx.ignite && b.weather !== "yagmur" && !(cb?.quench) && ENEMIES[e.def!]?.species === "hayvan") e.scared = true; // kurtlar ateşten korkar; yağmurda alev cılız
       if (fx.chain) {
         const wet = b.weather === "yagmur" || ["su", "camur"].includes(b.tiles[e.y][e.x]);
         for (const o of enemies(b)) if (o !== e && dist(o.x, o.y, e.x, e.y) === 1) {

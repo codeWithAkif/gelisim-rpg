@@ -14,7 +14,7 @@ import { ENEMIES } from "../content/world";
 import { addItem, removeItem, capacity } from "./inventory";
 import { weaponSet, hasBow, totalArmor, slotsFor, gearOf } from "./gear";
 import { spellOptions, SPELL_FX } from "./magic";
-import { boltStyle, type BoltStyle } from "./spellfx";
+import { boltStyle, combo, wets, bounces, BOUNCE_MUL, BOUNCE_RANGE, WET_SECS, type BoltStyle } from "./spellfx";
 import { trapsOwned, trapEffect } from "./engineering";
 import { petMul } from "./pet";
 import { healOf, healPower } from "./healing";
@@ -212,11 +212,11 @@ export function defaultLoadout(cfg: Config, s: GameState): Loadout {
 /* ---------- durum ---------- */
 export interface Stage { kind: "empty" | "item" | "money" | "weapon" | "key"; key?: number; item?: string; n?: number; money?: number; weapon?: string; time: number }
 export interface Spot { vault?: boolean; id: number; x: number; floor: number; name: string; stages: Stage[]; stage: number; prog: number; done: boolean }
-export interface SFoe { idle?: boolean; id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
+export interface SFoe { wet?: number; idle?: boolean; id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
 export type SFx =
   | { k: "loot"; text: string; x: number; floor: number } | { k: "full"; x: number; floor: number } | { k: "hit"; x: number; floor: number; dmg: number; crit: boolean }
   | { k: "hurt"; dmg: number } | { k: "raid"; n: number; last: boolean } | { k: "alarm"; human: boolean } | { k: "shot"; from: number; to: number; floor: number } | { k: "die"; x: number; floor: number }
-  | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "dodge"; x: number; floor: number } | { k: "key"; x: number; floor: number } | { k: "unlock"; x: number; floor: number } | { k: "locked"; x: number; floor: number } | { k: "door"; x: number; floor: number } | { k: "doorhit"; x: number; floor: number; dmg: number } | { k: "doorbreak"; x: number; floor: number } | { k: "fortify"; x: number; floor: number; level: number } | { k: "cast"; kind: SpellKind; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number; bolt?: BoltStyle | null } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
+  | { k: "spot"; x: number; floor: number } | { k: "trap"; x: number; floor: number } | { k: "dodge"; x: number; floor: number } | { k: "key"; x: number; floor: number } | { k: "unlock"; x: number; floor: number } | { k: "locked"; x: number; floor: number } | { k: "door"; x: number; floor: number } | { k: "combo"; tag: string; x: number; floor: number } | { k: "doorhit"; x: number; floor: number; dmg: number } | { k: "doorbreak"; x: number; floor: number } | { k: "fortify"; x: number; floor: number; level: number } | { k: "cast"; kind: SpellKind; x: number; floor: number } | { k: "spell"; kind: SpellKind; x: number; floor: number; r: number; bolt?: BoltStyle | null } | { k: "weapon"; name: string; x: number; floor: number } | { k: "bite"; x: number; floor: number };
 /** Odalar arası kapı: sen geçince kapanır, gelenler kırmaya çalışır. Seviye 1–10: dayanıklılık 200–2000. */
 export interface Door { floor: number; x: number; level: number; hp: number; state: "open" | "closed" | "broken" }
 export const DOOR_BASE = 200, DOOR_MAX_LEVEL = 10;
@@ -225,7 +225,7 @@ export const doorMax = (d: Door) => d.level * DOOR_BASE;
 export const fortifySeconds = (d: Door) => d.state === "broken" ? 2.5 : 2 + d.level * 0.35;
 export interface Lock { floor: number; x: number; side: "R" | "L"; key: number; open: boolean }
 export interface GItem { id: number; item: string; x: number; floor: number }
-export interface Proj { id: number; kind: SpellKind; x: number; floor: number; dir: 1 | -1; left: number; base: number; r: number; bolt?: BoltStyle | null }   // bolt: şimşek büyüsü zincir mi yıldırım mı (engine/spellfx.ts)
+export interface Proj { id: number; kind: SpellKind; x: number; floor: number; dir: 1 | -1; left: number; base: number; r: number; bolt?: BoltStyle | null; bounced?: boolean }   // bolt: şimşek büyüsü zincir mi yıldırım mı (engine/spellfx.ts)
 export interface TrapSlot { id: string; state: "hand" | "placed" | "cool"; x: number; floor: number; t: number }
 export interface Dog { x: number; floor: number; state: "yanda" | "av" | "don"; t: number; cd: number; moving: boolean; face: 1 | -1; lag: number }
 export interface Scav {
@@ -422,16 +422,25 @@ export function shootArrow(n: Scav, aim?: { dx: number; dy: number }): boolean {
   if (tgt) { const crit = n.rng.chance(8); hurtFoe(n, tgt, n.dmg * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); }
   return true;
 }
+/** Büyü bir düşmana değer: önce birleşik tepki (iletken, buhar, çatlama), sonra etki ve hasar. Kural engine/spellfx.ts'te. */
+function strike(n: Scav, f: SFoe, kind: SpellKind, base: number) {
+  const c = combo(kind, { wet: (f.wet ?? 0) > 0, burn: f.burn > 0 });
+  if (kind === "ates" && !c?.quench) f.burn = Math.max(f.burn, 4);
+  if (c?.quench) { f.burn = 0; f.wet = 0; }
+  if (kind === "buz" || kind === "sarmasik") f.root = Math.max(f.root, 3.5);
+  if (kind === "camur") f.slow = Math.max(f.slow, 5);
+  if (kind === "karga") f.root = Math.max(f.root, 2.5);
+  if (kind === "kilic") f.root = Math.max(f.root, 2);
+  if (wets(kind)) f.wet = WET_SECS;
+  if (c) n.fx.push({ k: "combo", tag: c.tag, x: f.x, floor: f.floor });
+  hurtFoe(n, f, base * (c?.mul ?? 1), false);
+}
 function explode(n: Scav, pj: Proj) {
   const hits = n.foes.filter(f => f.floor === pj.floor && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4);
-  for (const f of hits) {
-    if (pj.kind === "ates") f.burn = Math.max(f.burn, 4);
-    if (pj.kind === "buz" || pj.kind === "sarmasik") f.root = Math.max(f.root, 3.5);
-    if (pj.kind === "camur") f.slow = Math.max(f.slow, 5);
-    if (pj.kind === "karga") f.root = Math.max(f.root, 2.5);
-    if (pj.kind === "kilic") f.root = Math.max(f.root, 2);
-    hurtFoe(n, f, pj.base, false);
-  }
+  const rest = n.foes.filter(f => !hits.includes(f) && f.floor === pj.floor && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4 + BOUNCE_RANGE).sort((a, b) => Math.abs(a.x - pj.x) - Math.abs(b.x - pj.x));
+  for (const f of hits) strike(n, f, pj.kind, pj.base);
+  // sekme: çarpan top bir kez daha sekip en yakın ikinci düşmana vurur
+  if (bounces(pj.kind) && hits.length && rest[0] && n.foes.includes(rest[0])) { n.fx.push({ k: "combo", tag: "Sekti!", x: rest[0].x, floor: rest[0].floor }); strike(n, rest[0], pj.kind, pj.base * BOUNCE_MUL); }
   n.fx.push({ k: "spell", kind: pj.kind, x: pj.x, floor: pj.floor, r: pj.r * 2, bolt: pj.bolt });
 }
 
@@ -542,8 +551,12 @@ export function stepScav(n: Scav, dt: number) {
   }
   // büyü topları
   for (const pj of [...n.proj]) {
-    const st = 95 * dt; pj.x += pj.dir * st; pj.left -= st;
+    const st = 95 * dt; const x0 = pj.x; pj.x += pj.dir * st; pj.left -= st;
     const hit = n.foes.some(f => f.floor === pj.floor && f.climbT <= 0 && Math.abs(f.x - pj.x) <= 5);
+    if (!hit && bounces(pj.kind) && !pj.bounced) {
+      const wall = pj.x < 0 || pj.x > n.w || n.doors.some(d => d.floor === pj.floor && d.state === "closed" && (x0 - d.x) * (pj.x - d.x) <= 0) || n.locks.some(l => l.floor === pj.floor && !l.open && (x0 - l.x) * (pj.x - l.x) <= 0);
+      if (wall) { pj.dir = (-pj.dir) as 1 | -1; pj.x = x0; pj.bounced = true; pj.base *= BOUNCE_MUL; pj.left = Math.max(pj.left, 70); n.fx.push({ k: "combo", tag: "Sekti!", x: pj.x, floor: pj.floor }); continue; }
+    }
     if (hit || pj.left <= 0 || pj.x < 0 || pj.x > n.w) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); }
   }
   // tuzaklar
@@ -561,7 +574,7 @@ export function stepScav(n: Scav, dt: number) {
   // düşmanlar
   const pf = n.floor; const exposed = !n.climbing || Math.abs(n.py - pf) < 0.3;
   for (const f of [...n.foes]) {
-    f.hitT = Math.max(0, f.hitT - dt); f.cd -= dt; f.root = Math.max(0, f.root - dt); f.slow = Math.max(0, f.slow - dt);
+    f.hitT = Math.max(0, f.hitT - dt); f.cd -= dt; if (f.wet) f.wet = Math.max(0, f.wet - dt); f.root = Math.max(0, f.root - dt); f.slow = Math.max(0, f.slow - dt);
     if (f.burn > 0) { f.burn -= dt; hurtFoe(n, f, n.dmg * 0.12 * dt, false, true); if (!n.foes.includes(f)) continue; }
     if (f.idle) { if (f.floor === n.floor && Math.abs(f.x - n.px) <= 48 && !n.climbing) { f.idle = false; alarm(n, f); } else continue; }   // bekçi: yaklaşınca uyanır, ötekileri çağırır
     if (f.climbT > 0) { f.climbT -= dt; if (f.climbT <= 0) f.floor = f.toFloor; continue; }
