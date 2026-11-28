@@ -89,7 +89,7 @@ Uzun dayanmanın karşılığı (güç değil, gelişim, bilgi, ün ve para):
 
 - Odalar arasında (her katta) kapı vardır. Başta açıktır; **sen geçince arkandan kapanır**. Kilitli oda kapısı ayrıdır (anahtarla açılır).
 - Gelen düşmanlar kapalı kapıdan geçemez: önünde durup kapıyı döver (vuruş başına düşman hasarının 1,2 katı). Kapı kırılınca yolu açar.
-- Kapının önünde durup **Güçlendir**: her seferinde +200 dayanıklılık, en çok 2000 (10 seviye); seviye yükseldikçe süre uzar (2 sn + seviye × 0,35 sn). Hareket edersen yarıda kalır. Kırık kapı aynı düğmeyle onarılır.
+- Kapının önünde durup **Güçlendir**: her seferinde +200 dayanıklılık, en çok 2000 (10 seviye); seviye yükseldikçe süre uzar (2 sn + seviye × 0,35 sn). **Bedel:** çantandaki (o girişte bulduğun) malzemeden gider: ilk dört seviye 1 ip, sonraki beş seviye 1 demir parça (toplam 4 ip + 5 demir parça); onarım 1 ip. Malzeme yoksa düğme kapalı, kutulardan bulman gerekir; harcadığın, çıkışta eve götürdüğünden eksilir. Hareket edersen yarıda kalır. Kırık kapı aynı düğmeyle onarılır.
 - Kapı seviyesi harabe kaydında kalır; hasar kalmaz, her girişte kapı tam dayanıklılıkla başlar.
 - **Çift elli:** iki tek elli silahın varsa (aynı bıçaktan iki tane de olur) harabe girişinde "çift elli" seçeneği çıkar: vuruş = ana silah + yedek silahın yarısı (savaştaki kuralla aynı), vuruşlar biraz yavaşlar.
 - Kod: `engine/scavenge.ts` (`Door`, `beginFortify`, `walls`/`moveFoe`), çizim `ui/scav-view.ts`.

@@ -10,7 +10,7 @@ import { withGuide } from "./guide";
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
-  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, doorNear, beginFortify, canFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
+  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, doorNear, beginFortify, canFortify, fortifyCost, canAffordFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
   traitLines, bagUsed, canStore, weaponLabel, bagItemCount, STACK, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
@@ -272,8 +272,9 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
     (q("#scSearch") as HTMLElement).hidden = true;
     { const dn = doorNear(n); const db = q("#scDoor") as HTMLButtonElement; db.hidden = !dn || n.phase !== "play";
       if (dn) { const mx = doorMax(dn);
-        db.textContent = n.fort?.d === dn ? `Güçlendiriliyor… %${Math.round(n.fort.prog * 100)}` : dn.state === "broken" ? "Kapıyı onar" : canFortify(dn) ? `Kapıyı güçlendir ${Math.round(dn.hp)}/${mx} → ${mx + DOOR_BASE}` : `Kapı en güçlü (${mx})`;
-        db.disabled = !canFortify(dn); db.classList.toggle("busy", n.fort?.d === dn); } }
+        const fc = fortifyCost(dn), cn = `${fc.n} ${itemInfo(cfg, fc.item).name.toLocaleLowerCase("tr")}`;
+        db.textContent = n.fort?.d === dn ? `Güçlendiriliyor… %${Math.round(n.fort.prog * 100)}` : dn.state === "broken" ? `Kapıyı onar · ${cn}` : canFortify(dn) ? `Kapıyı güçlendir ${Math.round(dn.hp)}/${mx} → ${mx + DOOR_BASE} · ${cn}` : `Kapı en güçlü (${mx})`;
+        db.disabled = !canFortify(dn) || (!n.fort && !canAffordFortify(n, dn)); db.classList.toggle("busy", n.fort?.d === dn); } }
     const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", !canStore(n, gnear.item)); }
     const tb = q("#scTrap") as HTMLButtonElement; tb.hidden = !n.traps.length; if (n.traps.length) { const hand = trapsInHand(n); const cool = n.traps.filter(x => x.state === "cool").map(x => Math.ceil(x.t)); tb.textContent = hand ? `Tuzak ${hand}` : cool.length ? `Tuzak ${Math.min(...cool)} sn` : "Tuzak 0"; tb.disabled = !hand || n.climbing; }
     const hl = healItemsAvailable(s, n); const hk = hl.map(x => x.id + x.n).join() + (n.hp < n.maxHp); const he = q("#scHeal");
@@ -347,7 +348,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button"); if (!b || b.disabled || n.phase !== "play" || paused) return;
     if (b.dataset.c === "exit") { if (leave(n)) sfx("win"); return; }
     if (b.dataset.a === "pick") { const r = pickGround(n); if (r === "ok") sfx("coin"); else { sfx("bad"); if (r === "full") { tip.hidden = false; tip.textContent = "Çanta dolu: önce bir şey at"; setTimeout(() => { tip.hidden = true; }, 1500); } } }
-    if (b.dataset.a === "door") { const r = beginFortify(n); sfx(r === "ok" ? "tap" : "bad"); }
+    if (b.dataset.a === "door") { const r = beginFortify(n); sfx(r === "ok" ? "tap" : "bad"); if (r === "cost") { tip.hidden = false; tip.textContent = "Malzeme yok: kutulardan ip ve demir parça bul"; setTimeout(() => { tip.hidden = true; }, 1600); } }
     if (b.dataset.a === "search") { if (beginSearch(n)) { sfx("tap"); stickReset(); } else sfx("bad"); }
     if (b.dataset.a === "trap") { if (placeTrap(n)) sfx("thunk"); else sfx("bad"); }
   });

@@ -352,9 +352,13 @@ export function nearSpot(n: Scav): Spot | undefined {
 /** Yakındaki (±7) kapı. */
 export const doorNear = (n: Scav): Door | undefined => n.climbing ? undefined : n.doors.filter(d => d.floor === n.floor && Math.abs(d.x - n.px) <= 7).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
 export const canFortify = (d: Door) => d.state === "broken" || d.level < DOOR_MAX_LEVEL;
+/** Güçlendirmenin bedeli çantandaki (bu girişte bulduğun) malzemeden gider: ilk dört seviye ip, sonrası demir parça; onarım bir ip. */
+export const fortifyCost = (d: Door): { item: string; n: number } => d.state === "broken" ? { item: "ip", n: 1 } : { item: d.level < 5 ? "ip" : "demir_parca", n: 1 };
+export const canAffordFortify = (n: Scav, d: Door) => (n.bag[fortifyCost(d).item] ?? 0) >= fortifyCost(d).n;
+function spend(n: Scav, item: string, k: number) { n.bag[item] = (n.bag[item] ?? 0) - k; if (n.bag[item] <= 0) delete n.bag[item]; }
 /** Kapının önünde dururken güçlendirmeye ya da onarmaya başla. */
-export function beginFortify(n: Scav): "ok" | "max" | "none" {
-  const d = doorNear(n); if (!d || n.phase !== "play") return "none"; if (!canFortify(d)) return "max";
+export function beginFortify(n: Scav): "ok" | "max" | "none" | "cost" {
+  const d = doorNear(n); if (!d || n.phase !== "play") return "none"; if (!canFortify(d)) return "max"; if (!canAffordFortify(n, d)) return "cost";
   n.fort = { d, prog: 0 }; n.searchId = 0; return "ok";
 }
 /** Bir katta, x'in iki yanındaki kapalı kapıların sınırı (düşman geçemez). */
@@ -516,8 +520,11 @@ export function stepScav(n: Scav, dt: number) {
       n.fort.prog += dt / fortifySeconds(n.fort.d);
       if (n.fort.prog >= 1) {
         const d = n.fort.d; n.fort = null;
-        if (d.state === "broken") { d.state = "closed"; d.hp = doorMax(d); } else { d.level++; d.hp = Math.min(doorMax(d), d.hp + DOOR_BASE); }
-        n.fx.push({ k: "fortify", x: d.x, floor: d.floor, level: d.level });
+        if (canAffordFortify(n, d)) {
+          const c = fortifyCost(d); spend(n, c.item, c.n);
+          if (d.state === "broken") { d.state = "closed"; d.hp = doorMax(d); } else { d.level++; d.hp = Math.min(doorMax(d), d.hp + DOOR_BASE); }
+          n.fx.push({ k: "fortify", x: d.x, floor: d.floor, level: d.level });
+        }
       }
     }
   }
