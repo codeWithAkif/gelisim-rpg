@@ -779,3 +779,8 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .nb-card > * { flex: none; }
 .nb-card .choice.bagrow { flex-direction: row; align-items: center; padding: 4px 10px; }
 .nb-card .bagrow b { font-size: 18px; }
+
+/* Harabe çantası: üst üste biriken aynı eşyalar tek gözde, köşede adet */
+.bag-grid .cell { position: relative; }
+.bag-grid .cell-n { position: absolute; right: 4px; bottom: 2px; font-family: var(--f-hand); font-size: 18px; font-weight: 700; color: var(--ink); text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper); }
+#scPause.nb-card { padding-top: 84px; padding-bottom: 84px; }
