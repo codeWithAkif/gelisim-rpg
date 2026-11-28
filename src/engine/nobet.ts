@@ -16,7 +16,7 @@ import { addItem } from "./inventory";
 import { spellOptions } from "./magic";
 import { scavSpellInfo } from "./scavenge";
 import { spellAim, wallLen, THROW_RANGE, type SiegeAim } from "./siege";
-import { boltStyle, type BoltStyle } from "./spellfx";
+import { boltStyle, combo, wets, bounces, BOUNCE_MUL, BOUNCE_RANGE, WET_SECS, type BoltStyle } from "./spellfx";
 import { SPELL_FX } from "./magic";
 import { weaponSet, hasBow } from "./gear";
 import { trapEffect, barricadeMul, trapsOwned, owned } from "./engineering";
@@ -79,12 +79,12 @@ export const CARDS: Card[] = [
 ];
 
 /* ---------- durum ---------- */
-export interface NFoe { id: number; def: string; x: number; y: number; hp: number; max: number; speed: number; dmg: number; cd: number; r: number; boss: boolean; burn: number; burnMul?: number; slow: number; root: number; stun: number; peck: number; human: boolean; reward: number }
+export interface NFoe { wet?: number; id: number; def: string; x: number; y: number; hp: number; max: number; speed: number; dmg: number; cd: number; r: number; boss: boolean; burn: number; burnMul?: number; slow: number; root: number; stun: number; peck: number; human: boolean; reward: number }
 export interface Shot { x: number; y: number; tx: number; ty: number; target: number; dmg: number; crit: boolean; pierce: number; burn: boolean; hit: number[] }
 export type NFx =
   | { k: "hit"; x: number; y: number; dmg: number; crit: boolean } | { k: "die"; x: number; y: number; coins: number; boss: boolean }
   | { k: "hurt"; dmg: number } | { k: "zap"; pts: [number, number][] } | { k: "wave"; n: number; boss: boolean } | { k: "card" } | { k: "reward"; wave: number; loot: Loot } | { k: "spell"; id: SpellId; kind: SpellKind; x: number; y: number; r: number; x2?: number; y2?: number; hits: number[]; pts?: [number, number][]; from?: [number, number]; wall?: boolean } | { k: "bite"; x: number; y: number }
-  | { k: "melee"; x: number; y: number } | { k: "trap"; x: number; y: number; type: string; r: number } | { k: "barbreak"; x: number; y: number };
+  | { k: "melee"; x: number; y: number } | { k: "trap"; x: number; y: number; type: string; r: number } | { k: "barbreak"; x: number; y: number } | { k: "combo"; tag: string; x: number; y: number };
 export interface Nobet {
   site: NobetSite; phase: "play" | "card" | "over"; time: number; wave: number; waveLeft: number; spawnT: number; breakT: number;
   hp: number; maxHp: number; regen: number; dmg: number; rate: number; range: number; crit: number;
@@ -257,14 +257,14 @@ export function useSpell(n: Nobet, id: SpellId, tx?: number, ty?: number): boole
       const first = [...n.foes].filter(f => inR(f, R * 1.3)).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
       list = first ? [first, ...n.foes.filter(f => f !== first && Math.hypot(f.x - first.x, f.y - first.y) < 24).sort((a, b) => Math.hypot(a.x - first.x, a.y - first.y) - Math.hypot(b.x - first.x, b.y - first.y)).slice(0, 3)] : [];
     } else list = n.foes.filter(f => inR(f));
-    for (const f of list) { pts.push([f.x, f.y]); hits.push(f.id); f.slow = Math.max(f.slow, 1.5); hurt(n, f, n.dmg * sp.mul, false); }
+    for (const f of list) { pts.push([f.x, f.y]); hits.push(f.id); f.slow = Math.max(f.slow, 1.5); spellHit(n, f, "simsek", n.dmg * sp.mul); }
     if (!pts.length) pts.push([c.x, c.y]);
   } else if (sp.kind === "ates") {
-    for (const f of [...n.foes]) if (inR(f)) { hits.push(f.id); f.burn = Math.max(f.burn, 3.5); hurt(n, f, n.dmg * sp.mul, false); }
+    for (const f of [...n.foes]) if (inR(f)) { hits.push(f.id); const wasWet = (f.wet ?? 0) > 0; spellHit(n, f, "ates", n.dmg * sp.mul); if (!wasWet) f.burn = Math.max(f.burn, 3.5); }
   } else if (sp.kind === "buz") {
-    for (const f of n.foes) if (inR(f)) { hits.push(f.id); f.root = Math.max(f.root, f.boss ? 1.5 : 3.5); f.slow = Math.max(f.slow, 4); hurt(n, f, n.dmg * sp.mul, false); }
+    for (const f of n.foes) if (inR(f)) { hits.push(f.id); f.root = Math.max(f.root, f.boss ? 1.5 : 3.5); f.slow = Math.max(f.slow, 4); spellHit(n, f, "buz", n.dmg * sp.mul); }
   } else if (sp.kind === "camur") {
-    for (const f of n.foes) if (inR(f)) { hits.push(f.id); f.slow = Math.max(f.slow, 5); hurt(n, f, n.dmg * sp.mul, false); }
+    for (const f of n.foes) if (inR(f)) { hits.push(f.id); f.slow = Math.max(f.slow, 5); spellHit(n, f, "camur", n.dmg * sp.mul); }
   } else if (sp.kind === "sarmasik") {
     for (const f of n.foes) if (inR(f)) { hits.push(f.id); f.root = Math.max(f.root, f.boss ? 1.5 : 3.5); hurt(n, f, n.dmg * sp.mul, false); }
   } else if (sp.kind === "karga") {
@@ -278,6 +278,11 @@ export function useSpell(n: Nobet, id: SpellId, tx?: number, ty?: number): boole
       const vx = x2 - x1, vy = y2 - y1; const u = Math.max(0, Math.min(1, ((f.x - x1) * vx + (f.y - y1) * vy) / (vx * vx + vy * vy)));
       if (Math.hypot(f.x - (x1 + vx * u), f.y - (y1 + vy * u)) < 5 + f.r) { hits.push(f.id); f.stun = Math.max(f.stun, 1.4); hurt(n, f, n.dmg * sp.mul, true); }
     }
+  }
+  // sekme: ateş ve buz topu çarptığı yerden bir kez sekip en yakın ikinci düşmana vurur
+  if (bounces(sp.kind) && hits.length) {
+    const nxt = n.foes.filter(f => !hits.includes(f.id) && Math.hypot(f.x - c.x, f.y - c.y) < R + BOUNCE_RANGE).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
+    if (nxt) { hits.push(nxt.id); n.fx.push({ k: "combo", tag: "Sekti!", x: nxt.x, y: nxt.y }); if (sp.kind === "ates") nxt.burn = Math.max(nxt.burn, 2); else nxt.slow = Math.max(nxt.slow, 2.5); spellHit(n, nxt, sp.kind, n.dmg * sp.mul * BOUNCE_MUL); }
   }
   n.fx.push({ k: "spell", id, kind: sp.kind, x: fx0, y: fy0, r: sp.kind === "kilic" ? 5 : R, x2, y2, hits, pts, from });
   sp.cd = sp.max; n.stats.skills++;
@@ -381,6 +386,14 @@ function spawn(n: Nobet) {
     reward: Math.round((1 + w * 0.25) * (boss ? 12 : 1) * (human ? 1.3 : 1)) });
   n.waveLeft--;
 }
+/** Büyü vuruşu: birleşik tepki (iletken, buhar, çatlama) ve ıslatma. Kural engine/spellfx.ts'te, dört sahnede aynı. */
+function spellHit(n: Nobet, f: NFoe, kind: string, dmg: number) {
+  const c = combo(kind, { wet: (f.wet ?? 0) > 0, burn: f.burn > 0 });
+  if (c?.quench) { f.burn = 0; f.wet = 0; }
+  if (wets(kind)) f.wet = WET_SECS;
+  if (c) n.fx.push({ k: "combo", tag: c.tag, x: f.x, y: f.y });
+  hurt(n, f, dmg * (c?.mul ?? 1), false);
+}
 function hurt(n: Nobet, f: NFoe, dmg: number, crit: boolean, quiet = false) {
   if (f.hp <= 0) return;
   f.hp -= dmg; if (!quiet) n.fx.push({ k: "hit", x: f.x, y: f.y, dmg: Math.round(dmg), crit });
@@ -416,7 +429,7 @@ export function stepNobet(s: GameState, n: Nobet, dt: number) {
   const ice = n.cards.buz ?? 0, stake = n.cards.kazik ?? 0;
   for (const f of [...n.foes]) {
     if (f.burn > 0) { f.burn -= dt; hurt(n, f, n.dmg * 0.25 * (n.cards.ates ?? 1) * (f.burnMul ?? 1) * dt, false, true); if (f.burn <= 0) f.burnMul = 1; if (f.hp <= 0) continue; }
-    f.slow = Math.max(0, f.slow - dt); f.root = Math.max(0, f.root - dt);
+    f.slow = Math.max(0, f.slow - dt); f.root = Math.max(0, f.root - dt); if (f.wet) f.wet = Math.max(0, f.wet - dt);
     if (f.peck > 0) { f.peck -= dt; hurt(n, f, n.dmg * 0.5 * dt, false, true); if (f.hp <= 0) continue; }
     if (f.stun > 0) { f.stun -= dt; continue; }
     const dx = TOWER.x - f.x, dy = TOWER.y - f.y, d = Math.hypot(dx, dy);

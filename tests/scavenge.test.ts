@@ -255,3 +255,50 @@ test("çift elli: iki tek elli silahın (aynı bıçaktan iki de olur) varsa har
   const two = createScav(cfg, s, scavSite("koru_kule")!, 5, { kind: "melee", id: dual.id, off: dual.off });
   expect(two.melee).toBeGreaterThan(one.melee); expect(two.dual).toBe(true); expect(one.dual).toBe(false);
 });
+
+test("büyü taktiği (harabe): buz ıslatır, ıslak hedefe şimşek ×1,7; ateş ıslağı söndürür; top kapalı kapıdan sekip döner; çarpan top ikinci düşmana sekip vurur", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); n.raidT = 999; n.foes = [];
+  const mk = (x: number) => foe(x, { hp: 1000, max: 1000, speed: 0, dmg: 0, cd: 99 });
+  const fire = (kind: any, x0: number, base = 100) => { n.proj.push({ id: n.gid++, kind, x: x0, floor: 0, dir: 1, left: 100, base, r: 3 }); run(n, 1.2); };
+  const a = mk(60), dry = mk(160); dry.id = 10; n.foes = [a, dry]; n.px = 20;
+  fire("simsek", 40); const dryHit = 1000 - a.hp; a.hp = 1000;                 // kuru hedef: düz hasar
+  fire("buz", 40); expect(a.wet).toBeGreaterThan(0); a.hp = 1000;
+  fire("simsek", 40); expect(1000 - a.hp).toBeGreaterThan(dryHit * 1.5);     // ıslak: iletken
+  a.burn = 3; a.wet = 4; fire("ates", 40); expect(a.burn).toBe(0);           // buhar: alev söner
+  // sekme: kapalı kapı topu geri döndürür
+  n.foes = []; const d = n.doors.find(q => q.floor === 0)!; d.state = "closed";
+  n.proj.push({ id: n.gid++, kind: "ates", x: d.x - 5, floor: 0, dir: 1, left: 200, base: 50, r: 3 }); run(n, 0.2);
+  expect(n.proj[0]?.dir).toBe(-1); expect(n.proj[0]?.bounced).toBe(true);
+  // sekme: ilk düşmana çarpınca yanındaki ikinciye de vurur
+  n.proj = []; const p1 = mk(60), p2 = mk(70); p2.id = 11; n.foes = [p1, p2]; fire("ates", 40, 100);
+  expect(p1.hp).toBeLessThan(1000); expect(p2.hp).toBeLessThan(1000);
+});
+
+import { siteRule, SITE_RULES, nextRaidCount } from "../src/engine/scavenge";
+test("harabe kuralları: çamur yavaşlatır, bekçibaşı var, tuzaklı kutu can alır, duman aramayı uzatır, karanlıkta bekçi geç uyanır; kolay harabede kural yok", () => {
+  expect(siteRule(scavSite("koru_kulube")!)).toBeUndefined();
+  for (const id of ["koru_agil", "koru_kule", "koru_kosk", "karacam_sarnic", "ardic_kul"]) expect(SITE_RULES[id]).toBeTruthy();
+  const s = fresh();
+  const mud = createScav(cfg, s, scavSite("koru_agil")!, 3, { kind: "yumruk" }); const plain = createScav(cfg, s, scavSite("koru_kulube")!, 3, { kind: "yumruk" });
+  expect(mud.floor).toBe(0); expect(plain.floor).toBe(0); expect(speedOfCheck(mud)).toBeLessThan(speedOfCheck(plain));
+  const kule = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); const boss = kule.foes.find(f => f.boss)!;
+  expect(boss).toBeTruthy(); expect(boss.floor).toBe(kule.site.floors - 1); expect(boss.hp).toBeGreaterThan(Math.max(...kule.foes.filter(f => !f.boss).map(f => f.max)) * 2);
+  expect(kule.guardCount).toBe(kule.site.guards + 1);
+  const kosk = createScav(cfg, s, scavSite("koru_kosk")!, 3, { kind: "yumruk" }); n0(kosk);
+  const tr = kosk.spots.find(q => q.trapped)!; expect(tr).toBeTruthy();
+  tr.stages = [{ kind: "empty", time: 0.4 }, { kind: "empty", time: 0.2 }, { kind: "empty", time: 0.2 }]; kosk.foes = []; kosk.raidT = 999;
+  walkTo(kosk, tr.x); const hp0 = kosk.hp; beginSearch(kosk); run(kosk, 1.5); expect(kosk.hp).toBeLessThan(hp0); expect(tr.trapped).toBe(false);
+  const smoke = createScav(cfg, s, scavSite("ardic_kul")!, 3, { kind: "yumruk" }); expect(smoke.tr.search * 1.3).toBeGreaterThan(smoke.tr.search);
+  expect(nextRaidCount(kule)).toBe(kule.site.raidSize);
+});
+function n0(n: Scav) { n.raidT = 999; }
+function speedOfCheck(n: Scav) { setInput(n, 1, 0); const x0 = n.px; for (let i = 0; i < 20; i++) stepScav(n, 0.05); return n.px - x0; }
+
+test("düşman saldırıyı önceden belli eder: vuruştan önce işaret çıkar, menzilden çıkarsan boşa gider", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); n.raidT = 999; n.hp = 100; n.maxHp = 100;
+  const f = foe(n.px + 4, { speed: 0, dmg: 10, cd: 0 }); n.foes = [f];
+  stepScav(n, 0.05); expect(f.wind).toBeGreaterThan(0); expect(n.hp).toBe(100);        // işaret var, henüz vurmadı
+  n.px += 12; stepScav(n, 0.05); expect(f.wind).toBe(0);                                  // menzilden çıktın: boşa gitti
+  expect(n.hp).toBe(100);
+  n.px = f.x - 3; run(n, 1); expect(n.hp).toBeLessThan(100);                              // yakında kalırsan vurur
+});

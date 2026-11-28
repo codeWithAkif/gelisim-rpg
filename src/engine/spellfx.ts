@@ -18,3 +18,28 @@ export function boltStyle(cfg: Config, id: string): BoltStyle | null {
   if (form === "duvar") return null;
   return "sky";
 }
+
+/* ---------- büyü taktiği: dört savaş sahnesinde aynı kurallar ----------
+ * Islak: buz ve çamur büyüsü hedefi ıslatır (WET_SECS sn). Islaklık yağmur ve su/çamur zemininde zaten vardır.
+ * İletken: ıslak hedefe şimşek ×1,7. Buhar: ıslak hedefe ateş ×0,6 ve alev söner. Çatlama: yanan hedefe buz ×1,5.
+ * Sekme: ateş topu ve buz topu çarptığı yerden bir kez sekip en yakın ikinci düşmana BOUNCE_MUL gücüyle vurur;
+ * uçan toplar (harabe) ayrıca duvara, kapalı kapıya ve yapı kenarına çarpınca bir kez geri döner.
+ * Yeni bir sahne ya da büyü eklerken yalnız bu fonksiyonları çağır; sayıları burada değiştir. */
+export const WET_SECS = 6;
+export const BOUNCE_MUL = 0.6;
+export const BOUNCE_RANGE = 16;      // harabe/nöbet/barikat birimi; altıgen savaşta 2 altıgen
+export const BOUNCE_HEX = 2;
+export interface FoeState { wet: boolean; burn: boolean }
+export interface Combo { mul: number; tag: string; quench?: boolean }
+export const wets = (kind: string) => kind === "buz" || kind === "camur";
+export const bounces = (kind: string) => kind === "ates" || kind === "buz";
+export function combo(kind: string, st: FoeState): Combo | null {
+  if (kind === "simsek" && st.wet) return { mul: 1.7, tag: "İletken!" };
+  if (kind === "ates" && st.wet) return { mul: 0.6, tag: "Buhar", quench: true };
+  if (kind === "buz" && st.burn) return { mul: 1.5, tag: "Çatlama!" };
+  return null;
+}
+/** Etki bayraklarından büyü türü (altıgen savaş ve barikatta SPELL_FX bayrakları var, tür yok). */
+export function fxKind(fx: { chain?: boolean; ignite?: boolean; slow?: number; mud?: boolean; root?: number } | undefined): string {
+  if (!fx) return "other"; if (fx.chain) return "simsek"; if (fx.ignite) return "ates"; if (fx.mud) return "camur"; if (fx.root) return "sarmasik"; if (fx.slow) return "buz"; return "other";
+}

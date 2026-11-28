@@ -10,7 +10,7 @@ import { maxHp } from "./combat";
 import { maxMana } from "./derived";
 import { spellOptions, SPELL_FX } from "./magic";
 import { spellSequence } from "./synthesis";
-import { boltStyle } from "./spellfx";
+import { boltStyle, combo, wets, bounces, fxKind, BOUNCE_MUL, BOUNCE_RANGE, WET_SECS } from "./spellfx";
 import { Rng } from "./rng";
 import { ENEMIES, GAME_ITEMS, CONFIG_WEAPON_DAMAGE } from "../content/world";
 import { weaponSet, totalArmor, hasBow } from "./gear";
@@ -28,13 +28,13 @@ export interface SiegeDef { id: string; name: string; waves: SiegeWave[]; ground
 
 export interface Barricade { id: number; x1: number; y1: number; x2: number; y2: number; hp: number; max: number; kind: "kazik" | "buz" }
 export interface Foe { id: number; def: string; x: number; y: number; hp: number; max: number; speed: number; dmg: [number, number]; atkCd: number; slowT: number; stunT: number; burnT: number; side: number; r: number; human: boolean; flee?: boolean;
-  burnDps?: number; burnAcc?: number }   // tutuşunca saniyede kaç can yanar; birikmiş kesir
+  burnDps?: number; burnAcc?: number; wetT?: number }   // tutuşunca saniyede kaç can yanar; birikmiş kesir
 export interface Zone { x: number; y: number; r: number; kind: "ates" | "camur"; t: number; dps?: number }   // dps: alevin saniyelik yakması
 export interface Arrow { x: number; y: number; vx: number; vy: number; dmg: number; crit: boolean; life: number }
 export type SiegeFx =
   | { k: "hit"; x: number; y: number; dmg: number; crit?: boolean; by: "ok" | "kilic" | "buyu" | "kopek" | "ates" }
   | { k: "hurt"; dmg: number } | { k: "die"; x: number; y: number } | { k: "bar"; id: number; broken: boolean }
-  | { k: "cast"; spell: string; x: number; y: number; r: number; chain?: [number, number][]; bolt?: "chain" | "sky"; fire?: boolean; from?: [number, number]; line?: [number, number, number, number] } | { k: "shoot" } | { k: "wave"; n: number };
+  | { k: "cast"; spell: string; x: number; y: number; r: number; chain?: [number, number][]; bolt?: "chain" | "sky"; fire?: boolean; from?: [number, number]; line?: [number, number, number, number] } | { k: "shoot" } | { k: "wave"; n: number } | { k: "combo"; tag: string; x: number; y: number };
 
 export interface Siege {
   def: SiegeDef; phase: "build" | "fight" | "rest" | "won" | "lost"; time: number; wave: number;
@@ -199,13 +199,26 @@ export function cast(cfg: Config, s: GameState, sg: Siege, id: string, x: number
   }
   let hits = sg.foes.filter(f => Math.hypot(f.x - x, f.y - y) <= sp.r + f.r);
   if (fx.chain && hits.length) { const first = hits[0]; hits = [first, ...sg.foes.filter(f => f !== first).sort((a, b) => Math.hypot(a.x - first.x, a.y - first.y) - Math.hypot(b.x - first.x, b.y - first.y)).slice(0, 3)]; }
+  // birleşik tepkiler ve sekme: kural engine/spellfx.ts'te, dört sahnede aynı
+  const kind = fxKind(fx); const quenched = new Set<Foe>();
+  const strikeFoe = (f: Foe, dmg: number) => {
+    const c = combo(kind, { wet: (f.wetT ?? 0) > 0, burn: f.burnT > 0 });
+    if (c?.quench) { f.burnT = 0; f.burnDps = 0; f.wetT = 0; quenched.add(f); }
+    if (wets(kind)) f.wetT = WET_SECS;
+    if (c) sg.fx.push({ k: "combo", tag: c.tag, x: f.x, y: f.y });
+    damage(sg, f, dmg * (c?.mul ?? 1), "buyu");
+  };
+  if (bounces(kind) && hits.length) {
+    const nxt = sg.foes.filter(f => !hits.includes(f) && Math.hypot(f.x - x, f.y - y) <= sp.r + f.r + BOUNCE_RANGE).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
+    if (nxt) { sg.fx.push({ k: "combo", tag: "Sekti!", x: nxt.x, y: nxt.y }); strikeFoe(nxt, sp.dmg * BOUNCE_MUL); if (fx.ignite) ignite(nxt, Math.max(2, Math.round(sp.dmg * 0.1))); if (fx.slow) nxt.slowT = Math.max(nxt.slowT, fx.slow * 0.8); }
+  }
   for (const f of hits) {
-    damage(sg, f, sp.dmg, "buyu");
+    strikeFoe(f, sp.dmg);
     if (fx.slow) f.slowT = Math.max(f.slowT, fx.slow * 1.2);
     if (fx.blind) f.stunT = Math.max(f.stunT, fx.blind * 0.8);
     if (fx.root) f.stunT = Math.max(f.stunT, fx.root * 1.4);   // sarmaşık: yerinden kıpırdayamaz
     if (fx.stun) f.stunT = Math.max(f.stunT, fx.stun * 1.2);
-    if (fx.ignite) ignite(f, Math.max(2, Math.round(sp.dmg * 0.15)));   // hayvanlar yarı canla ateşten kaçar
+    if (fx.ignite && !quenched.has(f)) ignite(f, Math.max(2, Math.round(sp.dmg * 0.15)));   // hayvanlar yarı canla ateşten kaçar; ıslağa ateş buhar olur
   }
   const cf = sg.fx.find(e => e.k === "cast" && e.spell === id && e.x === x && e.y === y) as Extract<SiegeFx, { k: "cast" }> | undefined;
   const bs = boltStyle(cfg, id);
@@ -258,7 +271,7 @@ export function step(cfg: Config, s: GameState, sg: Siege, dt: number) {
       if (f.burnAcc >= 2) { const d = Math.floor(f.burnAcc); f.burnAcc -= d; damage(sg, f, d, "ates"); }
       if (f.burnT <= 0) { f.burnDps = 0; f.burnAcc = 0; } }
     if (f.stunT > 0) { f.stunT -= dt; continue; }
-    f.slowT = Math.max(0, f.slowT - dt); f.atkCd = Math.max(0, f.atkCd - dt);
+    f.slowT = Math.max(0, f.slowT - dt); if (f.wetT) f.wetT = Math.max(0, f.wetT - dt); f.atkCd = Math.max(0, f.atkCd - dt);
     const sp = f.speed * (f.slowT > 0 ? 0.45 : 1);
     const dx = CX - f.x, dy = CY - f.y, L = Math.hypot(dx, dy) || 1;
     if (f.flee) { f.x -= dx / L * sp * 1.4 * dt; f.y -= dy / L * sp * 1.4 * dt; if (f.x < -10 || f.x > ARENA.w + 10 || f.y < -10 || f.y > ARENA.h + 10) { f.hp = 0; sg.stats.kills++; } continue; }

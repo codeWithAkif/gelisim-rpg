@@ -10,7 +10,7 @@ import { withGuide } from "./guide";
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
-  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, doorNear, beginFortify, canFortify, fortifyCost, canAffordFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
+  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, siteRule, nextRaidCount, doorNear, beginFortify, canFortify, fortifyCost, canAffordFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
   traitLines, bagUsed, canStore, weaponLabel, bagItemCount, STACK, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
@@ -38,6 +38,7 @@ function openScavHubInner(cfg: Config, s: GameState, place: string, persist: () 
       return `<button class="site-opt ${pick?.id === x.id ? "on" : ""}" data-site="${x.id}" ${lock ? "disabled" : ""}>
         <span class="site-head"><b>${esc(x.name)}</b><span class="site-tier t${x.tier}">${stars(x.tier)} ${TIER_NAMES[x.tier]}</span></span>
         <span class="site-meta">${x.floors} kat · ${x.rooms} oda · ${x.guards} bekçi · ${x.raids} baskın${lock ? "" : ` · aranan ${pr.done}/${pr.total}`}${left ? ` · yerde ${left} eşya` : ""}</span>
+        ${siteRule(x) ? `<span class="tiny" style="color:var(--blue)"><b>${esc(siteRule(x)!.name)}:</b> ${esc(siteRule(x)!.desc)}</span>` : ""}
         ${lock ? `<span class="tiny red">${esc(lock)}</span>` : pr.done >= pr.total ? `<span class="tiny muted">Burada aranacak bir şey kalmadı.</span>` : ""}</button>`; }).join("");
     bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">Harabeler</p>
       <div class="site-list">${sites}</div>
@@ -89,6 +90,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
   document.body.appendChild(el);
   const cv = el.querySelector("canvas")!; const stage = el.querySelector<HTMLElement>(".siege-stage")!; const g = cv.getContext("2d")!;
   const pauseEl = el.querySelector<HTMLElement>("#scPause")!; const tip = el.querySelector<HTMLElement>("#scTip")!;
+  { const rl = siteRule(site); if (rl) { tip.hidden = false; tip.textContent = `${rl.name}: ${rl.desc}`; setTimeout(() => { tip.hidden = true; }, 4600); } }
   let W = 300, H = 400, paused = false, raf = 0, ended = false, last = performance.now(); let shake = 0; let walkT = 0; let lastLockedMsg = 0;
   const bolts: BoltFx[] = []; const bimpacts: Impact[] = [];
   const rings: { x: number; floor: number; t: number; r: number; color: string }[] = []; const pops: { x: number; floor: number; t: number; text: string; color: string }[] = []; const shots: { a: number; b: number; floor: number; t: number }[] = [];
@@ -217,10 +219,11 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       if (tr.state === "cool") { g.fillStyle = "#F2E7C9"; g.font = "700 14px Caveat, cursive"; g.textAlign = "center"; g.fillText(`${Math.ceil(tr.t)}`, x, y - 12); } g.globalAlpha = 1; }
     // düşmanlar
     for (const f of n.foes) {
-      const d = ENEMIES[f.def]; const wolf = f.def === "kurt" || f.def === "kar_kurdu"; const h = (wolf ? 9 : 20) * (d?.scale ?? 1); const right = n.px > f.x; const climbing = f.climbT > 0; const moving = f.root <= 0 && !climbing;
+      const d = ENEMIES[f.def]; const wolf = f.def === "kurt" || f.def === "kar_kurdu"; const h = (wolf ? 9 : 20) * (d?.scale ?? 1) * (f.boss ? 1.6 : 1); const right = n.px > f.x; const climbing = f.climbT > 0; const moving = f.root <= 0 && !climbing;
       const key = artUrl("dusman_" + f.def) ? "dusman_" + f.def : "dusman_kurt";
       const tint = f.burn > 0 ? "sepia(1) saturate(4) hue-rotate(-20deg)" : f.root > 0 ? "hue-rotate(160deg) saturate(2)" : "none";
       if (!drawFoeOrDog(key, wolf ? "anim_kurt_yuru" : null, moving, f.x, f.floor + (climbing ? ((1.6 - f.climbT) / 1.6) * (f.toFloor - f.floor) : 0), h, key === "dusman_kurt" ? right : !right, now, climbing ? 0.7 : 1, tint)) { g.fillStyle = "#B03A2A"; g.beginPath(); g.arc(X(f.x), gy(f.floor) - 12, 7, 0, 7); g.fill(); }
+      if ((f.wind ?? 0) > 0) { g.fillStyle = "#E0583A"; g.strokeStyle = "rgba(0,0,0,.8)"; g.lineWidth = 3; g.font = `800 ${Math.max(20, sc() * 3)}px Caveat, cursive`; g.textAlign = "center"; g.strokeText("!", X(f.x), gy(f.floor) - h * sc() - 14); g.fillText("!", X(f.x), gy(f.floor) - h * sc() - 14); }
       if (f.hp < f.max) { const w = 26, yy = gy(f.floor) - h * sc() - 6; g.fillStyle = "rgba(20,16,10,.8)"; g.fillRect(X(f.x) - w / 2, yy, w, 4); g.fillStyle = "#D9503A"; g.fillRect(X(f.x) - w / 2, yy, w * Math.max(0, f.hp / f.max), 4); }
     }
     // köpek
@@ -255,6 +258,8 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       if (ty) { g.font = `700 ${Math.max(14, sc() * 1.8)}px Caveat, cursive`; g.textAlign = "center"; g.fillText(ty < 0 ? "üst kat" : "alt kat", ex, ey + (ty < 0 ? -10 : 18)); } g.restore(); }
     for (const p of [...pops]) { const a = Math.max(0, (now - p.t) / 1100); if (a > 1) { pops.splice(pops.indexOf(p), 1); continue; } g.globalAlpha = 1 - a; g.fillStyle = p.color; g.strokeStyle = "rgba(0,0,0,.7)"; g.lineWidth = 3; g.font = `700 ${Math.max(16, sc() * 2.3)}px Caveat, cursive`; g.textAlign = "center";
       const px = X(p.x), py = gy(p.floor) - 24 * sc() / 2.4 - a * 26; g.strokeText(p.text, px, py); g.fillText(p.text, px, py); g.globalAlpha = 1; }
+    // karanlık harabe: yalnız yakının görünür
+    if (siteRule(site)?.id === "karanlik") { const cx = X(n.px), cy = gy(n.py) - 10 * sc(); const gr = g.createRadialGradient(cx, cy, 24 * sc() / 2, cx, cy, Math.max(W, H) * 0.42); gr.addColorStop(0, "rgba(6,5,8,0)"); gr.addColorStop(0.35, "rgba(6,5,8,.55)"); gr.addColorStop(1, "rgba(6,5,8,.93)"); g.fillStyle = gr; g.fillRect(0, 0, W, H); }
     g.restore();
   }
 
@@ -265,7 +270,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
     if (!n.alerted) { rp.textContent = "Sessiz"; rp.className = "raid-pill calm"; }
     else if (raidsLeft(n) <= 0 && !isFinite(n.raidT)) { rp.textContent = n.raidHold > 0 ? `Son baskın · ${Math.ceil(n.raidHold)}` : "Baskın kalmadı"; rp.className = "raid-pill calm"; }
     else if (n.raidHold > 0) { rp.textContent = `Baskın bitti · ${Math.ceil(n.raidHold)}`; rp.className = "raid-pill calm"; }
-    else { rp.textContent = `BASKIN ${rs}`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`; }
+    else { rp.textContent = `BASKIN ${rs} · ${nextRaidCount(n)}×`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`; }
     q("#scDanger").textContent = n.alerted ? `${raidsLeft(n)} baskın kaldı` : `${n.site.raids} baskın`;
     { const wa = n.weaponId && artUrl("harabe_silah_" + n.weaponId); q("#scAmmo").innerHTML = `${wa ? `<img class="sc-wicon" src="${wa}" alt="">` : ""}${esc(weaponLabel(n))}${n.bow ? ` · ok ${n.ammo}` : ""}`; } { const ka = artUrl("harabe_anahtar"); q("#scBag").innerHTML = `${n.keys.length ? (ka ? `<img class="sc-wicon" src="${ka}" alt="">×${n.keys.length} ` : `🔑${n.keys.length} `) : ""}Çanta ${bagUsed(n)}/${n.bagCap}`; }
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
@@ -310,6 +315,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       if (f.k === "locked") { if (now - lastLockedMsg > 1500) { lastLockedMsg = now; tip.hidden = false; tip.textContent = "Kilitli: başka bir odada anahtar var"; setTimeout(() => { tip.hidden = true; }, 1400); sfx("bad"); } }
       if (f.k === "door") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı kapandı", color: "#EFE6CC" }); sfx("thunk"); }
       if (f.k === "doorhit") { sfx("hit"); }
+      if (f.k === "combo") { pops.push({ x: f.x, floor: f.floor, t: now, text: f.tag, color: f.tag.startsWith("Tuzak") ? "#E0583A" : f.tag === "Buhar" ? "#CFD8DC" : f.tag === "Sekti!" ? "#F1C14A" : "#8FC4FF" }); sfx(f.tag.startsWith("Tuzak") ? "bad" : "crit"); }
       if (f.k === "doorbreak") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı kırıldı!", color: "#E0583A" }); sfx("bad"); buzz("heavy"); shake = 6; }
       if (f.k === "fortify") { pops.push({ x: f.x, floor: f.floor, t: now, text: `Kapı güçlendi · ${f.level * DOOR_BASE}`, color: "#9BD36B" }); sfx("good"); buzz("medium"); }
       if (f.k === "die") sfx("hit");

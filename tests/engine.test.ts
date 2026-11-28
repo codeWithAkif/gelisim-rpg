@@ -253,3 +253,21 @@ describe("hazırlık ve taktik", () => {
     expect(e.hp).toBeLessThan(e.maxHp); expect(b.events.some(v => v.k === "trap")).toBe(true);
   });
 });
+
+describe("büyü taktiği (altıgen savaş)", () => {
+  it("ıslak hedefe ateş buhar olur; ateş topu yakındaki ikinci düşmana sekip vurur", () => {
+    const s = newGame(cfg, 2); s.knownElements.push("el_ates"); s.attrs.ates.level = 20; s.mana = 99;
+    const b = createBattle(cfg, s, "mera", ["kurt", "kurt"], 9); b.weather = "acik";
+    const [e, o] = enemies(b); const p = player(b);
+    p.x = e.x; p.y = Math.min(b.h - 1, e.y + 2); e.wet = 3;
+    const log = castSpell(cfg, s, b, "ates_topu", e.x, e.y)!; expect(log).toContain("Buhar");
+    // ikinci düşmanı hemen yanına koy: sekme
+    const s2 = newGame(cfg, 2); s2.knownElements.push("el_ates"); s2.attrs.ates.level = 20; s2.mana = 99;
+    const b2 = createBattle(cfg, s2, "mera", ["kurt", "kurt"], 9); b2.weather = "acik";
+    const [a2, c2] = enemies(b2); const p2 = player(b2); p2.x = a2.x; p2.y = Math.min(b2.h - 1, a2.y + 2);
+    const hp0 = c2.hp; c2.x = a2.x + 1; c2.y = a2.y;
+    const t2 = castSpell(cfg, s2, b2, "ates_topu", a2.x, a2.y)!;
+    expect(t2.includes("Sekti") || c2.hp < hp0).toBe(true);
+    void o;
+  });
+});

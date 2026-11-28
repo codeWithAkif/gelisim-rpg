@@ -440,6 +440,7 @@ export function openNobet(cfg: Config, s: GameState, place: string, persist: () 
       if (f.k === "bite" && speed === 1) sfx("hit");
       if (f.k === "melee") { if (speed === 1) sfx("hit"); pops.push({ x: f.x, y: f.y - 6, t: now, text: "vuruş", color: C("--ink") }); }
       if (f.k === "trap") { sfx("thunk"); pops.push({ x: f.x, y: f.y - 8, t: now, text: "Tuzak!", color: C("--red"), dur: 900 }); }
+      if (f.k === "combo") { pops.push({ x: f.x, y: f.y - 10, t: now, text: f.tag, color: f.tag === "Buhar" ? "#7A8A94" : f.tag === "Sekti!" ? "#B07A1E" : C("--blue"), dur: 1000 }); }
       if (f.k === "barbreak") { sfx("bad"); pops.push({ x: f.x, y: f.y - 8, t: now, text: "Barikat kırıldı", color: C("--red"), dur: 900 }); }
       if (f.k === "wave") { const sc = waveScale(f.n); pops.push({ x: TOWER.x, y: TOWER.y - 22, t: now, text: f.boss ? `${f.n}. dalga: lider geliyor!` : `${f.n}. dalga`, color: C("--red"), big: true, dur: 1400 });
         if (f.n > 1) pops.push({ x: TOWER.x, y: TOWER.y - 14, t: now + 150, text: `hız +%${Math.round((sc.speed - 1) * 100)} · güç +%${Math.round((sc.power - 1) * 100)}`, color: C("--ink-soft"), dur: 1600 }); sfx("beat"); if (f.boss) buzz("medium"); }
