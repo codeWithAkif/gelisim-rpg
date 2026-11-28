@@ -101,19 +101,19 @@ test("çıkışta kazanç cebe girer, ölünce çanta gider; çanta dolunca fazl
   const s2 = fresh(); const d = createScav(cfg, s2, scavSite("koru_kule")!, 12, { kind: "yumruk" }); d.bag = { deri: 3 }; d.money = 10; d.hp = 0.1; d.raidT = 999;
   d.foes = [foe(d.px + 1, { hp: 999, max: 999, dmg: 50, cd: 0 })]; run(d, 3); expect(d.result).toBe("dead");
   finishScav(cfg, s2, d); expect(s2.inventory.deri ?? 0).toBe(0); expect(s2.hp).toBeGreaterThan(0);
-  const c = createScav(cfg, s, scavSite("koru_kule")!, 13, { kind: "yumruk" }); c.bag = { deri: c.bagCap }; expect(bagUsed(c)).toBe(c.bagCap);
+  const c = createScav(cfg, s, scavSite("koru_kule")!, 13, { kind: "yumruk" }); c.bag = { deri: c.bagCap * 5 }; expect(bagUsed(c)).toBe(c.bagCap);
   void ({} as GameState);
 });
 
 test("çanta doluyken bulunan eşya yere düşer; yer açılınca alınır; atılan eşya yerde kalır", async () => {
   const { dropBag, nearGround, pickGround } = await import("../src/engine/scavenge");
   const s = fresh(); const n = createScav(cfg, s, scavSite("koru_kule")!, 21, { kind: "yumruk" }); n.raidT = 999; const sp = n.spots[0];
-  n.bag = { deri: n.bagCap }; sp.stages = [{ kind: "item", item: "ip", n: 2, time: 0.4 }, { kind: "empty", time: 0.2 }, { kind: "empty", time: 0.2 }];
+  n.bag = { deri: n.bagCap * 5 }; sp.stages = [{ kind: "item", item: "ip", n: 2, time: 0.4 }, { kind: "empty", time: 0.2 }, { kind: "empty", time: 0.2 }];
   walkTo(n, sp.x); beginSearch(n); run(n, 3);
   expect(n.ground.filter(g => g.item === "ip").length).toBe(2); expect(bagUsed(n)).toBe(n.bagCap);
   expect(nearGround(n)?.item).toBe("ip"); expect(pickGround(n)).toBe("full");
-  expect(dropBag(n, "deri")).toBe(true); const ipG = n.ground.find(g => g.item === "ip")!; expect(pickGround(n, ipG.id)).toBe("ok"); expect(n.bag.ip).toBe(1); expect(bagUsed(n)).toBe(n.bagCap);
-  walkTo(n, 8); leave(n); const r = finishScav(cfg, s, n); expect(r.items.deri).toBe(n.bagCap - 1); expect(r.items.ip).toBe(1);
+  for (let i = 0; i < 5; i++) expect(dropBag(n, "deri")).toBe(true); const ipG = n.ground.find(g => g.item === "ip")!; expect(pickGround(n, ipG.id)).toBe("ok"); expect(n.bag.ip).toBe(1); expect(bagUsed(n)).toBe(n.bagCap);
+  walkTo(n, 8); leave(n); const r = finishScav(cfg, s, n); expect(r.items.deri).toBe(n.bagCap * 5 - 5); expect(r.items.ip).toBe(1);
 });
 
 test("kilitli oda anahtarsız açılmaz, anahtarla açılır; anahtar başka katta saklıdır", () => {

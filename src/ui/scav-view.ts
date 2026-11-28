@@ -11,7 +11,7 @@ import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
   type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, doorNear, beginFortify, canFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
-  traitLines, bagUsed, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
+  traitLines, bagUsed, canStore, weaponLabel, bagItemCount, STACK, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
 import { ENEMIES } from "../content/world";
@@ -267,14 +267,14 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
     else if (n.raidHold > 0) { rp.textContent = `Baskın bitti · ${Math.ceil(n.raidHold)}`; rp.className = "raid-pill calm"; }
     else { rp.textContent = `BASKIN ${rs}`; rp.className = `raid-pill ${rs <= 5 ? "red" : rs <= 9 ? "amber" : "green"}`; }
     q("#scDanger").textContent = n.alerted ? `${raidsLeft(n)} baskın kaldı` : `${n.site.raids} baskın`;
-    { const wa = n.weaponId && artUrl("harabe_silah_" + n.weaponId); q("#scAmmo").innerHTML = `${wa ? `<img class="sc-wicon" src="${wa}" alt="">` : ""}${esc(n.weaponName)}${n.bow ? ` · ok ${n.ammo}` : ""}`; } { const ka = artUrl("harabe_anahtar"); q("#scBag").innerHTML = `${n.keys.length ? (ka ? `<img class="sc-wicon" src="${ka}" alt="">×${n.keys.length} ` : `🔑${n.keys.length} `) : ""}Çanta ${bagUsed(n)}/${n.bagCap}`; }
+    { const wa = n.weaponId && artUrl("harabe_silah_" + n.weaponId); q("#scAmmo").innerHTML = `${wa ? `<img class="sc-wicon" src="${wa}" alt="">` : ""}${esc(weaponLabel(n))}${n.bow ? ` · ok ${n.ammo}` : ""}`; } { const ka = artUrl("harabe_anahtar"); q("#scBag").innerHTML = `${n.keys.length ? (ka ? `<img class="sc-wicon" src="${ka}" alt="">×${n.keys.length} ` : `🔑${n.keys.length} `) : ""}Çanta ${bagUsed(n)}/${n.bagCap}`; }
     (q("#scExit") as HTMLElement).hidden = !atExit(n);
     (q("#scSearch") as HTMLElement).hidden = true;
     { const dn = doorNear(n); const db = q("#scDoor") as HTMLButtonElement; db.hidden = !dn || n.phase !== "play";
       if (dn) { const mx = doorMax(dn);
         db.textContent = n.fort?.d === dn ? `Güçlendiriliyor… %${Math.round(n.fort.prog * 100)}` : dn.state === "broken" ? "Kapıyı onar" : canFortify(dn) ? `Kapıyı güçlendir ${Math.round(dn.hp)}/${mx} → ${mx + DOOR_BASE}` : `Kapı en güçlü (${mx})`;
         db.disabled = !canFortify(dn); db.classList.toggle("busy", n.fort?.d === dn); } }
-    const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", bagUsed(n) >= n.bagCap); }
+    const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", !canStore(n, gnear.item)); }
     const tb = q("#scTrap") as HTMLButtonElement; tb.hidden = !n.traps.length; if (n.traps.length) { const hand = trapsInHand(n); const cool = n.traps.filter(x => x.state === "cool").map(x => Math.ceil(x.t)); tb.textContent = hand ? `Tuzak ${hand}` : cool.length ? `Tuzak ${Math.min(...cool)} sn` : "Tuzak 0"; tb.disabled = !hand || n.climbing; }
     const hl = healItemsAvailable(s, n); const hk = hl.map(x => x.id + x.n).join() + (n.hp < n.maxHp); const he = q("#scHeal");
     if (he.dataset.k !== hk) { he.dataset.k = hk; he.innerHTML = hl.map(x => `<button class="sc-sup" data-heal="${x.id}" ${n.hp >= n.maxHp ? "disabled" : ""} aria-label="${esc(itemInfo(cfg, x.id).name)}">${itemPic(x.id, 30)}<i>${x.n}</i></button>`).join(""); }
@@ -355,13 +355,13 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
   let bagSel = "";
   function showBag() {
     paused = true; bagEl.hidden = false; stickReset(); sfx("page");
-    const cells: string[] = []; for (const [id, c] of Object.entries(n.bag)) for (let i = 0; i < c; i++) cells.push(id);
-    const grid = Array.from({ length: n.bagCap }, (_, i) => { const id = cells[i]; return id ? `<button class="cell ${bagSel === id ? "sel" : ""}" data-bag="${id}" aria-label="${esc(itemInfo(cfg, id).name)}">${itemPic(id, 36)}</button>` : `<div class="cell empty"></div>`; }).join("");
+    const cells: { id: string; c: number }[] = []; for (const [id, c] of Object.entries(n.bag)) for (let left = c; left > 0; left -= STACK) cells.push({ id, c: Math.min(STACK, left) });
+    const grid = Array.from({ length: n.bagCap }, (_, i) => { const ce = cells[i]; return ce ? `<button class="cell ${bagSel === ce.id ? "sel" : ""}" data-bag="${ce.id}" aria-label="${esc(itemInfo(cfg, ce.id).name)}">${itemPic(ce.id, 36)}${ce.c > 1 ? `<span class="cell-n">${ce.c}</span>` : ""}</button>` : `<div class="cell empty"></div>`; }).join("");
     const sel = bagSel && n.bag[bagSel] ? bagSel : ""; const near = groundNear(n);
     bagEl.innerHTML = `<p class="hand" style="margin:0;font-size:26px">Çanta <span class="muted">${bagUsed(n)}/${n.bagCap}</span></p>
       <div class="grid bag-grid">${grid}</div>
       ${sel ? `<div class="choice bagrow">${itemPic(sel, 40)}<b>${esc(itemInfo(cfg, sel).name)} ×${n.bag[sel]}</b><button class="btn small red" data-drop="${sel}">Yere at</button></div>` : `<p class="tiny muted" style="margin:0">Bir eşyaya dokun; yere atıp yer açabilirsin. Atılan eşya burada durur, çanta boşalınca geri alırsın.</p>`}
-      ${near.length ? `<p class="tiny muted" style="margin:0">Yerde (yanında):</p>` : ""}${near.map(gi => `<div class="choice bagrow">${itemPic(gi.item, 36)}<b>${esc(itemInfo(cfg, gi.item).name)}</b><button class="btn small" data-take="${gi.id}" ${bagUsed(n) >= n.bagCap ? "disabled" : ""}>Al</button></div>`).join("")}
+      ${near.length ? `<p class="tiny muted" style="margin:0">Yerde (yanında):</p>` : ""}${near.map(gi => `<div class="choice bagrow">${itemPic(gi.item, 36)}<b>${esc(itemInfo(cfg, gi.item).name)}</b><button class="btn small" data-take="${gi.id}" ${!canStore(n, gi.item) ? "disabled" : ""}>Al</button></div>`).join("")}
       <button class="choice" data-p="resume"><b>Kapat</b></button>`;
   }
   q("#scHeal").addEventListener("click", e => { const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-heal]"); if (!b || b.disabled || n.phase !== "play" || paused) return; const r = healRun(cfg, s, n, b.dataset.heal!); if (r.ok) { sfx("good"); buzz("light"); pops.push({ x: n.px, floor: n.floor, t: performance.now(), text: `+${r.healed} can`, color: "#9BD36B" }); (q("#scHeal") as HTMLElement).dataset.k = ""; } else sfx("bad"); });
@@ -369,7 +369,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
   el.querySelector(".nb-top")!.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-c]"); if (!b || b.dataset.c !== "pause") return;
     paused = true; pauseEl.hidden = false; sfx("page"); stickReset();
-    pauseEl.innerHTML = `<p class="hand" style="margin:0;font-size:26px">Mola</p><p class="tiny muted" style="margin:0">${n.searched} yer arandı · çantada ${bagUsed(n)} şey</p>
+    pauseEl.innerHTML = `<p class="hand" style="margin:0;font-size:26px">Mola</p><p class="tiny muted" style="margin:0">${n.searched} yer arandı · çantada ${bagItemCount(n)} şey</p>
       <button class="choice" data-p="resume"><b>Devam</b></button><button class="choice" data-p="quit"><b>Pes et</b><span>Çanta gider, kaçarsın.</span></button>`;
   });
   pauseEl.addEventListener("click", e => {

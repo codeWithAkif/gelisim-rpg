@@ -228,12 +228,20 @@ export interface Scav {
   w: number; alerted: boolean; guardCount: number; killed: number[];   // genişlik; bekçiler fark etti mi; ilk bekçi kimlikleri; öldürülen bekçiler
   px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
   spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number; raidHold: number; spellQ: { t: number; dir: 1 | -1; floor: number }[];
-  bag: Record<string, number>; bagCap: number; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
+  bag: Record<string, number>; bagCap: number; bowName: string; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
   foundWeapons: string[]; weaponId: string; castT: number; foundT: number; armor: number; tr: ScavTraits; searched: number; shots: number; kills: number; found: number; fx: SFx[];
   ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; doors: Door[]; fort: { d: Door; prog: number } | null; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number; bolt?: BoltStyle | null };
 }
+/** Çantada aynı eşyalar üst üste durur: bir göze en çok STACK tane sığar. */
+export const STACK = 5;
 const bagCount = (n: Scav) => Object.values(n.bag).reduce((a, b) => a + b, 0);
-export const bagUsed = bagCount;
+/** Çantada dolu göz sayısı (yığınlar sayılır). */
+export const bagUsed = (n: Scav) => Object.values(n.bag).reduce((a, c) => a + Math.ceil(c / STACK), 0);
+/** Bu eşyadan bir tane daha sığar mı: yarım yığın ya da boş göz. */
+export const canStore = (n: Scav, id: string) => (n.bag[id] ?? 0) % STACK !== 0 || bagUsed(n) < n.bagCap;
+export const bagItemCount = bagCount;
+/** Elde ne var: yay (bulunan ya da götürülen) ve yakın dövüş silahı birlikte yazılır. */
+export const weaponLabel = (n: Scav) => [n.bow ? (n.bowName || "Yay") : "", n.bow && n.weaponName === "Yumruk" ? "" : n.weaponName === "Yay" ? "" : n.weaponName].filter(Boolean).join(" + ") || "Yumruk";
 /** Bir katta şu an girilebilen aralık (kilitli oda kapalıyken dışarıda kalır). */
 export function freeRange(n: { locks: Lock[]; w: number }, floor: number): [number, number] {
   let lo = 0, hi = n.w; const lk = n.locks.find(l => l.floor === floor && !l.open);
@@ -246,7 +254,7 @@ export const groundNear = (n: Scav): GItem[] => n.climbing ? [] : n.ground.filte
 export const nearGround = (n: Scav): GItem | undefined => groundNear(n)[0];
 /** Yerdekini çantaya al (yer varsa); id verilmezse en yakını. */
 export function pickGround(n: Scav, gid?: number): "ok" | "full" | "none" {
-  const g = gid ? groundNear(n).find(q => q.id === gid) : nearGround(n); if (!g) return "none"; if (bagCount(n) >= n.bagCap) return "full";
+  const g = gid ? groundNear(n).find(q => q.id === gid) : nearGround(n); if (!g) return "none"; if (!canStore(n, g.item)) return "full";
   n.ground = n.ground.filter(q => q !== g); n.bag[g.item] = (n.bag[g.item] ?? 0) + 1; return "ok";
 }
 export const speedOf = (n: Scav) => 32 * n.tr.walk;
@@ -291,9 +299,9 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
     const kf = (f + 1) % site.floors; const cands = spots.filter(q => q.floor === kf && !q.vault); const sp = cands[rng.int(0, cands.length - 1)]; sp.stages[rng.int(0, SPOT_STAGES - 1)] = { kind: "key", key: f, time: 3.2 };
   }
   const tr = scavTraits(cfg, s); const mh = maxHp(cfg, s); const lv = (a: string) => s.attrs[a]?.level ?? 0; const fist = 2 + lv("ust_govde") / 10;
-  let melee = fist, weaponName = "Yumruk", bow = false, ammo = 0; const traps: TrapSlot[] = []; let dog: Dog | undefined; let spell: Scav["spell"];
+  let melee = fist, weaponName = "Yumruk", bowName = "", bow = false, ammo = 0; const traps: TrapSlot[] = []; let dog: Dog | undefined; let spell: Scav["spell"];
   if (load.kind === "melee" && load.id) { const d = weaponSet(cfg, { ...s, equipped: { weapon: load.id } } as GameState); melee = (d.dmg + lv("ust_govde") / 10) * tr.melee; weaponName = d.name; }
-  if (load.kind === "bow") { bow = true; ammo = Math.min(tr.ammoCap, s.inventory.ok ?? 0); weaponName = "Yay"; }
+  if (load.kind === "bow") { bow = true; ammo = Math.min(tr.ammoCap, s.inventory.ok ?? 0); bowName = "Yay"; }
   if (load.kind === "dog" && s.pet) dog = { x: EXIT_X + 10, floor: 0, state: "yanda", t: 12, cd: 0, moving: false, face: 1, lag: 0 };
   if (load.kind === "trap" && load.id) { const own = trapsOwned(s).find(x => x.id === load.id); for (let i = 0; i < Math.min(3, own?.n ?? 0); i++) traps.push({ id: load.id, state: "hand", x: 0, floor: 0, t: 0 }); }
   if (load.kind === "spell" && load.id) { const o = spellOptions(cfg, { ...s, mana: 999 } as GameState).find(x => x.spell.id === load.id && x.ok); const info = scavSpellInfo(cfg, load.id);
@@ -322,7 +330,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   return {
     site, seed, rng: run, w: W, alerted: false, guardCount: site.guards, killed: [...sv.killed], time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4 * tr.hp)), maxHp: Math.round(mh * 1.4 * tr.hp),
     spots, searchId: 0, searchWait: 0, foes: alive, nextId: gid2, wave: 0, raidT: tr.firstRaid, raidHold: 0, spellQ: [], bag: {}, bagCap: tr.bagCap, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
-    atkCd: 0, atkFx: 0, weaponName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), tr, searched: 0, shots: 0, kills: 0, found: 0, fx: [],
+    atkCd: 0, atkFx: 0, weaponName, bowName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), tr, searched: 0, shots: 0, kills: 0, found: 0, fx: [],
     ground, gid: ground.length + 1, proj: [], locks, doors, fort: null, keys: [...sv.keys], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
   };
 }
@@ -428,13 +436,13 @@ function applyStage(n: Scav, sp: Spot, st: Stage) {
   if (st.kind === "weapon") {
     const w = FOUND_WEAPONS.find(x => x.id === st.weapon)!;
     if (w.kind === "melee") { if (w.dmg > n.melee) { n.melee = w.dmg * n.tr.melee; n.weaponName = w.name; n.weaponId = w.id; } }
-    else if (!n.bow) { n.bow = true; n.dmg = Math.max(n.dmg, w.dmg); n.ammo += 6; n.weaponName = w.name; n.weaponId = w.id; }
-    else n.dmg = Math.max(n.dmg, w.dmg);
+    else if (!n.bow) { n.bow = true; n.dmg = Math.max(n.dmg, w.dmg); n.ammo += 6; n.bowName = w.name; n.weaponId = w.id; }
+    else { if (w.dmg > n.dmg) n.bowName = w.name; n.dmg = Math.max(n.dmg, w.dmg); }
     n.foundWeapons.push(w.id); n.fx.push({ k: "weapon", name: w.name, ...at }); return;
   }
   const c = st.n ?? 1; const id = st.item!;
   if (id === "ok" && n.bow) { n.ammo += c; n.fx.push({ k: "loot", text: `+${c} ok`, ...at }); n.found += c; return; }
-  let got = 0; let spilled = 0; for (let i = 0; i < c; i++) { if (bagCount(n) >= n.bagCap) { n.ground.push({ id: n.gid++, item: id, x: sp.x + (spilled * 5 - 3), floor: sp.floor }); spilled++; continue; } n.bag[id] = (n.bag[id] ?? 0) + 1; got++; }
+  let got = 0; let spilled = 0; for (let i = 0; i < c; i++) { if (!canStore(n, id)) { n.ground.push({ id: n.gid++, item: id, x: sp.x + (spilled * 5 - 3), floor: sp.floor }); spilled++; continue; } n.bag[id] = (n.bag[id] ?? 0) + 1; got++; }
   if (spilled) n.fx.push({ k: "full", ...at });
   if (got) { n.found += got; n.fx.push({ k: "loot", text: `+${got} ${id}`, ...at }); }
 }
