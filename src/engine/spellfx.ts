@@ -43,3 +43,8 @@ export function combo(kind: string, st: FoeState): Combo | null {
 export function fxKind(fx: { chain?: boolean; ignite?: boolean; slow?: number; mud?: boolean; root?: number } | undefined): string {
   if (!fx) return "other"; if (fx.chain) return "simsek"; if (fx.ignite) return "ates"; if (fx.mud) return "camur"; if (fx.root) return "sarmasik"; if (fx.slow) return "buz"; return "other";
 }
+
+/** Ateş ve buz topu uçarken odadan çıkmaz: duvara, tavana, tabana ve kapıya (açık ya da kapalı) çarpınca sekip kalır; her seferinde biraz güç kaybeder. */
+export const WALL_BOUNCE_MUL = 0.85;
+export const MAX_WALL_BOUNCES = 4;
+export const ROOM_CEIL = 0.85;   // oda tavanı, kat cinsinden (zemin 0)

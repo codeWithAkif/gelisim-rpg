@@ -14,7 +14,7 @@ import { ENEMIES } from "../content/world";
 import { addItem, removeItem, capacity } from "./inventory";
 import { weaponSet, hasBow, totalArmor, slotsFor, gearOf } from "./gear";
 import { spellOptions, SPELL_FX } from "./magic";
-import { boltStyle, combo, wets, bounces, BOUNCE_MUL, BOUNCE_RANGE, WET_SECS, type BoltStyle } from "./spellfx";
+import { boltStyle, combo, wets, bounces, BOUNCE_MUL, BOUNCE_RANGE, WET_SECS, WALL_BOUNCE_MUL, MAX_WALL_BOUNCES, ROOM_CEIL, type BoltStyle } from "./spellfx";
 import { trapsOwned, trapEffect } from "./engineering";
 import { petMul } from "./pet";
 import { healOf, healPower } from "./healing";
@@ -236,7 +236,7 @@ export const doorMax = (d: Door) => d.level * DOOR_BASE;
 export const fortifySeconds = (d: Door) => d.state === "broken" ? 2.5 : 2 + d.level * 0.35;
 export interface Lock { floor: number; x: number; side: "R" | "L"; key: number; open: boolean }
 export interface GItem { id: number; item: string; x: number; floor: number }
-export interface Proj { id: number; kind: SpellKind; x: number; floor: number; dir: 1 | -1; left: number; base: number; r: number; bolt?: BoltStyle | null; bounced?: boolean; y?: number; slope?: number }   // y: açılı atışta kat cinsinden yükseklik; slope: x birimi başına kat (yukarı +)   // bolt: şimşek büyüsü zincir mi yıldırım mı (engine/spellfx.ts)
+export interface Proj { id: number; kind: SpellKind; x: number; floor: number; dir: 1 | -1; left: number; base: number; r: number; bolt?: BoltStyle | null; bounced?: boolean; y?: number; slope?: number; conf?: boolean; room?: number; nb?: number }   // conf: ateş/buz topu odadan çıkmaz   // y: açılı atışta kat cinsinden yükseklik; slope: x birimi başına kat (yukarı +)   // bolt: şimşek büyüsü zincir mi yıldırım mı (engine/spellfx.ts)
 export interface TrapSlot { id: string; state: "hand" | "placed" | "cool"; x: number; floor: number; t: number }
 export interface Dog { x: number; floor: number; state: "yanda" | "av" | "don"; t: number; cd: number; moving: boolean; face: 1 | -1; lag: number }
 export interface Scav {
@@ -440,7 +440,7 @@ export function castSpell(n: Scav, aim?: { dx: number; dy: number }): boolean {
 const spellMul = (n: Scav) => n.tr.spellPow;
 function launchSpell(n: Scav, q: { dir: 1 | -1; floor: number; slope?: number }) {
   const sp = n.spell; if (!sp) return; const wide = n.tr.spellShots >= 3 ? 1.3 : 1;
-  n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + q.dir * 5, floor: q.floor, dir: q.dir, ...(q.slope ? { y: q.floor, slope: q.slope } : {}), left: 150, base: n.dmg * sp.mul * 0.5 * spellMul(n), r: sp.r * 0.9 * spellMul(n) * wide, bolt: sp.bolt });
+  n.proj.push({ id: n.gid++, kind: sp.kind, x: n.px + q.dir * 5, floor: q.floor, dir: q.dir, ...(bounces(sp.kind) ? { conf: true, room: Math.floor((n.px + q.dir * 5) / ROOM_W), ...(q.slope ? { y: q.floor + 0.12, slope: q.slope } : {}) } : q.slope ? { y: q.floor, slope: q.slope } : {}), left: 150, base: n.dmg * sp.mul * 0.5 * spellMul(n), r: sp.r * 0.9 * spellMul(n) * wide, bolt: sp.bolt });
 }
 /** Elle ok atışı: nişan aldığın yönde/katta ilk düşmana vurur. */
 export function shootArrow(n: Scav, aim?: { dx: number; dy: number }): boolean {
@@ -467,7 +467,8 @@ function strike(n: Scav, f: SFoe, kind: SpellKind, base: number) {
   hurtFoe(n, f, base * (c?.mul ?? 1), false);
 }
 /** Top bu düşmanla aynı hizada mı: düzde aynı kat, açılıda yükseklik farkı 0,3 kattan az. */
-const onFloor = (f: SFoe, pj: Proj) => pj.y === undefined ? f.floor === pj.floor : Math.abs(f.floor - pj.y) <= 0.3;
+const isConf = (pj: Proj) => pj.conf ?? bounces(pj.kind);
+const onFloor = (f: SFoe, pj: Proj) => isConf(pj) ? f.floor === pj.floor && (pj.y === undefined || (pj.y - f.floor >= -0.1 && pj.y - f.floor <= 0.5)) : pj.y === undefined ? f.floor === pj.floor : Math.abs(f.floor - pj.y) <= 0.3;
 function explode(n: Scav, pj: Proj) {
   const hits = n.foes.filter(f => onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4);
   const rest = n.foes.filter(f => !hits.includes(f) && onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= pj.r + 4 + BOUNCE_RANGE).sort((a, b) => Math.abs(a.x - pj.x) - Math.abs(b.x - pj.x));
@@ -590,18 +591,26 @@ export function stepScav(n: Scav, dt: number) {
   // büyü topları
   for (const pj of [...n.proj]) {
     const st = 95 * dt; const x0 = pj.x; pj.x += pj.dir * st; pj.left -= st;
-    if (pj.y !== undefined) {
+    // sekme: kayıp güçle yön değiştirir; sınıra ulaşınca patlar
+    const wallBounce = (axis: "x" | "y"): boolean => {
+      if ((pj.nb ?? 0) >= MAX_WALL_BOUNCES) return false;
+      pj.nb = (pj.nb ?? 0) + 1; pj.bounced = true; pj.base *= WALL_BOUNCE_MUL; pj.left += 25;
+      if (axis === "x") { pj.dir = (-pj.dir) as 1 | -1; pj.x = x0; } else pj.slope = -pj.slope!;
+      n.fx.push({ k: "combo", tag: "Sekti!", x: pj.x, floor: pj.floor }); return true;
+    };
+    if (isConf(pj)) {
+      // ateş/buz topu odadan çıkmaz: oda duvarına (kapı açık da olsa), tavana ve tabana çarpınca sekip kalır
+      if (pj.y !== undefined) { pj.y += pj.slope! * st; const lo = pj.floor - 0.05, hi = pj.floor + ROOM_CEIL;
+        if (pj.y > hi || pj.y < lo) { pj.y = pj.y > hi ? 2 * hi - pj.y : 2 * lo - pj.y; if (!wallBounce("y")) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); continue; } } }
+      const hit0 = n.foes.some(f => onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= 5);
+      if (!hit0 && Math.floor(pj.x / ROOM_W) !== (pj.room ?? Math.floor(x0 / ROOM_W))) { if (!wallBounce("x")) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); } continue; }
+    } else if (pj.y !== undefined) {
       pj.y += pj.slope! * st; pj.floor = Math.round(pj.y);
-      if (pj.y < -0.25 || pj.y > n.site.floors - 1 + 0.25) {   // zemine ya da tavana çarptı: ateş/buz bir kez sekip döner, ötekiler patlar
-        if (bounces(pj.kind) && !pj.bounced) { pj.slope = -pj.slope!; pj.y = Math.max(0, Math.min(n.site.floors - 1, pj.y)); pj.bounced = true; pj.base *= BOUNCE_MUL; n.fx.push({ k: "combo", tag: "Sekti!", x: pj.x, floor: Math.round(pj.y) }); continue; }
+      if (pj.y < -0.25 || pj.y > n.site.floors - 1 + 0.25) {   // zemine ya da tavana çarptı: patlar
         pj.y = Math.max(0, Math.min(n.site.floors - 1, pj.y)); pj.floor = Math.round(pj.y); n.proj = n.proj.filter(q => q !== pj); explode(n, pj); continue;
       }
     }
     const hit = n.foes.some(f => onFloor(f, pj) && f.climbT <= 0 && Math.abs(f.x - pj.x) <= 5);
-    if (!hit && bounces(pj.kind) && !pj.bounced) {
-      const wall = pj.x < 0 || pj.x > n.w || n.doors.some(d => d.floor === pj.floor && d.state === "closed" && (x0 - d.x) * (pj.x - d.x) <= 0) || n.locks.some(l => l.floor === pj.floor && !l.open && (x0 - l.x) * (pj.x - l.x) <= 0);
-      if (wall) { pj.dir = (-pj.dir) as 1 | -1; pj.x = x0; pj.bounced = true; pj.base *= BOUNCE_MUL; pj.left = Math.max(pj.left, 70); n.fx.push({ k: "combo", tag: "Sekti!", x: pj.x, floor: pj.floor }); continue; }
-    }
     if (hit || pj.left <= 0 || pj.x < 0 || pj.x > n.w) { n.proj = n.proj.filter(q => q !== pj); explode(n, pj); }
   }
   // tuzaklar

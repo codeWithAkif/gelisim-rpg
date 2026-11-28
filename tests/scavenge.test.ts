@@ -303,7 +303,7 @@ test("düşman saldırıyı önceden belli eder: vuruştan önce işaret çıkar
   n.px = f.x - 3; run(n, 1); expect(n.hp).toBeLessThan(100);                              // yakında kalırsan vurur
 });
 
-test("açılı atış: yatay + dikey çekince top/ok yükselir ve üst kattaki düşmana ulaşır; yalnız yatay düz gider; tavana çarpan ateş topu sekip döner", async () => {
+test("açılı atış: yatay + dikey çekince top/ok yükselir ve üst kattaki düşmana ulaşır; yalnız yatay düz gider; tavana çarpan ateş topu sekip döner ve odadan çıkmaz", async () => {
   const { aimShot, castSpell, shootArrow, FLOOR_X } = await import("../src/engine/scavenge");
   const s = fresh(); s.equipped.bow = "av_yayi"; s.inventory.av_yayi = 1; s.inventory.ok = 10;
   const n = createScav(cfg, s, scavSite("koru_kule")!, 32, { kind: "bow" }); n.raidT = 999; n.foes = []; n.px = 20;   // merdivenden uzak
@@ -317,9 +317,21 @@ test("açılı atış: yatay + dikey çekince top/ok yükselir ve üst kattaki d
   // büyü topu açılı uçar
   n.foes = []; n.px = 20; n.atkCd = 0; n.spell = { id: "x", kind: "ates", name: "Ateş", cd: 0, max: 4, mul: 2, r: 4 } as any; n.tr.spellShots = 1;
   expect(castSpell(n, aim)).toBe(true); run(n, 0.5); const pj = n.proj[0]; expect(pj?.y).toBeGreaterThan(0);
-  // hedefe ulaşınca üst kattaki düşmana vurur
-  n.proj = []; n.spellQ = []; n.spell!.cd = 0; const f2 = foe(n.px + dxFoe, { floor: 1 }); n.foes = [f2]; castSpell(n, aim); run(n, 2); expect(f2.hp).toBeLessThan(500);
+  // ateş/buz topu odadan çıkmaz: açılı atınca tavana ve tabana çarpıp odanın içinde kalır
+  n.proj = []; n.spellQ = []; n.spell!.cd = 0; n.px = 20; n.foes = []; castSpell(n, aim); n.tr.spellShots = 1; run(n, 1.5);
+  const ball = n.proj[0]; if (ball) { expect(ball.y!).toBeGreaterThanOrEqual(-0.1); expect(ball.y!).toBeLessThanOrEqual(1); expect(ball.nb ?? 0).toBeGreaterThan(0); expect(Math.floor(ball.x / 100)).toBe(0); }
+  // ateş/buz dışındakiler (çamur) açılı atınca kat atlayıp üst kattaki düşmana ulaşır
+  n.proj = []; n.spellQ = []; n.spell = { id: "c", kind: "camur", name: "Çamur", cd: 0, max: 4, mul: 2, r: 4 } as any; n.px = 20;
+  const f2 = foe(n.px + dxFoe, { floor: 1 }); n.foes = [f2]; castSpell(n, aim); run(n, 2); expect(f2.hp).toBeLessThan(500);
   // tavan: son katın üstüne çıkan ateş topu bir kez sekip alçalır
-  n.proj = []; n.foes = []; n.proj.push({ id: 99, kind: "ates", x: 30, floor: n.site.floors - 1, y: n.site.floors - 1, slope: 0.05, dir: 1, left: 150, base: 10, r: 3 }); run(n, 0.2);
+  n.proj = []; n.foes = []; n.proj.push({ id: 99, kind: "ates", conf: true, x: 30, floor: n.site.floors - 1, y: n.site.floors - 1, slope: 0.05, dir: 1, left: 150, base: 10, r: 3 }); run(n, 0.2);
   expect(n.proj[0]?.slope).toBeLessThan(0);
+});
+
+test("ateş topu odadan çıkmaz: oda duvarına (kapı açık olsa da) çarpıp döner; ölçülü sayıda sekince patlar", () => {
+  const s = fresh(); const n = createScav(cfg, s, scavSite("koru_kule")!, 3, { kind: "yumruk" }); n.raidT = 999; n.foes = [];
+  n.proj.push({ id: 1, kind: "ates", x: 60, floor: 0, dir: 1, left: 400, base: 40, r: 3 });
+  let maxX = 0, minX = 999; for (let i = 0; i < 120 && n.proj.length; i++) { stepScav(n, 0.05); const p = n.proj[0]; if (p) { maxX = Math.max(maxX, p.x); minX = Math.min(minX, p.x); } }
+  expect(maxX).toBeLessThan(100); expect(minX).toBeGreaterThanOrEqual(0);       // 0. odanın içinde kaldı (açık kapıdan çıkmadı)
+  expect(n.proj.length).toBe(0);                                                // sekmeler bitince patladı
 });
