@@ -242,3 +242,13 @@ test("kapı seviyesi 10'da biter (2000) ve kayıtta kalır", () => {
   const n2 = createScav(cfg, s, scavSite("koru_kule")!, 4, { kind: "yumruk" });
   expect(n2.doors.find(q => q.floor === 0 && q.x === d.x)!.level).toBe(DOOR_MAX_LEVEL);
 });
+
+test("çift elli: iki tek elli silahın (aynı bıçaktan iki de olur) varsa harabede seçenek çıkar; vuruş artar, hız biraz düşer", () => {
+  const s = fresh(); s.inventory.el_yapimi_bicak = 1; s.equipped.weapon = "el_yapimi_bicak";
+  expect(loadoutOptions(cfg, s).some(o => !!o.off)).toBe(false);          // tek bıçak: çift elli yok
+  s.inventory.el_yapimi_bicak = 2;
+  const dual = loadoutOptions(cfg, s).find(o => !!o.off)!; expect(dual).toBeTruthy(); expect(dual.id).toBe("el_yapimi_bicak"); expect(dual.off).toBe("el_yapimi_bicak");
+  const one = createScav(cfg, s, scavSite("koru_kule")!, 5, { kind: "melee", id: "el_yapimi_bicak" });
+  const two = createScav(cfg, s, scavSite("koru_kule")!, 5, { kind: "melee", id: dual.id, off: dual.off });
+  expect(two.melee).toBeGreaterThan(one.melee); expect(two.dual).toBe(true); expect(one.dual).toBe(false);
+});
