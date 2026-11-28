@@ -278,7 +278,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
     { const dn = doorNear(n); const db = q("#scDoor") as HTMLButtonElement; db.hidden = !dn || n.phase !== "play";
       if (dn) { const mx = doorMax(dn);
         const fc = fortifyCost(dn), cn = `${fc.n} ${itemInfo(cfg, fc.item).name.toLocaleLowerCase("tr")}`;
-        db.textContent = n.fort?.d === dn ? `Güçlendiriliyor… %${Math.round(n.fort.prog * 100)}` : dn.state === "broken" ? `Kapıyı onar · ${cn}` : canFortify(dn) ? `Kapıyı güçlendir ${Math.round(dn.hp)}/${mx} → ${mx + DOOR_BASE} · ${cn}` : `Kapı en güçlü (${mx})`;
+        db.textContent = n.fort?.d === dn ? `Güçlendiriliyor… %${Math.round(n.fort.prog * 100)}` : dn.state === "broken" ? `Onar · ${cn}` : canFortify(dn) ? `Güçlendir → ${mx + DOOR_BASE} · ${cn}` : `Kapı en güçlü (${mx})`;
         db.disabled = !canFortify(dn) || (!n.fort && !canAffordFortify(n, dn)); db.classList.toggle("busy", n.fort?.d === dn); } }
     const gnear = nearGround(n); const pk = q("#scPick") as HTMLButtonElement; pk.hidden = !gnear; if (gnear) { pk.textContent = `Al: ${itemInfo(cfg, gnear.item).name}`; pk.classList.toggle("busy", !canStore(n, gnear.item)); }
     const tb = q("#scTrap") as HTMLButtonElement; tb.hidden = !n.traps.length; if (n.traps.length) { const hand = trapsInHand(n); const cool = n.traps.filter(x => x.state === "cool").map(x => Math.ceil(x.t)); tb.textContent = hand ? `Tuzak ${hand}` : cool.length ? `Tuzak ${Math.min(...cool)} sn` : "Tuzak 0"; tb.disabled = !hand || n.climbing; }

@@ -784,3 +784,8 @@ button.chip { background: none; cursor: pointer; font-family: inherit; }
 .bag-grid .cell { position: relative; }
 .bag-grid .cell-n { position: absolute; right: 4px; bottom: 2px; font-family: var(--f-hand); font-size: 18px; font-weight: 700; color: var(--ink); text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper); }
 #scPause.nb-card { padding-top: 84px; padding-bottom: 84px; }
+
+/* Harabe eylem düğmeleri joystick'in üstüne binmez; uzun yazılar alt satıra iner */
+.sc-acts { max-width: calc(100% - 150px); }
+.sc-act { max-width: 100%; white-space: normal; line-height: 1.1; text-align: center; }
+#scDoor { font-size: 18px; padding: 8px 12px; }
