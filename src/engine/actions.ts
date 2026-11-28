@@ -18,10 +18,11 @@ import { pagesAt } from "./synthesis";
 import { nobetSite, nobetSave } from "./nobet";
 import { tradeOpen, postAt, tradeOf, cartsFree, papersAt, hasPaper, feastHere } from "./trade";
 import { REGION_NAMES, paper } from "../content/trade";
+import { HUNTS, HUNT_MINUTES, HUNT_ENERGY, HUNT_MIN_ENERGY } from "../content/hunt";
 import { homeBed, candidatesAt, canHire, canBuyHouse, HOUSES, HOME_PLACES, ROLE_NAMES } from "./estate";
 
 export interface PlaceAction {
-  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "study" | "market" | "show-place" | "partner" | "sleep" | "scav" | "pet-adopt" | "hire" | "house" | "olcer" | "caravan" | "paper" | "feast" | "mpage" | "nobet";
+  act: "accept" | "fight" | "walk" | "search" | "deliver" | "session-pick" | "study" | "market" | "show-place" | "partner" | "sleep" | "scav" | "pet-adopt" | "hire" | "house" | "olcer" | "caravan" | "paper" | "feast" | "mpage" | "nobet" | "av";
   id: string; label: string; sub?: string; disabled?: string; primary?: boolean;
 }
 /** Bulunduğun yerde yapılabilecekler, önem sırasıyla. */
@@ -52,6 +53,10 @@ export function placeActions(cfg: Config, s: GameState, placeId: string): PlaceA
   // sonsuz nöbet: ne kadar dayanacaksın (güçlenmeler yalnız o nöbette)
   const ns = nobetSite(placeId);
   if (ns && !ns.unlock(s)) out.push({ act: "nobet", id: placeId, label: `Nöbet tut: ${ns.name}`, sub: `Sonsuz dalga · rekor ${nobetSave(s).best[placeId] ?? 0}. dalga`, disabled: placeId === s.location ? undefined : "Oraya git" });
+  // av: hikâyeden bağımsız, vahşi yerde kurtlarla dövüş (altıgen savaş, barikat ya da gizlenme)
+  if (HUNTS[placeId]) { const h = HUNTS[placeId]; const here = placeId === s.location;
+    out.push({ act: "av", id: placeId, label: `Ava çık: ${h.title}`, sub: `${h.text} · ${HUNT_MINUTES} dk, enerji -${HUNT_ENERGY}`,
+      disabled: !here ? "Oraya git" : s.journey ? "Yoldayken olmaz" : s.energy < HUNT_MIN_ENERGY ? "Dinç değilsin" : undefined }); }
   const ruins = sitesAt(placeId).filter(x => !x.unlock(s));
   if (ruins.length) out.push({ act: "scav", id: placeId, label: ruins.length > 1 ? `Harabeler (${ruins.length})` : `Harabeyi ara: ${ruins[0].name}`,
     sub: ruins.map(x => `${x.name} · ${TIER_NAMES[x.tier]}`).join(" / "), disabled: placeId === s.location ? undefined : "Oraya git" });

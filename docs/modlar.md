@@ -85,6 +85,10 @@ Uzun dayanmanın karşılığı (güç değil, gelişim, bilgi, ün ve para):
 - Bir kulede ilk kez 10, 20, 30. dalgayı geçmek o bölgede tanınırlık ve güven verir (bir kez).
 - Kese dalgayla belirgin büyür (yaylada 30 dalga ≈ 100 bakır; handa iki katı).
 
+## Av (hikâyeden bağımsız savaş)
+
+Altıgen savaş, barikat ve gizlenme eskiden yalnız görev ya da yol pususunda açılıyordu. **Av:** vahşi yerlerde (Hasan'ın yaylası, Meşe korusu; `content/hunt.ts`) Harita kartında "Ava çık" ile istediğin zaman kurtlarla karşılaşırsın; yine üç yoldan biriyle: göğüs göğüse (altıgen), barikat ya da gizlenip pusu. 30 dk ve 10 enerji alır, kazanınca deri düşer, savaş gelişimi verir. Hikâye ilerlemesine bağlı değildir.
+
 ## Harabe: kurallar, saldırı işareti, baskın sayacı
 
 - **Her harabenin bir kuralı var** (en kolay olanda yok; giriş kartında ve girerken yazar): Ağıl **Çamur** (zemin katta sen ve düşmanlar %20 yavaş), Kule **Bekçibaşı** (üst katta 3 kat canlı dev kurt; ölünce bir kez bakır), Köşk **Tuzaklı kutular** (~%30 kutu tuzaklı; aramanın %60'ında "Tuzak var!" uyarısı çıkar, sürdürürsen can gider), Sarnıç **Karanlık** (görüş kısa, bekçiler yakından uyanır), Yanık evler **Duman** (arama %30 yavaş). Kod: `SITE_RULES`.

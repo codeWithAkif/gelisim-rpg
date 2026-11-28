@@ -6,7 +6,7 @@ import { sleep, eat, type GainReport } from "../engine/progression";
 import { acceptQuest, walkQuest, completeQuest, itemName, type RewardReport } from "../engine/quests";
 import { maxHp } from "../engine/combat";
 import { load, save, reset } from "../engine/save";
-import { newGame } from "../engine/state";
+import { newGame, DAY_MINUTES } from "../engine/state";
 import { QUESTS, CRAFTS, ENEMIES } from "../content/world";
 import { build, upgrade, dismantle, structure } from "../engine/engineering";
 import { callable, callMany, heroDef, ROLE_NAMES, afterBattle, hire as hireHero, buyHouse, found as foundVenture, upVenture, setWorker, collect as collectVenture, toggleParty, dismiss, assign as assignJob, recall as recallHero, VENTURES, diyarOpen } from "../engine/estate";
@@ -20,6 +20,7 @@ import { place, here } from "../engine/travel";
 import { startJourney, dueEvent, pauseJourney, resumeJourney, resolveEvent, finishJourney, turnBack, canUseChoice } from "../engine/journey";
 import { makeScenario, DEFAULT_PLAN, foeWords, cap } from "../engine/combat";
 import { AMBUSH_MAP } from "../content/world";
+import { HUNTS, HUNT_MINUTES, HUNT_ENERGY, HUNT_MIN_ENERGY } from "../content/hunt";
 import { esc, ICONS } from "./sketch";
 import { statusBar, defterScreen, vucutScreen, calisScreen, cantaScreen, gainList, alerts, type UiState } from "./screens";
 import { openBattle } from "./battle-view";
@@ -369,6 +370,7 @@ export function startApp(root: HTMLElement) {
         persist(); render(false); break; }
       case "feast": { const r = feast(s); sfx(r.ok ? "good" : "bad"); toast(r.ok ? "Doyasıya yedin. Bu gece kasların daha çok gelişecek." : r.reason ?? ""); persist(); render(); break; }
       case "scav": doScav(id); break;
+      case "av": doHunt(id); break;
       case "nobet": doNobet(id); break;
       case "market": tab = "canta"; ui.bagPage = "pazar"; render(false); break;
       case "study": tab = "calis"; sfx("page"); render(false); break;
@@ -402,6 +404,32 @@ export function startApp(root: HTMLElement) {
         ${Object.keys(r.dropped).length ? `<p class="tiny red" style="margin:0">Çantan doluydu; bazılarını taşıyamadın.</p>` : ""}
         ${r.notes.map(t => `<p class="story-after" style="margin:0">${esc(t)}</p>`).join("")}
         <h3>Gelişen</h3>${gainList(cfg, r.gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]);
+    });
+  }
+  /** Av: hikâyeden bağımsız, vahşi yerde kurtlarla; altıgen savaş, barikat ya da gizlenme seçilir. */
+  function doHunt(placeId: string) {
+    const h = HUNTS[placeId]; if (!h || placeId !== s.location || s.journey) return;
+    if (s.energy < HUNT_MIN_ENERGY) { toast("Dinç değilsin; önce dinlen."); return; }
+    s.energy = Math.max(0, s.energy - HUNT_ENERGY); s.minute = Math.min(DAY_MINUTES, s.minute + HUNT_MINUTES); persist();
+    const foes = rollFoes(s, h.foes, "av" + s.day + Math.floor(s.minute)); const night = isNight(s);
+    const spoils = (won: boolean) => won ? (addItem(cfg, s, "deri", night ? 2 : 1) ? "" : ` ${night ? "İki" : "Bir"} deri yüzdün.`) : "";
+    const endModal = (head: string, text: string, gains: Record<string, number>) => { persist(); render(); modal(`<h2>${esc(head)}</h2><p class="lede">${esc(text)}</p>${gainList(cfg, gains, 5)}`, [{ label: "Tamam", cls: "primary", fn: () => {} }]); };
+    const melee = (plan: typeof DEFAULT_PLAN = { ...DEFAULT_PLAN }) => {
+      const sc = makeScenario(s, h.map, foes, "av" + s.day + s.minute);
+      openBattle(cfg, s, sc, plan, undefined, (o, bt) => { const hl = afterBattle(s, bt.units.filter(u => u.uid.startsWith("h:")).map(u => u.uid.slice(2)), o.result === "won" ? "won" : o.result === "fled" ? "fled" : "lost", Object.fromEntries(bt.units.filter(u => u.uid.startsWith("h:")).map(u => [u.uid.slice(2), u.hp])));
+        endModal(o.result === "won" ? "Av tamam" : o.result === "fled" ? "Geri çekildin" : "Yaralandın",
+          (o.result === "lost" ? "Yaralı döndün; biraz dinlen." : o.result === "fled" ? "İzi bıraktın." : "Kurtlar dağıldı.") + spoils(o.result === "won") + (hl.length ? " " + hl.join(" ") : ""), o.gains); }, persist);
+    };
+    chooseMode(h.title, foes, "gorev", mode => {
+      if (mode === "yakin") { melee(); return; }
+      if (mode === "barikat") {
+        openSiege(cfg, s, siegeFromFoes(h.title, foes, groundOf(s.region, foes)), (s.seed + s.day * 19 + s.minute) | 0,
+          (won, gains, hs) => { const hl = afterBattle(s, hs, won ? "won" : "lost"); endModal(won ? "Av tamam" : "Yaralandın", (won ? "Kazıkların arkasında dayandın; kurtlar çekildi." : "Kazıklar dağıldı; zar zor sıyrıldın.") + spoils(won) + (hl.length ? " " + hl.join(" ") : ""), gains); }, persist);
+        return;
+      }
+      openStealth(cfg, s, h.title, foes, stealthGoal(foes, "gorev"), (s.seed * 5 + s.day * 61 + s.minute) | 0, night, (won, gains) => {
+        persist(); modal(`<h2>${won ? "Pusuya yattın" : "Görüldün!"}</h2><p class="lede">${won ? "Kurtlar seni fark etmedi; ilk vuruş senin." : "Kokunu aldılar. Dövüşmekten başka yol yok."}</p>`, [{ label: "Savaş", cls: "primary", fn: () => melee({ ...DEFAULT_PLAN, surprise: won, ambushed: !won } as typeof DEFAULT_PLAN) }]);
+      }, persist);
     });
   }
   /** Harabe araması; bitince sonuç. */
