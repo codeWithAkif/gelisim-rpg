@@ -302,3 +302,24 @@ test("düşman saldırıyı önceden belli eder: vuruştan önce işaret çıkar
   expect(n.hp).toBe(100);
   n.px = f.x - 3; run(n, 1); expect(n.hp).toBeLessThan(100);                              // yakında kalırsan vurur
 });
+
+test("açılı atış: yatay + dikey çekince top/ok yükselir ve üst kattaki düşmana ulaşır; yalnız yatay düz gider; tavana çarpan ateş topu sekip döner", async () => {
+  const { aimShot, castSpell, shootArrow, FLOOR_X } = await import("../src/engine/scavenge");
+  const s = fresh(); s.equipped.bow = "av_yayi"; s.inventory.av_yayi = 1; s.inventory.ok = 10;
+  const n = createScav(cfg, s, scavSite("koru_kule")!, 32, { kind: "bow" }); n.raidT = 999; n.foes = []; n.px = 20;   // merdivenden uzak
+  expect(aimShot(n, { dx: 1, dy: 0 }).slope).toBe(0);
+  const up = aimShot(n, { dx: 1, dy: -1 }); expect(up.slope).toBeGreaterThan(0); expect(up.dir).toBe(1); expect(aimShot(n, { dx: 1, dy: 1 }).slope).toBeLessThan(0);
+  expect(aimShot(n, { dx: 1, dy: -1.7 }).slope).toBeGreaterThan(up.slope);                     // daha dik çekince daha dik
+  // ok: 45° çizgide FLOOR_X birim ileride bir üst kattaki düşmana ulaşır
+  const aim = { dx: 1, dy: -1 }; const dxFoe = FLOOR_X / Math.tan(Math.atan2(1, 1));            // 45°: bir kat için FLOOR_X birim
+  const f = foe(n.px + dxFoe, { floor: 1 }); n.foes = [f]; expect(shootArrow(n, aim)).toBe(true); expect(f.hp).toBeLessThan(500);
+  const g0 = foe(n.px + dxFoe, { floor: 0 }); f.hp = 500; n.foes = [g0]; n.atkCd = 0; shootArrow(n, aim); expect(g0.hp).toBe(500);   // aynı kattakine ok yükselip ıskalar
+  // büyü topu açılı uçar
+  n.foes = []; n.px = 20; n.atkCd = 0; n.spell = { id: "x", kind: "ates", name: "Ateş", cd: 0, max: 4, mul: 2, r: 4 } as any; n.tr.spellShots = 1;
+  expect(castSpell(n, aim)).toBe(true); run(n, 0.5); const pj = n.proj[0]; expect(pj?.y).toBeGreaterThan(0);
+  // hedefe ulaşınca üst kattaki düşmana vurur
+  n.proj = []; n.spellQ = []; n.spell!.cd = 0; const f2 = foe(n.px + dxFoe, { floor: 1 }); n.foes = [f2]; castSpell(n, aim); run(n, 2); expect(f2.hp).toBeLessThan(500);
+  // tavan: son katın üstüne çıkan ateş topu bir kez sekip alçalır
+  n.proj = []; n.foes = []; n.proj.push({ id: 99, kind: "ates", x: 30, floor: n.site.floors - 1, y: n.site.floors - 1, slope: 0.05, dir: 1, left: 150, base: 10, r: 3 }); run(n, 0.2);
+  expect(n.proj[0]?.slope).toBeLessThan(0);
+});

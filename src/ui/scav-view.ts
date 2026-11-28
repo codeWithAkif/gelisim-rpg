@@ -10,7 +10,7 @@ import { withGuide } from "./guide";
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
-  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, siteRule, nextRaidCount, doorNear, beginFortify, canFortify, fortifyCost, canAffordFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, leave, finishScav, scavSite, canStartScav,
+  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, siteRule, nextRaidCount, doorNear, beginFortify, canFortify, fortifyCost, canAffordFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, aimShot, leave, finishScav, scavSite, canStartScav,
   traitLines, bagUsed, canStore, weaponLabel, bagItemCount, STACK, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
@@ -93,7 +93,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
   { const rl = siteRule(site); if (rl) { tip.hidden = false; tip.textContent = `${rl.name}: ${rl.desc}`; setTimeout(() => { tip.hidden = true; }, 4600); } }
   let W = 300, H = 400, paused = false, raf = 0, ended = false, last = performance.now(); let shake = 0; let walkT = 0; let lastLockedMsg = 0;
   const bolts: BoltFx[] = []; const bimpacts: Impact[] = [];
-  const rings: { x: number; floor: number; t: number; r: number; color: string }[] = []; const pops: { x: number; floor: number; t: number; text: string; color: string }[] = []; const shots: { a: number; b: number; floor: number; t: number }[] = [];
+  const rings: { x: number; floor: number; t: number; r: number; color: string }[] = []; const pops: { x: number; floor: number; t: number; text: string; color: string }[] = []; const shots: { a: number; b: number; floor: number; t: number; toFloor?: number }[] = [];
   const F = site.floors; const VIEW = 110;
   const layout = () => { const r = stage.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + "px"; cv.style.height = H + "px"; g.setTransform(dpr, 0, 0, dpr, 0, 0); };
   const sc = () => W / VIEW; const camX = () => Math.max(VIEW / 2, Math.min(n.w - VIEW / 2, n.px));
@@ -243,17 +243,17 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       { const w = 44, hx = X(x) - w / 2, hy = gy(fl) - 20 * sc() - 14; g.fillStyle = "rgba(20,16,10,.85)"; g.fillRect(hx - 1, hy - 1, w + 2, 8); g.fillStyle = n.hp / n.maxHp < 0.3 ? "#E0483A" : "#D9503A"; g.fillRect(hx, hy, w * Math.max(0, n.hp / n.maxHp), 6);
         g.fillStyle = "#F2E7C9"; g.font = "700 11px sans-serif"; g.textAlign = "center"; g.fillText(`${Math.round(n.hp)}`, X(x), hy - 3); }
       if (n.searchId) { g.fillStyle = "#F1C14A"; g.font = `700 ${Math.max(14, sc() * 2)}px Caveat, cursive`; g.textAlign = "center"; g.fillText("aranıyor…", X(x), gy(fl) - 20 * sc() - 28); } }
-    for (const pj of n.proj) { if (pj.bolt) continue; const x = X(pj.x), y = gy(pj.floor) - 11 * sc(); const col = pj.kind === "buz" ? ["#BFE6FA", "#6BB6E0"] : pj.kind === "ates" ? ["#FFE08A", "#E8602A"] : pj.kind === "simsek" ? ["#FFFFFF", "#7FA8FF"] : ["#E4D3FF", "#8A6BE0"];
+    for (const pj of n.proj) { if (pj.bolt) continue; const x = X(pj.x), y = gy(pj.y ?? pj.floor) - 11 * sc(); const col = pj.kind === "buz" ? ["#BFE6FA", "#6BB6E0"] : pj.kind === "ates" ? ["#FFE08A", "#E8602A"] : pj.kind === "simsek" ? ["#FFFFFF", "#7FA8FF"] : ["#E4D3FF", "#8A6BE0"];
       for (let k = 4; k >= 1; k--) { g.globalAlpha = 0.14 * (5 - k); g.fillStyle = col[1]; g.beginPath(); g.arc(x - pj.dir * k * 6, y, 6 + (5 - k), 0, 7); g.fill(); }
       g.globalAlpha = 1; const gr = g.createRadialGradient(x, y, 1, x, y, 11); gr.addColorStop(0, col[0]); gr.addColorStop(1, col[1]); g.fillStyle = gr; g.beginPath(); g.arc(x, y, 10 + Math.sin(now / 60) * 1.5, 0, 7); g.fill(); }
-    for (const sh of [...shots]) { const a = Math.max(0, (now - sh.t) / 160); if (a > 1) { shots.splice(shots.indexOf(sh), 1); continue; } g.strokeStyle = `rgba(255,245,210,${1 - a})`; g.lineWidth = 2; g.beginPath(); g.moveTo(X(sh.a), gy(sh.floor) - 12 * sc()); g.lineTo(X(sh.b), gy(sh.floor) - 8 * sc()); g.stroke(); }
+    for (const sh of [...shots]) { const a = Math.max(0, (now - sh.t) / 160); if (a > 1) { shots.splice(shots.indexOf(sh), 1); continue; } g.strokeStyle = `rgba(255,245,210,${1 - a})`; g.lineWidth = 2; g.beginPath(); g.moveTo(X(sh.a), gy(sh.floor) - 12 * sc()); g.lineTo(X(sh.b), gy(sh.toFloor ?? sh.floor) - 8 * sc()); g.stroke(); }
     for (const r of [...rings]) { const a = Math.max(0, (now - r.t) / 500); if (a > 1) { rings.splice(rings.indexOf(r), 1); continue; } g.strokeStyle = `${r.color}${(1 - a).toFixed(2)})`; g.lineWidth = 4; g.beginPath(); g.ellipse(X(r.x), gy(r.floor) - 8 * sc(), Math.max(0.1, r.r * sc() * a), Math.max(0.1, r.r * sc() * 0.5 * a), 0, 0, 7); g.stroke(); }
     for (let i = bolts.length - 1; i >= 0; i--) if (!drawBolt(g, bolts[i], now, Math.max(0.8, sc() / 4.5))) bolts.splice(i, 1);
     for (let i = bimpacts.length - 1; i >= 0; i--) if (!drawImpact(g, bimpacts[i], now)) bimpacts.splice(i, 1);
     if (aim && Math.hypot(aim.dx, aim.dy) > 0.25) {
-      const rv = { dx: -aim.dx, dy: -aim.dy }; const tg = aimTarget(n, rv); const hx = X(n.px), hy = gy(n.py) - 11 * sc(); const len = 90 + Math.hypot(aim.dx, aim.dy) * 60; const ty = tg.floor === n.floor ? 0 : (tg.floor > n.floor ? -1 : 1);
+      const rv = { dx: -aim.dx, dy: -aim.dy }; const tg = aimShot(n, rv); const hx = X(n.px), hy = gy(n.py) - 11 * sc(); const len = 90 + Math.hypot(aim.dx, aim.dy) * 60; const ty = tg.slope ? 0 : tg.floor === n.floor ? 0 : (tg.floor > n.floor ? -1 : 1);
       g.save(); g.setLineDash([8, 6]); g.strokeStyle = "rgba(255,240,180,.9)"; g.lineWidth = 3; g.beginPath(); g.moveTo(hx, hy);
-      const ex = hx + tg.dir * len, ey = hy + ty * Math.min(fh() * 0.7, 60); g.lineTo(ex, ey); g.stroke(); g.setLineDash([]);
+      const ex = hx + tg.dir * len, ey = tg.slope ? hy - tg.slope * (len / sc()) * fh() : hy + ty * Math.min(fh() * 0.7, 60); g.lineTo(ex, ey); g.stroke(); g.setLineDash([]);
       g.fillStyle = "rgba(255,240,180,.95)"; g.beginPath(); g.arc(ex, ey, 6, 0, 7); g.fill();
       if (ty) { g.font = `700 ${Math.max(14, sc() * 1.8)}px Caveat, cursive`; g.textAlign = "center"; g.fillText(ty < 0 ? "üst kat" : "alt kat", ex, ey + (ty < 0 ? -10 : 18)); } g.restore(); }
     for (const p of [...pops]) { const a = Math.max(0, (now - p.t) / 1100); if (a > 1) { pops.splice(pops.indexOf(p), 1); continue; } g.globalAlpha = 1 - a; g.fillStyle = p.color; g.strokeStyle = "rgba(0,0,0,.7)"; g.lineWidth = 3; g.font = `700 ${Math.max(16, sc() * 2.3)}px Caveat, cursive`; g.textAlign = "center";
@@ -297,7 +297,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       if (f.k === "hurt") { shake = Math.max(shake, 5); sfx("hurt"); buzz("light"); }
       if (f.k === "alarm") { tip.hidden = false; tip.textContent = f.human ? "Seni fark ettiler! Islık çalıp ötekileri çağırdılar." : "Kurtlar seni fark etti! Uluyarak arkadaşlarını çağırdılar."; setTimeout(() => { tip.hidden = true; }, 3200); if (!f.human) howl(); sfx("beat"); buzz("heavy"); shake = 6; }
       if (f.k === "raid") { tip.hidden = false; tip.textContent = f.last ? `Son baskın! ${f.n} düşman geliyor` : `Baskın! ${f.n} düşman geliyor`; setTimeout(() => { tip.hidden = true; }, 2200); sfx("beat"); buzz("medium"); }
-      if (f.k === "shot") { shots.push({ a: f.from, b: f.to, floor: f.floor, t: now }); sfx("whoosh"); }
+      if (f.k === "shot") { shots.push({ a: f.from, b: f.to, floor: f.floor, toFloor: f.toFloor, t: now }); sfx("whoosh"); }
       if (f.k === "trap") { rings.push({ x: f.x, floor: f.floor, t: now, r: 14, color: "rgba(241,193,74," }); sfx("thunk"); pops.push({ x: f.x, floor: f.floor, t: now, text: "Tuzak!", color: "#F1C14A" }); }
       if (f.k === "spell" && f.bolt) {
         // şimşek: zincir kahramanın elinden hedeften hedefe; yıldırım üstten aşağı (barikat, nöbet ve altıgen savaşla aynı kural)

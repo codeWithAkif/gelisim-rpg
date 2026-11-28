@@ -98,6 +98,12 @@ Uzun dayanmanın karşılığı (güç değil, gelişim, bilgi, ün ve para):
 - **Sekme:** ateş ve buz topu çarptığı yerden bir kez sekip en yakın ikinci düşmana %60 güçle vurur (harabe/nöbet/barikat 16 birim, altıgen savaşta 2 altıgen). Harabede uçan top ayrıca duvara, kapalı kapıya, kilitli kapıya ve yapı kenarına çarpınca bir kez geri döner.
 - Yeni büyü ya da sahne eklerken bu fonksiyonları (`combo`, `wets`, `bounces`) çağır; sayıları yalnız orada değiştir.
 
+## Harabe: açılı atış
+
+- Büyü ve ok düğmesini hem yatay hem dikey çekince atış **açılı** gider: yukarı çekmek yükseltir, aşağı çekmek alçaltır. Çizgi bir kat çıkmak için 45°'de yatay ~55 birim gider (`FLOOR_X`); top üst/alt kattaki düşmana ulaşır, oku düşman hizasına denk gelirse vurur.
+- Yalnız yatay çekmek düz gider (eskisi gibi); merdiven açıklığında çapraz çekmek eskisi gibi bir üst/alt kata atar.
+- Ateş ve buz topu, yapının tavanına ya da zeminine çarpınca bir kez sekip döner; ötekiler patlar. Kural `engine/scavenge.ts` (`aimShot`).
+
 ## Harabe kapıları
 
 - Odalar arasında (her katta) kapı vardır. Başta açıktır; **sen geçince arkandan kapanır**. Kilitli oda kapısı ayrıdır (anahtarla açılır).

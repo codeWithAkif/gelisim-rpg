@@ -26,6 +26,7 @@ export const GUIDES: Record<"barikat" | "gizlenme" | "harabe" | "olcer" | "nobet
     "Sandığa, rafa yaklaşınca \"Ara\" çıkar. Aramak vakit ister; bulduğun çantana girer, çantan sınırlı.",
     "Bekçiler uyur. Biri seni fark ederse ötekileri çağırır ve baskın sayacı başlar. Sessiz ol, çabuk ol.",
     "Odalar arası kapılar sen geçince kapanır; gelenler onu kırmaya çalışır. Kapının önünde durup \"Güçlendir\"e bas: her seferinde 200 dayanıklılık, en çok 2000.",
+    "Büyü ve ok düğmesini yan ve yukarı çekersen atış açılı gider: üst kattaki düşmana ulaşır. Düz çekersen düz gider.",
     "Çıkış zemin katın solunda. Sayaç azalınca çık; ölürsen çantan düştüğün yerde kalır.",
   ] },
   olcer: { who: "Annemin defteri", portrait: "portre_anne", title: "Ölçer işi", steps: [
