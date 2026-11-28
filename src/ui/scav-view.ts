@@ -10,7 +10,7 @@ import { withGuide } from "./guide";
 import type { Config } from "../engine/config";
 import type { GameState } from "../engine/state";
 import {
-  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, siteRule, nextRaidCount, doorNear, beginFortify, canFortify, fortifyCost, canAffordFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, aimShot, leave, finishScav, scavSite, canStartScav,
+  type Scav, type Spot, type Loadout, type ScavSite, EXIT_X, ladderAt, SPOT_STAGES, sitesAt, siteProgress, TIER_NAMES, raidsLeft, createScav, stepScav, setInput, beginSearch, nearSpot, siteLevel, siteRule, nextRaidCount, doorNear, beginFortify, canFortify, fortifyCost, canAffordFortify, doorMax, DOOR_BASE, fortifySeconds, placeTrap, trapsInHand, castSpell, shootArrow, aimTarget, aimShot, leave, finishScav, scavSite, canStartScav,
   traitLines, bagUsed, canStore, weaponLabel, bagItemCount, STACK, dropBag, healRun, healItemsAvailable, nearGround, groundNear, pickGround, SCAV_ENERGY, type ScavResult, loadoutOptions, defaultLoadout, atExit,
 } from "../engine/scavenge";
 import { itemInfo } from "../engine/inventory";
@@ -37,7 +37,7 @@ function openScavHubInner(cfg: Config, s: GameState, place: string, persist: () 
     const sites = list.map(x => { const lock = x.unlock(s); const pr = siteProgress(s, x); const left = s.harabe?.[x.id]?.ground.length ?? 0;
       return `<button class="site-opt ${pick?.id === x.id ? "on" : ""}" data-site="${x.id}" ${lock ? "disabled" : ""}>
         <span class="site-head"><b>${esc(x.name)}</b><span class="site-tier t${x.tier}">${stars(x.tier)} ${TIER_NAMES[x.tier]}</span></span>
-        <span class="site-meta">${x.floors} kat · ${x.rooms} oda · ${x.guards} bekçi · ${x.raids} baskın${lock ? "" : ` · aranan ${pr.done}/${pr.total}`}${left ? ` · yerde ${left} eşya` : ""}</span>
+        <span class="site-meta">${x.floors} kat · ${x.rooms} oda · ${x.guards} bekçi · ${x.raids} baskın · seviye ${siteLevel(s, x.id)}${lock ? "" : ` · aranan ${pr.done}/${pr.total}`}${left ? ` · yerde ${left} eşya` : ""}</span>
         ${siteRule(x) ? `<span class="tiny" style="color:var(--blue)"><b>${esc(siteRule(x)!.name)}:</b> ${esc(siteRule(x)!.desc)}</span>` : ""}
         ${lock ? `<span class="tiny red">${esc(lock)}</span>` : pr.done >= pr.total ? `<span class="tiny muted">Burada aranacak bir şey kalmadı.</span>` : ""}</button>`; }).join("");
     bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><p class="hand muted" style="margin:0">Harabeler</p>
@@ -90,7 +90,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
   document.body.appendChild(el);
   const cv = el.querySelector("canvas")!; const stage = el.querySelector<HTMLElement>(".siege-stage")!; const g = cv.getContext("2d")!;
   const pauseEl = el.querySelector<HTMLElement>("#scPause")!; const tip = el.querySelector<HTMLElement>("#scTip")!;
-  { const rl = siteRule(site); if (rl) { tip.hidden = false; tip.textContent = `${rl.name}: ${rl.desc}`; setTimeout(() => { tip.hidden = true; }, 4600); } }
+  { const rl = siteRule(site); const lvl = n.level > 1 ? `Seviye ${n.level}${n.level % 5 === 0 ? ": mühürlü sandık var!" : ""}` : ""; if (rl || lvl) { tip.hidden = false; tip.textContent = [lvl, rl ? `${rl.name}: ${rl.desc}` : ""].filter(Boolean).join(" · "); setTimeout(() => { tip.hidden = true; }, 4600); } }
   let W = 300, H = 400, paused = false, raf = 0, ended = false, last = performance.now(); let shake = 0; let walkT = 0; let lastLockedMsg = 0;
   const bolts: BoltFx[] = []; const bimpacts: Impact[] = [];
   const rings: { x: number; floor: number; t: number; r: number; color: string }[] = []; const pops: { x: number; floor: number; t: number; text: string; color: string }[] = []; const shots: { a: number; b: number; floor: number; t: number; toFloor?: number }[] = [];
@@ -315,7 +315,7 @@ export function openScav(cfg: Config, s: GameState, siteId: string, persist: () 
       if (f.k === "locked") { if (now - lastLockedMsg > 1500) { lastLockedMsg = now; tip.hidden = false; tip.textContent = "Kilitli: başka bir odada anahtar var"; setTimeout(() => { tip.hidden = true; }, 1400); sfx("bad"); } }
       if (f.k === "door") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı kapandı", color: "#EFE6CC" }); sfx("thunk"); }
       if (f.k === "doorhit") { sfx("hit"); }
-      if (f.k === "combo") { pops.push({ x: f.x, floor: f.floor, t: now, text: f.tag, color: f.tag.startsWith("Tuzak") ? "#E0583A" : f.tag === "Buhar" ? "#CFD8DC" : f.tag === "Sekti!" ? "#F1C14A" : "#8FC4FF" }); sfx(f.tag.startsWith("Tuzak") ? "bad" : "crit"); }
+      if (f.k === "combo") { pops.push({ x: f.x, floor: f.floor, t: now, text: f.tag, color: f.tag.startsWith("Eşsiz") ? "#F4D35E" : f.tag.startsWith("Tuzak") ? "#E0583A" : f.tag === "Buhar" ? "#CFD8DC" : f.tag === "Sekti!" ? "#F1C14A" : "#8FC4FF" }); sfx(f.tag.startsWith("Tuzak") ? "bad" : f.tag.startsWith("Eşsiz") ? "perfect" : "crit"); }
       if (f.k === "doorbreak") { pops.push({ x: f.x, floor: f.floor, t: now, text: "Kapı kırıldı!", color: "#E0583A" }); sfx("bad"); buzz("heavy"); shake = 6; }
       if (f.k === "fortify") { pops.push({ x: f.x, floor: f.floor, t: now, text: `Kapı güçlendi · ${f.level * DOOR_BASE}`, color: "#9BD36B" }); sfx("good"); buzz("medium"); }
       if (f.k === "die") sfx("hit");

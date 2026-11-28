@@ -18,6 +18,7 @@ import { boltStyle, combo, wets, bounces, BOUNCE_MUL, BOUNCE_RANGE, WET_SECS, WA
 import { trapsOwned, trapEffect } from "./engineering";
 import { petMul } from "./pet";
 import { healOf, healPower } from "./healing";
+import { discover } from "./synthesis";
 
 /** Harabede büyü karşılıkları: büyü türü, hasar çarpanı, patlama yarıçapı. */
 export type SpellKind = "simsek" | "ates" | "buz" | "camur" | "sarmasik" | "karga" | "kilic";
@@ -112,15 +113,32 @@ const ruleOf = (n: { site: { id: string } }) => SITE_RULES[n.site.id]?.id;
 export const sitesAt = (place: string) => SCAV_SITES.filter(x => x.place === place).sort((a, b) => a.tier - b.tier);
 
 /* ---------- kalıcı durum: boşaltılan sandık boş kalır ---------- */
-export interface HarabeSave { stages: Record<number, number>; opened: number[]; keys: number[]; killed: number[]; ground: { item: string; x: number; floor: number }[]; doors?: Record<string, number> }
+export interface HarabeSave { stages: Record<number, number>; opened: number[]; keys: number[]; killed: number[]; ground: { item: string; x: number; floor: number }[]; doors?: Record<string, number>; level?: number }
 export function harabeSave(s: GameState, siteId: string): HarabeSave {
   const all = (s.harabe ??= {}); return (all[siteId] ??= { stages: {}, opened: [], keys: [], killed: [], ground: [] });
 }
 /** Yerleşim her kayıtta aynıdır: aynı harabeye girince aynı odalar, aynı sandıklar. */
-export const layoutSeed = (s: GameState, siteId: string) => { let h = s.seed | 0; for (const c of siteId) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+export const layoutSeed = (s: GameState, siteId: string, level = 1) => { let h = s.seed | 0; for (const c of siteId) h = Math.imul(h ^ c.charCodeAt(0), 16777619); if (level > 1) h = Math.imul(h ^ (level * 0x9e3779b1), 16777619); return h >>> 0; };
+/** Derinleşme seviyesi: bir harabeyi tamamen boşaltınca yeniden dolar ve bir seviye zorlaşır (1, 2, 3…). Kapı seviyeleri ve yerdeki eşyalar kalır. */
+export const siteLevel = (s: GameState, siteId: string) => s.harabe?.[siteId]?.level ?? 1;
+/** Her 5. seviyede mühürlü sandıktan eşsiz bir ödül: ilkinde o harabenin eşyası, ikincisinde büyü parşömeni, sonrakilerde bol bakır. */
+export interface SiteReward { item?: string; scroll?: string; money?: number }
+export const SITE_REWARDS: Record<string, SiteReward[]> = {
+  koru_kulube: [{ scroll: "sy_el_simsek_top" }],
+  koru_agil: [{ item: "cobanin_cizmesi" }, { scroll: "sy_el_toprak_firlat" }],
+  koru_kule: [{ item: "bekcibasi_kilici" }, { scroll: "sy_c_buz_firlat" }],
+  koru_kosk: [{ item: "komurlesmis_yay" }, { scroll: "sy_obsidyen_firlat" }],
+  karacam_sarnic: [{ item: "sarnic_feneri" }, { scroll: "sy_saganak_perde" }],
+  ardic_kul: [{ item: "kul_maskesi" }, { scroll: "sy_plazma_zincir" }],
+};
+export const CHEST_ID = 9000;
+export function rewardFor(siteId: string, level: number, tier: number): SiteReward | null {
+  if (level % 5 !== 0) return null; const k = level / 5;
+  return SITE_REWARDS[siteId]?.[k - 1] ?? { money: 40 * tier * k };
+}
 /** Aranacak kutu sayısı ve kaçının boşaltıldığı (açılmış odalar dahil). */
 export function siteProgress(s: GameState, site: ScavSite): { done: number; total: number } {
-  const total = site.floors * (site.spotsPerFloor + (site.vault ? 3 : 0));
+  const total = site.floors * (site.spotsPerFloor + (site.vault ? 3 : 0)) + (siteLevel(s, site.id) % 5 === 0 ? 1 : 0);   // 5. seviyede mühürlü sandık da sayılır
   const st = s.harabe?.[site.id]?.stages ?? {};
   return { done: Object.values(st).filter(v => v >= SPOT_STAGES).length, total };
 }
@@ -221,7 +239,7 @@ export function defaultLoadout(cfg: Config, s: GameState): Loadout {
 }
 
 /* ---------- durum ---------- */
-export interface Stage { kind: "empty" | "item" | "money" | "weapon" | "key"; key?: number; item?: string; n?: number; money?: number; weapon?: string; time: number }
+export interface Stage { kind: "empty" | "item" | "money" | "weapon" | "key" | "unique"; spell?: string; key?: number; item?: string; n?: number; money?: number; weapon?: string; time: number }
 export interface Spot { trapped?: boolean; seen?: boolean; vault?: boolean; id: number; x: number; floor: number; name: string; stages: Stage[]; stage: number; prog: number; done: boolean }
 export interface SFoe { boss?: boolean; wind?: number; wet?: number; idle?: boolean; id: number; def: string; x: number; floor: number; hp: number; max: number; speed: number; dmg: number; cd: number; human: boolean; climbT: number; toFloor: number; hitT: number; root: number; slow: number; burn: number }
 export type SFx =
@@ -244,7 +262,7 @@ export interface Scav {
   w: number; alerted: boolean; guardCount: number; killed: number[];   // genişlik; bekçiler fark etti mi; ilk bekçi kimlikleri; öldürülen bekçiler
   px: number; py: number; floor: number; face: 1 | -1; moving: boolean; climbing: boolean; input: { dx: number; dy: number }; hp: number; maxHp: number;
   spots: Spot[]; searchId: number; searchWait: number; foes: SFoe[]; nextId: number; wave: number; raidT: number; raidHold: number; spellQ: { t: number; dir: 1 | -1; floor: number; slope?: number }[];
-  bag: Record<string, number>; bagCap: number; bowName: string; dual: boolean; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
+  bag: Record<string, number>; bagCap: number; bowName: string; dual: boolean; level: number; perks: string[]; learned: string[]; money: number; ammo: number; ammoStart: number; bow: boolean; dmg: number; melee: number; rate: number; atkCd: number; atkFx: number; weaponName: string;
   foundWeapons: string[]; weaponId: string; castT: number; foundT: number; armor: number; tr: ScavTraits; searched: number; shots: number; kills: number; found: number; fx: SFx[];
   ground: GItem[]; gid: number; proj: Proj[]; locks: Lock[]; doors: Door[]; fort: { d: Door; prog: number } | null; keys: number[]; traps: TrapSlot[]; trapFx: Record<string, { dmg: number; slow: number; fire: boolean }>; dog?: Dog; dogBond: number; dogMul: number; spell?: { id: string; kind: SpellKind; name: string; cd: number; max: number; mul: number; r: number; bolt?: BoltStyle | null };
 }
@@ -273,7 +291,7 @@ export function pickGround(n: Scav, gid?: number): "ok" | "full" | "none" {
   const g = gid ? groundNear(n).find(q => q.id === gid) : nearGround(n); if (!g) return "none"; if (!canStore(n, g.item)) return "full";
   n.ground = n.ground.filter(q => q !== g); n.bag[g.item] = (n.bag[g.item] ?? 0) + 1; return "ok";
 }
-export const speedOf = (n: Scav) => 32 * n.tr.walk * (ruleOf(n) === "camur" && n.floor === 0 && !n.climbing ? 0.8 : 1);
+export const speedOf = (n: Scav) => 32 * n.tr.walk * (ruleOf(n) === "camur" && !n.perks.includes("camur") && n.floor === 0 && !n.climbing ? 0.8 : 1);
 export const CLIMB_SPEED = 0.5;      // kat/sn
 export const SPOT_STAGES = 3;
 /** Çıkacak şey basitse hızlı, değerliyse yavaş aranır. */
@@ -289,12 +307,17 @@ function rollStage(site: ScavSite, rng: Rng): Stage {
   if (pick.money) { const m = rng.int(pick.money[0], pick.money[1]); return { kind: "money", money: m, time: stageTime(pick, m) }; }
   return { kind: "item", item: pick.item, n: pick.n ? rng.int(pick.n[0], pick.n[1]) : 1, time: stageTime(pick) };
 }
-export const searchMul = (n: Scav) => n.tr.search * (ruleOf(n) === "duman" ? 1.3 : 1);
+export const searchMul = (n: Scav) => n.tr.search * (ruleOf(n) === "duman" && !n.perks.includes("maske") ? 1.3 : 1);
 export const stageSeconds = (n: Scav, sp: Spot) => sp.stages[sp.stage] ? sp.stages[sp.stage].time * searchMul(n) : 0;
 
-export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: number, load: Loadout = defaultLoadout(cfg, s)): Scav {
+export function createScav(cfg: Config, s: GameState, site0: ScavSite, seed: number, load: Loadout = defaultLoadout(cfg, s)): Scav {
+  // derinleşme: her seviyede biraz daha çok bekçi, baskın ve güçlü düşman; yerleşim seviyeye göre yeniden dağılır
+  const level = siteLevel(s, site0.id); const L = level - 1;
+  const site: ScavSite = L ? { ...site0, guards: site0.guards + Math.min(4, Math.floor(L / 2)), raids: site0.raids + Math.min(3, Math.floor(L / 3)), raidSize: site0.raidSize + Math.floor(L / 2) } : site0;
+  const worn = new Set(Object.values(s.equipped).filter((x): x is string => !!x));
+  const perks = ["cobanin_cizmesi:camur", "bekcibasi_kilici:islatir", "komurlesmis_yay:yay_sek", "sarnic_feneri:fener", "kul_maskesi:maske"].filter(x => worn.has(x.split(":")[0])).map(x => x.split(":")[1]);
   // yerleşim (odalar, sandıklar, bekçiler) kayda bağlı sabit tohumdan; savaş ve baskınlar her girişte başka
-  const rng = new Rng(layoutSeed(s, site.id)); const run = new Rng(seed); const spots: Spot[] = []; let id = 1; const locks: Lock[] = [];
+  const rng = new Rng(layoutSeed(s, site.id, level)); const run = new Rng(seed); const spots: Spot[] = []; let id = 1; const locks: Lock[] = [];
   const W = siteW(site); const ladders = Array.from({ length: Math.max(0, site.floors - 1) }, (_, g) => ladderAt(W, g));
   if (site.vault) for (let f = 0; f < site.floors; f++) { const side = f % 2 === 0 ? "R" : "L"; locks.push({ floor: f, side, x: side === "R" ? W - ROOM_W : ROOM_W, key: f, open: false }); }
   const lockOf = (f: number) => locks.find(l => l.floor === f);
@@ -329,7 +352,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
     const vault = site.vault && k >= site.floors && rng.chance(35);
     const [lo, hi] = vault ? vaultSpan(f) : freeSpan(f);
     let x = lo + rng.next() * (hi - lo); if (f === 0 && !vault && x < 130) x = Math.min(hi, 130 + rng.next() * Math.max(10, hi - 130));
-    const def = site.foes[rng.int(0, site.foes.length - 1)]; const d = ENEMIES[def]; const sc = 1 + f * 0.12 + (vault ? 0.2 : 0) + (site.tier - 1) * 0.08;
+    const def = site.foes[rng.int(0, site.foes.length - 1)]; const d = ENEMIES[def]; const sc = 1 + f * 0.12 + (vault ? 0.2 : 0) + (site.tier - 1) * 0.08 + L * 0.12;
     guards.push({ idle: true, id: gid2++, def, x, floor: f, hp: d.hp * sc * 1.35, max: d.hp * sc * 1.35, speed: 9 + (d.move ?? 4) * 1.5 + rng.next() * 2.5, dmg: (d.damage[0] + d.damage[1]) / 2 * sc * 0.7, cd: 1.2, human: d.species === "insan", climbT: 0, toFloor: f, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
   // kuralı olan harabeler: bekçibaşı (üst kat, çok can) ve tuzaklı kutular (ayrı tohum: yerleşim değişmez)
@@ -339,7 +362,16 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
     const sc = 1 + bf * 0.12 + (site.tier - 1) * 0.08;
     guards.push({ boss: true, idle: true, id: gid2++, def, x: hi - 26, floor: bf, hp: d.hp * sc * 1.35 * 3.2, max: d.hp * sc * 1.35 * 3.2, speed: 11 + (d.move ?? 4) * 1.2, dmg: (d.damage[0] + d.damage[1]) / 2 * sc * 0.7 * 1.5, cd: 1.2, human: d.species === "insan", climbT: 0, toFloor: bf, hitT: 0, root: 0, slow: 0, burn: 0 });
   }
-  if (rid === "tuzak") { const tr = new Rng(layoutSeed(s, site.id) ^ 0x5bd1e995); for (const sp of spots) if (!sp.vault && tr.chance(30)) sp.trapped = true; }
+  // para ödülleri seviyeyle büyür
+  for (const sp of spots) for (const st of sp.stages) if (st.kind === "money" && st.money) st.money = Math.round(st.money * (1 + 0.2 * L));
+  // 5. seviyenin katları: mühürlü sandık (üç aşama; sonuncusu eşsiz ödül)
+  const rw = rewardFor(site.id, level, site.tier);
+  if (rw) {
+    const bf = site.floors - 1; const x = site.vault ? (vaultSpan(bf)[0] + vaultSpan(bf)[1]) / 2 : W - 40; const k = level / 5;
+    const last: Stage = rw.item ? { kind: "unique", item: rw.item, time: 4.5 } : rw.scroll ? { kind: "unique", spell: rw.scroll, time: 4.5 } : { kind: "money", money: rw.money ?? 40, time: 4 };
+    spots.push({ id: CHEST_ID, x, floor: bf, vault: true, name: "Mühürlü sandık", stages: [{ kind: "money", money: 12 * site.tier * k, time: 2.5 }, { kind: "item", item: "yara_merhemi", n: 2, time: 2.5 }, last], stage: 0, prog: 0, done: false });
+  }
+  if (rid === "tuzak") { const tr = new Rng(layoutSeed(s, site.id, level) ^ 0x5bd1e995); for (const sp of spots) if (!sp.vault && tr.chance(30)) sp.trapped = true; }
   // kayıtlı durum: boşaltılan sandık boş, açılan kapı açık, öldürülen bekçi yok, yerde bırakılanlar yerde
   const sv = harabeSave(s, site.id);
   for (const sp of spots) { const st = sv.stages[sp.id] ?? 0; sp.stage = Math.min(SPOT_STAGES, st); sp.done = st >= SPOT_STAGES; }
@@ -352,7 +384,7 @@ export function createScav(cfg: Config, s: GameState, site: ScavSite, seed: numb
   const alive = guards.filter(g => !sv.killed.includes(g.id));
   const ground: GItem[] = sv.ground.map((g, i) => ({ id: i + 1, ...g }));
   return {
-    site, seed, rng: run, w: W, alerted: false, guardCount: site.guards + (rid === "boss" ? 1 : 0), killed: [...sv.killed], time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4 * tr.hp)), maxHp: Math.round(mh * 1.4 * tr.hp),
+    site, seed, rng: run, w: W, alerted: false, level, perks, learned: [], guardCount: site.guards + (rid === "boss" ? 1 : 0), killed: [...sv.killed], time: 0, phase: "play", load, px: EXIT_X + 6, py: 0, floor: 0, face: 1, moving: false, climbing: false, input: { dx: 0, dy: 0 }, hp: Math.max(1, Math.round((s.hp || mh) * 1.4 * tr.hp)), maxHp: Math.round(mh * 1.4 * tr.hp),
     spots, searchId: 0, searchWait: 0, foes: alive, nextId: gid2, wave: 0, raidT: tr.firstRaid, raidHold: 0, spellQ: [], bag: {}, bagCap: tr.bagCap, money: 0, ammo, ammoStart: ammo, bow, dmg: 6 + lv("okculuk") / 4 + lv("ust_govde") / 10, melee, rate: 0.9 + lv("refleks") / 80,
     atkCd: 0, atkFx: 0, weaponName, dual, bowName, foundWeapons: [], weaponId: "", castT: 0, foundT: 0, armor: totalArmor(s), tr, searched: 0, shots: 0, kills: 0, found: 0, fx: [],
     ground, gid: ground.length + 1, proj: [], locks, doors, fort: null, keys: [...sv.keys], traps, trapFx: Object.fromEntries(trapsOwned(s).map(x => [x.id, trapEffect(s, x.id)])), dog, dogBond: s.pet?.bond ?? 0, dogMul: petMul(s), spell,
@@ -450,7 +482,9 @@ export function shootArrow(n: Scav, aim?: { dx: number; dy: number }): boolean {
   const tgt = n.foes.filter(f => f.climbT <= 0 && (f.x - n.px) * dir > 0 && Math.abs(f.x - n.px) <= 90 && (slope ? Math.abs(f.floor - (n.floor + slope * Math.abs(f.x - n.px))) <= 0.3 : f.floor === floor)).sort((a, b) => Math.abs(a.x - n.px) - Math.abs(b.x - n.px))[0];
   const endX = tgt ? tgt.x : n.px + dir * 90;
   n.fx.push({ k: "shot", from: n.px, to: endX, floor, ...(slope ? { toFloor: n.floor + slope * Math.abs(endX - n.px) } : {}) });
-  if (tgt) { const crit = n.rng.chance(8); hurtFoe(n, tgt, n.dmg * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); }
+  if (tgt) { const crit = n.rng.chance(8); const dm = n.dmg * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2); hurtFoe(n, tgt, dm, crit);
+    // Kömürleşmiş yay: ok ikinci bir düşmana sekip vurur
+    if (n.perks.includes("yay_sek")) { const nx = n.foes.filter(f => f !== tgt && f.floor === tgt.floor && f.climbT <= 0 && Math.abs(f.x - tgt.x) <= BOUNCE_RANGE).sort((a, b) => Math.abs(a.x - tgt.x) - Math.abs(b.x - tgt.x))[0]; if (nx) { n.fx.push({ k: "combo", tag: "Sekti!", x: nx.x, floor: nx.floor }); hurtFoe(n, nx, dm * BOUNCE_MUL, false); } } }
   return true;
 }
 /** Büyü bir düşmana değer: önce birleşik tepki (iletken, buhar, çatlama), sonra etki ve hasar. Kural engine/spellfx.ts'te. */
@@ -479,8 +513,13 @@ function explode(n: Scav, pj: Proj) {
 }
 
 /* ---------- arama, silah, baskın ---------- */
-function applyStage(n: Scav, sp: Spot, st: Stage) {
-  const at = { x: sp.x, floor: sp.floor };
+function applyStage(n: Scav, sp: Spot, st0: Stage) {
+  const at = { x: sp.x, floor: sp.floor }; let st = st0;
+  if (st.kind === "unique") {
+    n.foundT = 0.7; n.fx.push({ k: "combo", tag: st.spell ? "Eşsiz parşömen!" : "Eşsiz eşya!", ...at });
+    if (st.spell) { n.learned.push(st.spell); n.fx.push({ k: "loot", text: "Büyü parşömenini okudun", ...at }); return; }
+    st = { kind: "item", item: st.item, n: 1, time: st.time };   // eşya çantaya girer; yer yoksa yerde kalır (kaybolmaz)
+  }
   if (st.kind === "key") { n.keys.push(st.key!); n.fx.push({ k: "key", ...at }); return; }
   if (st.kind !== "empty") n.foundT = 0.7;
   if (st.kind === "empty") { n.fx.push({ k: "loot", text: "boş", ...at }); return; }
@@ -510,7 +549,7 @@ function alarm(n: Scav, f?: SFoe) {
 }
 function spawnRaid(n: Scav) {
   if (raidsLeft(n) <= 0) { n.raidT = Infinity; return; }
-  n.wave++; const count = Math.min(7, n.site.raidSize + n.wave - 1); const scale = 1 + n.wave * 0.1 + (n.site.tier - 1) * 0.08;
+  n.wave++; const count = Math.min(7, n.site.raidSize + n.wave - 1); const scale = 1 + n.wave * 0.1 + (n.site.tier - 1) * 0.08 + (n.level - 1) * 0.1;
   for (let i = 0; i < count; i++) {
     const def = n.site.foes[n.rng.int(0, n.site.foes.length - 1)]; const d = ENEMIES[def];
     const floor = n.rng.chance(60) ? n.floor : n.rng.int(0, n.site.floors - 1); const [lo, hi] = freeRange(n, floor); const x = n.rng.chance(50) ? hi - 6 - n.rng.next() * 30 : lo + 10 + n.rng.next() * 30;
@@ -630,7 +669,7 @@ export function stepScav(n: Scav, dt: number) {
   for (const f of [...n.foes]) {
     f.hitT = Math.max(0, f.hitT - dt); f.cd -= dt; if (f.wet) f.wet = Math.max(0, f.wet - dt); f.root = Math.max(0, f.root - dt); f.slow = Math.max(0, f.slow - dt);
     if (f.burn > 0) { f.burn -= dt; hurtFoe(n, f, n.dmg * 0.12 * dt, false, true); if (!n.foes.includes(f)) continue; }
-    if (f.idle) { if (f.floor === n.floor && Math.abs(f.x - n.px) <= (ruleOf(n) === "karanlik" ? 28 : 48) && !n.climbing) { f.idle = false; alarm(n, f); } else continue; }   // bekçi: yaklaşınca uyanır, ötekileri çağırır
+    if (f.idle) { if (f.floor === n.floor && Math.abs(f.x - n.px) <= (ruleOf(n) === "karanlik" ? 28 : 48) * (n.perks.includes("fener") ? 0.75 : 1) && !n.climbing) { f.idle = false; alarm(n, f); } else continue; }   // bekçi: yaklaşınca uyanır, ötekileri çağırır
     if (f.climbT > 0) { f.climbT -= dt; if (f.climbT <= 0) f.floor = f.toFloor; continue; }
     if (f.root > 0) continue;
     const sp = f.speed * (f.slow > 0 ? 0.45 : 1) * (ruleOf(n) === "camur" && f.floor === 0 ? 0.8 : 1);
@@ -674,13 +713,13 @@ export function stepScav(n: Scav, dt: number) {
     if (t) {
       const dist = Math.abs(t.x - n.px); const crit = n.rng.chance(8);
       if (n.bow && n.ammo > 0 && dist <= 80) { n.ammo--; n.shots++; n.atkCd = 1 / n.rate; n.atkFx = 0.25; n.face = t.x > n.px ? 1 : -1; n.fx.push({ k: "shot", from: n.px, to: t.x, floor: n.floor }); hurtFoe(n, t, n.dmg * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); }
-      else if (dist <= 8) { n.atkCd = n.dual ? 0.95 : 0.85; n.atkFx = 0.25; n.face = t.x > n.px ? 1 : -1; hurtFoe(n, t, n.melee * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); }
+      else if (dist <= 8) { n.atkCd = n.dual ? 0.95 : 0.85; n.atkFx = 0.25; n.face = t.x > n.px ? 1 : -1; hurtFoe(n, t, n.melee * (crit ? 1.8 : 1) * (0.9 + n.rng.next() * 0.2), crit); if (n.perks.includes("islatir") && n.foes.includes(t)) t.wet = WET_SECS; }
     }
   }
 }
 
 /* ---------- bitiş ---------- */
-export interface ScavResult { result: "exit" | "dead"; items: Record<string, number>; lostItems: Record<string, number>; money: number; dropped: Record<string, number>; minutes: number; gains: GainReport; kills: number; waves: number; searched: number; weaponParts: string[]; progress: { done: number; total: number } }
+export interface ScavResult { level: number; leveledUp?: number; learned: string[]; result: "exit" | "dead"; items: Record<string, number>; lostItems: Record<string, number>; money: number; dropped: Record<string, number>; minutes: number; gains: GainReport; kills: number; waves: number; searched: number; weaponParts: string[]; progress: { done: number; total: number } }
 /** Harabedeki ilerlemeyi kayda yazar: sandıklar, kapılar, anahtarlar, öldürülen bekçiler, yerde kalanlar. */
 function saveRun(s: GameState, n: Scav, dead: boolean) {
   const sv = harabeSave(s, n.site.id);
@@ -693,6 +732,9 @@ function saveRun(s: GameState, n: Scav, dead: boolean) {
 }
 export function finishScav(cfg: Config, s: GameState, n: Scav): ScavResult {
   const dead = n.result === "dead"; const gains: GainReport = {}; saveRun(s, n, dead);
+  // okunan parşömenler ölsen de bilgi olarak kalır; harabe tamamen boşaldıysa yeniden dolar ve bir seviye zorlaşır
+  const learned = n.learned.filter(id => discover(s, id));
+  const prog = siteProgress(s, n.site); let leveledUp: number | undefined; { const pr = prog; if (!dead && pr.done >= pr.total) { const sv = harabeSave(s, n.site.id); sv.level = n.level + 1; sv.stages = {}; sv.opened = []; sv.keys = []; sv.killed = []; leveledUp = sv.level; } }
   const items = dead ? {} : { ...n.bag }; const lostItems = dead ? { ...n.bag } : {}; const money = dead ? Math.floor(n.money / 2) : n.money;
   s.money += money; const dropped: Record<string, number> = {};
   for (const [k, v] of Object.entries(items)) { const d = addItem(cfg, s, k, v); if (d) dropped[k] = d; }
@@ -706,7 +748,7 @@ export function finishScav(cfg: Config, s: GameState, n: Scav): ScavResult {
   const k = 1.4 * n.tr.hp; s.hp = dead ? Math.max(1, Math.round(n.maxHp / k * 0.2)) : Math.max(1, Math.min(maxHp(cfg, s), Math.round(n.hp / k)));   // harabede can 1,4 kat (dayanmayla daha çok) ölçeklidir
   const minutes = Math.min(120, 20 + Math.round(n.time / 3)); s.minute = Math.min(DAY_MINUTES, s.minute + minutes);
   s.energy = Math.max(0, s.energy - SCAV_ENERGY - Math.min(12, n.wave * 2)); s.satiety = Math.max(0, s.satiety - 5);
-  return { result: n.result ?? "exit", items, lostItems, money, dropped, minutes, gains, kills: n.kills, waves: n.wave, searched: n.searched, weaponParts, progress: siteProgress(s, n.site) };
+  return { level: n.level, leveledUp, learned, result: n.result ?? "exit", items, lostItems, money, dropped, minutes, gains, kills: n.kills, waves: n.wave, searched: n.searched, weaponParts, progress: prog };
 }
 
 /** Harabede yara sar: önce çantadan, yoksa cebinden; can 1,4 kat ölçeklidir. */

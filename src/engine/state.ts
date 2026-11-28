@@ -52,7 +52,7 @@ export interface GameState {
   journey?: Journey;                           // süren yolculuk                           // süren gerçek zamanlı çalışma
   alerts?: Record<string, boolean>;            // gösterilmiş uyarılar (tekrar etmesin)
   olcer?: { solved: string[] };                 // çözülen Ölçer işleri (ısı bulmacası)
-  harabe?: Record<string, { stages: Record<number, number>; opened: number[]; keys: number[]; killed: number[]; ground: { item: string; x: number; floor: number }[] }>;   // harabelerde boşaltılan sandıklar, açılan kapılar, öldürülen bekçiler, yerde kalanlar
+  harabe?: Record<string, { stages: Record<number, number>; opened: number[]; keys: number[]; killed: number[]; ground: { item: string; x: number; floor: number }[]; doors?: Record<string, number>; level?: number }>;   // harabelerde boşaltılan sandıklar, açılan kapılar, öldürülen bekçiler, yerde kalanlar
   nightGains?: { day: number; gains: Record<string, number> }; // son uykuda işlenen gelişme (sabah Vücut'ta parlar)
   prep?: Record<string, { day: number; scout?: boolean; readWind?: boolean }>; // savaş öncesi yapılmış keşifler
   seen?: string[];                             // haritada açılmış yerler (yoksa hepsi açık: eski kayıt)
